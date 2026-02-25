@@ -1,7 +1,7 @@
 import { createSignal, createMemo, onMount, For, Index } from 'solid-js'
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
-import { saveEvent, listEvents } from './db'
+import { saveEvent, listEvents, setSelectedParticipant } from './db'
 import Win95Field from './components/Win95Field'
 import MineIcon from './icons/MineIcon'
 import FlagIcon from './icons/FlagIcon'
@@ -51,6 +51,7 @@ export default function Landing(props: Props) {
   const [timeStart, setTimeStart] = createSignal('10:00')
   const [timeEnd, setTimeEnd] = createSignal('18:00')
   const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   onMount(async () => {
     const events = await listEvents()
@@ -120,6 +121,7 @@ export default function Landing(props: Props) {
       delete next[ds]
       setSelectedDates(next)
     } else {
+      if (Object.keys(cur).length >= 7) return
       setSelectedDates({ ...cur, [ds]: true })
     }
   }
@@ -173,6 +175,7 @@ export default function Landing(props: Props) {
         })),
     }
     await saveEvent(event)
+    await setSelectedParticipant(event.id, participantNames[0])
     props.onOpenEvent(event.id)
   }
 
@@ -251,7 +254,7 @@ export default function Landing(props: Props) {
         </div>
 
         <div class="field">
-          <label>What times might work?</label>
+          <label>What times might work? ({localTimezone})</label>
           <div class="time-range">
             <Win95Field
               kind="select"
@@ -358,8 +361,6 @@ export default function Landing(props: Props) {
 
       <div class="footer">
         No accounts | No tracking | Works offline
-        <br />
-        Timezones handled automatically
         <br />
         <span class="footer-links">
           timesweeper.app | <a href="#">About</a>

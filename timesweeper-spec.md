@@ -471,7 +471,7 @@ The homepage IS the create form. No marketing page, no "Get started" — you lan
 3. **Create form** (sunken panel):
    - Event name input (beveled sunken, system font 12px)
    - Calendar date picker: 7-day grid, month/year header with `<` `>` nav, click to select dates (max 7 free plan). Selected dates highlighted with navy background.
-   - Time range label: "What times might work? [CET]" — the detected timezone shown in brackets next to the label, auto-detected from browser. Two beveled dropdown selects (start/end). Default 2:00 PM – 10:00 PM.
+   - Time range label: "What times might work?" Two beveled dropdown selects (start/end). Default 2:00 PM – 10:00 PM.
    - Participant names: list of beveled text inputs. Each has an `x` remove button. "Add participant" raised button below. Max 5 free plan.
    - `Create Event` raised button (full width, system font 12px, bold)
 4. **How it works** (sunken panel, VT323 heading):
@@ -543,7 +543,7 @@ The selected name loads that person's availability into the editing grid instant
 ```
 Each state shown as a mini cell with the actual bevel styling. The cycle is closed (repeats "no" at end) to make the infinite loop obvious.
 
-**"Your availability" header:** Collapsible accordion header above the grid: `▾ Your availability [CET]` — the participant's detected timezone shown in brackets. Click to collapse/expand. Triangle flips to `▸` when collapsed.
+**"Your availability" header:** Collapsible accordion header above the grid: `▾ Your availability (America/Lima)` — the selected participant timezone shown in brackets. This is the only timezone shown in the UI. Click to collapse/expand. Triangle flips to `▸` when collapsed.
 
 #### Heatmap (Group Availability)
 
@@ -618,7 +618,7 @@ Two segments (sunken-thin):
 - Left: `Editing: [name]` when a name is selected, or `No participants yet` when none. If a time has been confirmed, appends ` | Confirmed | [label]`. Temporary flash messages (e.g., `Link copied to clipboard`) replace the left segment for 2 seconds, then revert.
 - Right: `timesweeper.app`
 
-Timezone badge next to the name (`Jamie (EST)`) is deferred with the timezone feature.
+Timezone is shown only in the "Your availability (Timezone)" header.
 
 #### Function Bar
 
@@ -636,7 +636,6 @@ When someone opens a TimeSweeper link, they see:
 - Event name + date summary
 - Name picker: list of participant names. Tap yours. Names already visited show ✓.
 - `"+ I'm someone else"` button to add a new name
-- Detected timezone shown, with a change link
 - Selecting a name immediately loads the grid (Screen 2)
 
 ### Screen 4: Confirmed State
@@ -647,13 +646,13 @@ Currently: the confirmed slot label is stored in state and shown in the status b
 
 **Surface 1 — Notification bar:** A full-width bar appears between the control deck and the content panels. Yellow background (`#ffff80`), Win95 bevel border (sunken), containing `✔ Confirmed: [day] [time]` on the left and a dismissible `×` button on the right. Appears immediately on confirm, persists until dismissed or unconfirmed. This gives the attention-grabbing signal without blocking the rest of the UI.
 
-**Surface 2 — Suggestions panel transforms:** The "Results" sub-panel header changes to `✔ Confirmed` and its body swaps from the ranked suggestion list to a focused confirmed-time display: the day and time in large `VT323` text, per-participant timezone translations below, and an "Unconfirm" button at the bottom. The panel reverts to the normal suggestions list if unconfirmed.
+**Surface 2 — Suggestions panel transforms:** The "Results" sub-panel header changes to `✔ Confirmed` and its body swaps from the ranked suggestion list to a focused confirmed-time display: the day and time in large `VT323` text, plus an "Unconfirm" button at the bottom. The panel reverts to the normal suggestions list if unconfirmed.
 
 Both surfaces reinforce the same state. The notification bar is the immediate alert; the panel transformation is the persistent record. The grid and group heatmap remain fully functional below for reference or re-deciding.
 
 Planned additional actions in the transformed panel:
 - Add to calendar (.ics download) button
-- Copy summary button → formatted multi-timezone text for pasting in group chat
+- Copy summary button → formatted confirmed-time text for pasting in group chat
 - Undo/Unconfirm button (anyone can unconfirm — same permissive philosophy)
 
 **The "Who Decides" Philosophy:** Anyone can confirm. No admin role. In friend groups, whoever gets tired of waiting picks the green slot. In professional settings, it's usually the creator. Confirmation is reversible — anyone can undo and pick a different time. Starting permissive matches the trust model.
@@ -730,7 +729,7 @@ These decisions were made through iterative HTML prototyping and are final:
 6. **Jamie (NYC)** taps the link on phone. Sees name list, taps "Jamie". TZ auto-detected as EST. Grid shows times in EST. Fills in availability. Sees Alex's heatmap overlaid.
 7. **Sam (Tokyo)** opens link next morning. Taps "Sam". Sees JST times. Fills in. Heatmap updates.
 8. Li and Max fill in over the next day.
-9. **Anyone** opens results, sees timezone overlap bar + best times with TZ sanity warnings ("5 AM for Sam" flagged).
+9. **Anyone** opens results, sees best times ranked by shared availability.
 10. Jamie taps the top suggestion, confirms it. Event page now shows "✅ Tue 2:30 PM EST / 8:30 PM CET / Wed 4:30 AM JST".
 11. Everyone downloads .ics or copies summary to Telegram.
 
@@ -753,13 +752,10 @@ These decisions were made through iterative HTML prototyping and are final:
 ### Step 1: Build from Prototypes
 The grid interaction (v8 prototype) and landing page prototype are complete as single-file HTML. Next: extract into component architecture (SolidJS/Preact), wire up IndexedDB, implement real timezone conversion.
 
-### Step 2: Timezone Overlap Visualizer
-Standalone component: input list of timezones, output bar showing where everyone's reasonable hours overlap. This is the "aha moment" for Use Case A.
-
-### Step 3: UTC Conversion + Cross-TZ Grid
+### Step 2: UTC Conversion + Cross-TZ Grid
 Prove that the grid works across timezones: Alex picks "Tuesday 8pm" in CET, Jamie opens the same event and sees "Tuesday 2pm" in EST. The heatmap is consistent for both viewers.
 
-### Step 4: Wire Up Sync + Ship
+### Step 3: Wire Up Sync + Ship
 Minimal backend, WebSocket sync, offline queue. Deploy, test with actual friend group. Iterate.
 
 ---

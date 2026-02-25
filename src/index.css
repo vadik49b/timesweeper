@@ -234,7 +234,7 @@ body {
 }
 
 .grid-controls__name {
-  text-decoration: underline;
+  font-weight: bold;
 }
 
 .grid-view__deck {
@@ -579,6 +579,29 @@ body {
   font-size: 14px;
   padding: 4px 2px;
 }
+.confirmed-box {
+  margin: 0 2px 8px;
+  padding: 5px 6px;
+}
+.confirmed-box__title {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 3px;
+}
+.confirmed-box__line {
+  font-size: 12px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+.confirmed-box__actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.confirmed-box__actions .win95-button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
 .results__empty {
   font-size: 14px;
   color: #808080;
@@ -599,6 +622,10 @@ body {
 }
 .results__line {
   line-height: 1.2;
+}
+.results__rank {
+  display: inline-block;
+  min-width: 14px;
 }
 .results__breakdown {
   font-size: 12px;
@@ -710,6 +737,9 @@ body {
   padding-bottom: 2px;
 }
 .participant-picker__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   width: auto;
   min-width: fit-content;
   text-align: center;

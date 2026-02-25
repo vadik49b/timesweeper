@@ -91,7 +91,7 @@ Sync blob per participant:
 - **Event creation:** name, date picker (max 7-day span free), time range (default 8h, 30-min slots), participant names → shareable link
 - **Participant experience:** open link → name list → tap yours (or add yourself) → can switch name anytime
 - **Grid:** mobile-first, tap-to-cycle (empty→yes→maybe→empty), long-press-drag for bulk, undo button, 44px+ touch targets, haptic feedback, past dates grayed out
-- **Timezone:** auto-detect, per-person badge, all times in local zone, timezone overlap bar
+- **Timezone:** auto-detect, displayed only in the "Your availability (Timezone)" header
 - **Live heatmap:** real-time updates, always on
 - **Focus mode:** checkbox hides group heatmap while editing; your edits still flow live
 - **Three-state availability:** yes=1pt / maybe=0.5pt / no=0pt
@@ -272,7 +272,7 @@ Native Win95 `<select>` dropdown — not chips, not custom. Beveled sunken frame
 ```
 Each state shown as a mini cell with actual bevel styling. Repeated "no" at end makes the infinite loop explicit.
 
-**"Your availability" header:** Collapsible accordion: `▾ Your availability`. Triangle flips to `▸` when collapsed.
+**"Your availability" header:** Collapsible accordion: `▾ Your availability (America/Lima)`. Triangle flips to `▸` when collapsed.
 
 #### Heatmap (Group Availability)
 
@@ -355,7 +355,7 @@ Each clickable. Hotkey letter underlined. Hover: navy background + white text.
 - Event name + date summary
 - Name picker list. Tap yours. Visited names show ✓.
 - `"+ I'm someone else"` button to add a new name
-- Detected timezone shown with change link
+- Timezone shown only in the "Your availability (Timezone)" header
 - Selecting a name immediately loads Screen 2
 
 ---
@@ -364,7 +364,7 @@ Each clickable. Hotkey letter underlined. Hover: navy background + white text.
 
 - `✅ Confirmed: Tuesday 3:00 PM EST / 9:00 PM CET / Wed 4:00 AM JST`
 - Add to calendar (.ics download) button
-- Copy summary button → formatted multi-timezone text
+- Copy summary button → confirmed-time text
 - Undo confirmation button (anyone can undo — permissive model)
 - Grid and results remain visible below
 

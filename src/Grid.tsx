@@ -69,7 +69,6 @@ export default function Grid(props: Props) {
     return ev.participants.map((p) => ({ key: p.name, label: p.name }))
   })
 
-  const [focusMode, setFocusMode] = createSignal(false)
   const [editCollapsed, setEditCollapsed] = createSignal(false)
   const [bestCollapsed, setBestCollapsed] = createSignal(false)
   const [groupCollapsed, setGroupCollapsed] = createSignal(false)
@@ -80,7 +79,6 @@ export default function Grid(props: Props) {
   const [confirmTime, setConfirmTime] = createSignal('')
   const [statusFlash, setStatusFlash] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
-  const [confirmedSlotLabel, setConfirmedSlotLabel] = createSignal('')
 
   // Non-reactive drag state
   let dragging = false
@@ -90,6 +88,23 @@ export default function Grid(props: Props) {
   let undoStack: UndoEntry[][] = []
   let statusTimer: ReturnType<typeof setTimeout> | null = null
   let shareInputRef!: HTMLInputElement
+
+  function addMinutes(hhmm: string, minutes: number) {
+    const [h, m] = hhmm.split(':').map(Number)
+    const total = h * 60 + m + minutes
+    const wrapped = ((total % 1440) + 1440) % 1440
+    const oh = Math.floor(wrapped / 60)
+    const om = wrapped % 60
+    return `${String(oh).padStart(2, '0')}:${String(om).padStart(2, '0')}`
+  }
+
+  function toUtcStamp(ds: string, hhmm: string) {
+    const [y, m, d] = ds.split('-').map(Number)
+    const [h, mm] = hhmm.split(':').map(Number)
+    const dt = new Date(Date.UTC(y, m - 1, d, h, mm, 0))
+    const stamp = dt.toISOString().replace(/[-:]/g, '')
+    return stamp.slice(0, 15) + 'Z'
+  }
 
   // --- Logic ---
   function heat(dk: string, ti: number) {
@@ -193,18 +208,6 @@ export default function Grid(props: Props) {
     persistCurrentSlots()
   }
 
-  function toggleFocus() {
-    const next = !focusMode()
-    setFocusMode(next)
-    if (next) {
-      setBestCollapsed(true)
-      setGroupCollapsed(true)
-    } else {
-      setBestCollapsed(false)
-      setGroupCollapsed(false)
-    }
-  }
-
   function openConfirm(day: string | null, time: string | null) {
     setConfirmDay(day ?? days()[0]?.label ?? '')
     setConfirmTime(time ?? times()[0]?.label ?? '')
@@ -212,8 +215,33 @@ export default function Grid(props: Props) {
   }
 
   function doConfirm() {
+    const ev = event()
+    if (!ev) return
+    const day = days().find((d) => d.label === confirmDay())
+    const time = times().find((t) => t.label === confirmTime())
+    if (!day || !time) return
+    const updated: AppEvent = {
+      ...ev,
+      status: 'confirmed',
+      confirmedSlot: {
+        date: day.key,
+        startTime: time.value,
+        endTime: addMinutes(time.value, 30),
+      },
+    }
+    void saveEvent(updated)
+    setEvent(updated)
+    flashStatus('Confirmed time updated')
     setDialog(null)
-    setConfirmedSlotLabel(`${confirmDay()} ${confirmTime()}`)
+  }
+
+  function undoConfirmedTime() {
+    const ev = event()
+    if (!ev) return
+    const updated: AppEvent = { ...ev, status: 'open', confirmedSlot: undefined }
+    void saveEvent(updated)
+    setEvent(updated)
+    flashStatus('Confirmation removed')
   }
 
   function closeOpenDialog() {
@@ -251,6 +279,70 @@ export default function Grid(props: Props) {
     } else {
       setCopyStatus('Select and press Command+C')
     }
+  }
+
+  const currentParticipant = createMemo(() =>
+    event()?.participants.find((p) => p.name === currentName()),
+  )
+  const currentTimezone = createMemo(
+    () => currentParticipant()?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+  )
+
+  const confirmedInfo = createMemo(() => {
+    const ev = event()
+    if (!ev || ev.status !== 'confirmed' || !ev.confirmedSlot) return null
+    const dayLabel = formatDateLabel(ev.confirmedSlot.date)
+    const start = times().find((t) => t.value === ev.confirmedSlot!.startTime)?.label ?? ev.confirmedSlot.startTime
+    return {
+      dayLabel,
+      start,
+      slot: ev.confirmedSlot,
+    }
+  })
+
+  const confirmedSummary = createMemo(() => {
+    const info = confirmedInfo()
+    if (!info) return ''
+    return `Confirmed: ${info.dayLabel} ${info.start}`
+  })
+
+  async function copyConfirmedSummary() {
+    const summary = confirmedSummary()
+    if (!summary) return
+    try {
+      await navigator.clipboard.writeText(summary)
+      flashStatus('Summary copied')
+    } catch {
+      flashStatus('Copy failed')
+    }
+  }
+
+  function downloadIcs() {
+    const info = confirmedInfo()
+    const ev = event()
+    if (!info || !ev) return
+    const dtStart = toUtcStamp(info.slot.date, info.slot.startTime)
+    const dtEnd = toUtcStamp(info.slot.date, info.slot.endTime)
+    const payload = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//TimeSweeper//EN',
+      'BEGIN:VEVENT',
+      `UID:${ev.id}@timesweeper.app`,
+      `DTSTAMP:${toUtcStamp(info.slot.date, info.slot.startTime)}`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      `SUMMARY:${ev.name}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n')
+    const blob = new Blob([payload], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${ev.name.replace(/\s+/g, '-').toLowerCase() || 'timesweeper'}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   async function selectParticipant(name: string) {
@@ -317,8 +409,7 @@ export default function Grid(props: Props) {
   const statusLeft = createMemo(() => {
     if (statusFlash()) return statusFlash()
     const parts = [currentName() ? `Editing: ${currentLabel()}` : 'No participants yet']
-    if (focusMode()) parts.push('Focus ON')
-    if (confirmedSlotLabel()) parts.push(`Confirmed | ${confirmedSlotLabel()}`)
+    if (confirmedInfo()) parts.push(`Confirmed | ${confirmedInfo()!.dayLabel} ${confirmedInfo()!.start}`)
     return parts.join(' | ')
   })
 
@@ -362,17 +453,9 @@ export default function Grid(props: Props) {
         e.preventDefault()
         doUndo()
       }
-      if (e.key === 'F2') {
-        e.preventDefault()
-        toggleFocus()
-      }
       if (e.key === 'u' || e.key === 'U') {
         e.preventDefault()
         doUndo()
-      }
-      if (e.key === 'f' || e.key === 'F') {
-        e.preventDefault()
-        toggleFocus()
       }
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
@@ -417,7 +500,7 @@ export default function Grid(props: Props) {
     })
   })
 
-  const MEDALS = ['🥇', '🥈', '🥉']
+  const RANKS = ['1.', '2.', '3.']
 
   return (
     <div class="grid-view">
@@ -459,7 +542,6 @@ export default function Grid(props: Props) {
                 </Win95Button>
               </div>
             </div>
-
             {/* Two-panel layout */}
             <div class="grid-view__panels">
               {/* Panel: Your availability */}
@@ -467,7 +549,7 @@ export default function Grid(props: Props) {
                 <div class="grid-view__panel-frame s">
                   <div class="grid-view__panel-header" onClick={() => setEditCollapsed(!editCollapsed())}>
                     <div class="grid-view__panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
-                    <span>Your availability</span>
+                    <span>Your availability ({currentTimezone()})</span>
                     <hr />
                   </div>
                   <Show when={!editCollapsed()}>
@@ -535,6 +617,17 @@ export default function Grid(props: Props) {
                   </div>
                   <Show when={!bestCollapsed()}>
                     <div class="grid-view__panel-body">
+                      <Show when={confirmedInfo()}>
+                        <div class="confirmed-box s">
+                          <div class="confirmed-box__title">Confirmed time</div>
+                          <div class="confirmed-box__line">{confirmedSummary()}</div>
+                          <div class="confirmed-box__actions">
+                            <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
+                            <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
+                            <Win95Button onClick={undoConfirmedTime}>Undo</Win95Button>
+                          </div>
+                        </div>
+                      </Show>
                       <Show
                         when={canShowSuggestions()}
                         fallback={
@@ -578,8 +671,8 @@ export default function Grid(props: Props) {
                                     classList={{ 'results__row': true, 'results__row--best': i() === 0 }}
                                   >
                                     <div class="results__main">
-                                      <div class="results__line">
-                                        {MEDALS[i()]}{' '}
+                                    <div class="results__line">
+                                        <span class="results__rank">{RANKS[i()]}</span>{' '}
                                         <b>
                                           {slot.day} {slot.time}
                                         </b>{' '}
@@ -696,9 +789,6 @@ export default function Grid(props: Props) {
               <div class="grid-view__function-item" onClick={doUndo}>
                 <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
               </div>
-              <div class="grid-view__function-item" onClick={toggleFocus}>
-                <span class="grid-view__function-key">F2</span> <span class="hk">F</span>ocus
-              </div>
               <div class="grid-view__function-item" onClick={openShareDialog}>
                 <span class="grid-view__function-key">F3</span> <span class="hk">S</span>hare
               </div>
@@ -717,7 +807,7 @@ export default function Grid(props: Props) {
           <div class="dialog-overlay">
             <div class="dialog dialog--name-picker r">
               <div class="win95-window__title-bar">
-                <span>Pick Your Name</span>
+                <span>Choose participant</span>
                 <div class="win95-window__title-buttons">
                   <div class="win95-window__title-button r" onClick={() => setShowNamePicker(false)}>
                     ×
@@ -725,7 +815,7 @@ export default function Grid(props: Props) {
                 </div>
               </div>
               <div class="dialog-body">
-                <p class="participant-picker__lead">Choose your name to start editing availability.</p>
+                <p class="participant-picker__lead">Choose your participant name to start editing availability.</p>
                 <div class="participant-picker__list">
                   <For each={event()!.participants}>
                     {(p) => (
@@ -815,7 +905,7 @@ export default function Grid(props: Props) {
                   <b>How to use TimeSweeper:</b>
                 </p>
                 <p class="help__step">
-                  <b>1.</b> Pick your name from the dropdown
+                  <b>1.</b> Click <b>Switch...</b> and pick your participant name
                 </p>
                 <p class="help__step">
                   <b>2.</b> Click a cell to mark availability:
@@ -838,8 +928,6 @@ export default function Grid(props: Props) {
                   <b>Keyboard shortcuts:</b>
                   <br />
                   <span class="help__key-line">F1 / U — Undo</span>
-                  <br />
-                  <span class="help__key-line">F2 / F — Focus mode</span>
                   <br />
                   <span class="help__key-line">S — Share link</span>
                   <br />
