@@ -143,17 +143,9 @@ When2Meet's timezone dropdown mixes city names with country names with abbreviat
 - **Timezone overlap visualizer** — a simple bar showing each participant's "reasonable hours" with the overlap highlighted. This is the "aha" feature for international friend groups.
 - Override timezone only if auto-detect is wrong (searchable picker, not a 200-item dropdown)
 
-### 3. Always Live + Focus Mode
+### 3. Always Live
 
 The heatmap is **always live** — real-time updates as people fill in, same as When2Meet. This is the correct default.
-
-But the research found an anchoring problem: later respondents gravitate toward the first person's green blocks instead of honestly reporting their full availability. Rather than hiding data *from* others (blind mode), the fix is letting participants hide others' data *from themselves* while editing:
-
-- **Checkbox above the grid: "Focus mode"** (or "Show only my availability") — hides the group heatmap overlay while you edit. You see only your own cells on a clean grid.
-- Uncheck when done → the full heatmap appears with your data already included.
-- Your data flows into the live heatmap for everyone else in real-time regardless — focus mode only affects *your* view.
-- Per-participant, per-session. Not a creator setting. Zero friction.
-- This solves the anchoring bias without adding complexity: people who don't care just ignore the checkbox and edit with the heatmap visible (the default).
 
 ### 4. Three-State Availability
 
@@ -271,7 +263,6 @@ Event {
   - All times in your local zone
   - Timezone overlap bar
 - **Live heatmap** — always on, real-time updates
-- **Focus mode checkbox** — hide group heatmap while editing, see only your cells
 - **Three-state availability** — yes / if-needed / no
 - **Offline-first:** Service Worker + IndexedDB, sync when online
 - **PWA installable**
@@ -462,9 +453,8 @@ Inspired by MS-DOS menu bars (`[F]ile [E]dit [V]iew`), primary actions highlight
 
 Applied across the app:
 
-- Grid menu bar: `Game · View · Help`
-- Grid function bar: `F1 Undo · F2 Focus · F3 Share · F5 Confirm`
-- Keyboard: `U`=undo, `F`=focus, `S`=share, `Ctrl+Z`=undo
+- Grid function bar: `F1 Undo · F3 Share · F5 Confirm`
+- Keyboard: `U`=undo, `S`=share, `Ctrl+Z`=undo
 
 ---
 
@@ -481,7 +471,7 @@ The homepage IS the create form. No marketing page, no "Get started" — you lan
 3. **Create form** (sunken panel):
    - Event name input (beveled sunken, system font 12px)
    - Calendar date picker: 7-day grid, month/year header with `<` `>` nav, click to select dates (max 7 free plan). Selected dates highlighted with navy background.
-   - Time range: two beveled dropdown selects (start/end). Default 2:00 PM – 10:00 PM.
+   - Time range label: "What times might work? [CET]" — the detected timezone shown in brackets next to the label, auto-detected from browser. Two beveled dropdown selects (start/end). Default 2:00 PM – 10:00 PM.
    - Participant names: list of beveled text inputs. Each has an `x` remove button. "Add participant" raised button below. Max 5 free plan.
    - `Create Event` raised button (full width, system font 12px, bold)
 4. **How it works** (sunken panel, VT323 heading):
@@ -510,48 +500,17 @@ This is the minesweeper board. A full Win95 window with menu bar, control bar, e
 
 #### Window Structure
 
-```
-┌─ Title Bar ────────────────────────────┐
-│ [mine] TimeSweeper — "Event Name"      │
-├─ Menu Bar ─────────────────────────────┤
-│ Game   View   Help                     │
-├─ Control Bar (sunken) ─────────────────┤
-│ [Name dropdown ▼]        [Share btn]   │
-├─ Layout Container ─────────────────────┤
-│                                        │
-│  ┌─ ▾ Your availability ────────────┐  │
-│  │ Legend: □ no → ✔ yes → ? maybe   │  │
-│  │                                  │  │
-│  │  [Time grid with minesweeper     │  │
-│  │   cells]                         │  │
-│  └──────────────────────────────────┘  │
-│                                        │
-│  ┌─ ▾ Results · 3/5 participants ───┐  │
-│  │ 🥇 Tue 3:00  3/3  [Confirm]     │  │
-│  │ 🥈 Wed 4:30  2.5/3              │  │
-│  │ 🥉 Tue 4:00  2/3                │  │
-│  │ Pick a different time...         │  │
-│  ├──────────────────────────────────┤  │
-│  │ ▾ Group availability             │  │
-│  │ [Mini heatmap grid with          │  │
-│  │  minesweeper-colored numbers]    │  │
-│  └──────────────────────────────────┘  │
-│                                        │
-├─ Status Bar ───────────────────────────┤
-│ Editing: Jamie (EST)  │  timesweeper.. │
-├─ Function Bar ─────────────────────────┤
-│ F1 Undo  F2 Focus  F3 Share  F5 Conf  │
-└────────────────────────────────────────┘
-```
+Top to bottom: title bar → control deck → two-panel content area (side-by-side on ≥700px, stacked on mobile) → status bar → function bar. The window is a centered `max-width: 900px` Win95-styled box on the teal desktop background. The two content panels are "Your availability" (left) and "Results + Group availability" (right, stacked vertically within the panel).
 
-#### Name Selector
+**Planned layout upgrade — IE5 intranet app style:** The floating-dialog-on-teal look is a known weakness. The target is a full-viewport layout: the window fills `100vh`, the title bar is pinned to the top of the browser, the status/function bars are pinned to the bottom, and the content area scrolls between them. The window acts like a real application rather than a dialog on a desktop. The teal background becomes invisible on normal screens. Max-width constraint stays for readability on wide monitors.
 
-**Win95 native `<select>` dropdown** — not chips, not a custom component. Beveled sunken frame with a raised `▼` arrow button. Options:
+#### Name Selector / Control Deck
 
-- Participant names with timezone: `"Jamie (EST)"`, `"Alex (CET)"`, `"Sam (JST)"`
-- Last option: `"+ Add yourself..."` — triggers a prompt for name entry
+The control deck (sunken bevel panel) sits below the title bar and spans the full width. Left side shows `Hi [name]!` with a `Switch...` button. Right side shows `Share` and `Help` buttons.
 
-Selecting a name loads that person's availability into the editing grid. Name switch is instant.
+Clicking `Switch...` opens the **name picker dialog** — a Win95 modal with a list of participant name buttons (tap one to select) and, below the list, an "I'm not in the list" label + text input + "Add participant" button for joining as a new person. Closing the dialog without picking a name is allowed if a name was already selected; on first visit the dialog auto-opens and cannot be dismissed without selecting a name.
+
+The selected name loads that person's availability into the editing grid instantly.
 
 #### Grid Interaction (Minesweeper-Native)
 
@@ -584,7 +543,7 @@ Selecting a name loads that person's availability into the editing grid. Name sw
 ```
 Each state shown as a mini cell with the actual bevel styling. The cycle is closed (repeats "no" at end) to make the infinite loop obvious.
 
-**"Your availability" header:** Collapsible accordion header above the grid: `▾ Your availability` — click to collapse/expand. Triangle flips to `▸` when collapsed.
+**"Your availability" header:** Collapsible accordion header above the grid: `▾ Your availability [CET]` — the participant's detected timezone shown in brackets. Click to collapse/expand. Triangle flips to `▸` when collapsed.
 
 #### Heatmap (Group Availability)
 
@@ -618,24 +577,10 @@ Sits **above** the Group availability heatmap (inside the same collapsible conta
 - **Mobile (<700px):** Stack vertically
 - **Accordion collapse:** All panels independently collapsible by clicking their headers. Saves scrolling on mobile.
 
-#### Focus Mode
-
-Toggle via F2 key or function bar button. When active:
-- Results and Group availability panels auto-collapse
-- Status bar shows `🔒 Focus ON`
-- Only your editing grid is visible — zero anchoring bias from others' data
-- Your edits still flow to the live heatmap for everyone else in real-time
-
-#### Menu Bar
-
-Three items, DOS hotkey style:
-- **Game** — event management actions (future: new event, recent events)
-- **View** — toggle focus mode, toggle panels
-- **Help** — opens the help dialog
 
 #### Help Dialog
 
-A Win95 modal dialog box. Title bar: "How to use TimeSweeper". Content: 6 numbered steps:
+Opened from the `Help` button in the control deck. A Win95 modal dialog. Title bar: "Help — TimeSweeper". Content: 6 numbered steps:
 
 1. Pick your name from the dropdown
 2. Click cells to mark availability (shows the visual cycle: □→✔→?→□)
@@ -670,20 +615,20 @@ A single dialog serves both "confirm a suggested best time" and "pick a differen
 #### Status Bar
 
 Two segments (sunken-thin):
-- Left: `Editing: Jamie (EST)` or `🔒 Focus ON` or `✅ Confirmed | Tue 3:00`
+- Left: `Editing: [name]` when a name is selected, or `No participants yet` when none. If a time has been confirmed, appends ` | Confirmed | [label]`. Temporary flash messages (e.g., `Link copied to clipboard`) replace the left segment for 2 seconds, then revert.
 - Right: `timesweeper.app`
 
-Temporary messages (e.g., `Link copied to clipboard`) display in the left segment for 2 seconds, then revert.
+Timezone badge next to the name (`Jamie (EST)`) is deferred with the timezone feature.
 
 #### Function Bar
 
-Bottom of the window, thin border-top separator. Four items:
+Bottom of the window, thin border-top separator. Three items:
 
 ```
-F1 Undo  |  F2 Focus  |  F3 Share  |  F5 Confirm
+F1 Undo  |  F3 Share  |  F5 Confirm
 ```
 
-Each is clickable. Hotkey letter underlined. Hover: navy background + white text (Win95 menu highlight).
+Each is clickable. Hotkey letter underlined.
 
 ### Screen 3: Participant Landing (from shared link)
 
@@ -696,12 +641,20 @@ When someone opens a TimeSweeper link, they see:
 
 ### Screen 4: Confirmed State
 
-After someone confirms a time, the event page shows:
-- `✅ Confirmed: Tuesday 3:00 PM EST / 9:00 PM CET / Wed 4:00 AM JST`
+Currently: the confirmed slot label is stored in state and shown in the status bar as `Confirmed | [label]`. The grid and results panels remain unchanged.
+
+**Planned confirmed UI — two-surface approach:**
+
+**Surface 1 — Notification bar:** A full-width bar appears between the control deck and the content panels. Yellow background (`#ffff80`), Win95 bevel border (sunken), containing `✔ Confirmed: [day] [time]` on the left and a dismissible `×` button on the right. Appears immediately on confirm, persists until dismissed or unconfirmed. This gives the attention-grabbing signal without blocking the rest of the UI.
+
+**Surface 2 — Suggestions panel transforms:** The "Results" sub-panel header changes to `✔ Confirmed` and its body swaps from the ranked suggestion list to a focused confirmed-time display: the day and time in large `VT323` text, per-participant timezone translations below, and an "Unconfirm" button at the bottom. The panel reverts to the normal suggestions list if unconfirmed.
+
+Both surfaces reinforce the same state. The notification bar is the immediate alert; the panel transformation is the persistent record. The grid and group heatmap remain fully functional below for reference or re-deciding.
+
+Planned additional actions in the transformed panel:
 - Add to calendar (.ics download) button
 - Copy summary button → formatted multi-timezone text for pasting in group chat
-- Undo confirmation button (anyone can undo — same permissive philosophy)
-- The grid and results remain visible below for re-deciding
+- Undo/Unconfirm button (anyone can unconfirm — same permissive philosophy)
 
 **The "Who Decides" Philosophy:** Anyone can confirm. No admin role. In friend groups, whoever gets tired of waiting picks the green slot. In professional settings, it's usually the creator. Confirmation is reversible — anyone can undo and pick a different time. Starting permissive matches the trust model.
 
@@ -734,7 +687,7 @@ These decisions were made through iterative HTML prototyping and are final:
 
 7. **Drag paints a single target state.** The first cell clicked determines the target state. All subsequent cells in the drag get that same state. This prevents accidental cycling during drag.
 
-8. **Name selector is a native Win95 `<select>`.** Not chips, not a custom dropdown. The beveled frame with `▼` arrow button. Last option is always `"+ Add yourself..."`.
+8. **Name selector is a "Hi [name]! Switch..." control deck pattern.** Not a native `<select>`. The control deck shows the current name inline and a `Switch...` button that opens a name picker dialog. The dialog lists participant name buttons (tap to select) and an "I'm not in the list" input + "Add participant" button for new participants.
 
 9. **Share feedback goes in the status bar.** No toasts, no modals for clipboard confirmation. The status bar shows "Link copied to clipboard" for 2 seconds. This is the most Win95-native feedback pattern.
 
@@ -744,7 +697,6 @@ These decisions were made through iterative HTML prototyping and are final:
 
 12. **Desktop: side-by-side. Mobile: stacked.** At ≥700px, the two panels sit in a horizontal flex row. Below that, they stack vertically.
 
-13. **Focus mode collapses both Results and Group panels.** Not just a visual toggle — it actively hides the other panels so you can't even scroll to them. Pure editing surface.
 
 14. **Legend closes the loop visually.** `□ no → ✔ yes → ? maybe → □ no` — the repeated "no" at the end makes the infinite cycle obvious without explanation.
 
@@ -760,6 +712,10 @@ These decisions were made through iterative HTML prototyping and are final:
 
 20. **Landing page uses Win95 system fonts at Win95 scale.** 10–13px body text. VT323 only for brand name and section headings. Everything else is Segoe UI / Tahoma / MS Sans Serif.
 
+21. **Confirmed state uses two surfaces.** A notification bar (yellow, full-width, Win95 bevel) appears between the control deck and content panels showing the confirmed slot label. Simultaneously, the Suggestions panel header and body transform to display the confirmed time prominently. Both surfaces revert on unconfirm.
+
+22. **The grid page is a full-viewport application, not a floating dialog.** The window fills `100vh`. Title bar pins to top. Status and function bars pin to bottom. Content scrolls between them. Teal background is structural but invisible on normal screens. Floating-on-teal is rejected as too dialog-like for a primary app screen.
+
 ---
 
 ## User Journeys
@@ -771,7 +727,7 @@ These decisions were made through iterative HTML prototyping and are final:
 3. Adds names: Alex, Jamie, Sam, Li, Max
 4. Creates event, copies link, pastes in Telegram group
 5. Picks "Alex", fills in availability on the grid. Times shown in CET.
-6. **Jamie (NYC)** taps the link on phone. Sees name list, taps "Jamie". TZ auto-detected as EST. Grid shows times in EST. Fills in availability. Sees Alex's heatmap overlaid (unless Focus Mode checked).
+6. **Jamie (NYC)** taps the link on phone. Sees name list, taps "Jamie". TZ auto-detected as EST. Grid shows times in EST. Fills in availability. Sees Alex's heatmap overlaid.
 7. **Sam (Tokyo)** opens link next morning. Taps "Sam". Sees JST times. Fills in. Heatmap updates.
 8. Li and Max fill in over the next day.
 9. **Anyone** opens results, sees timezone overlap bar + best times with TZ sanity warnings ("5 AM for Sam" flagged).
@@ -811,7 +767,7 @@ Minimal backend, WebSocket sync, offline queue. Deploy, test with actual friend 
 ## Prototypes
 
 Working HTML prototypes exist for:
-- **Availability grid** (v8): `timesweep-grid.html` — full minesweeper-themed grid with drag, undo, focus mode, accordion panels, results, confirm dialog, help dialog, share dialog
+- **Availability grid** (v8): `timesweep-grid.html` — full minesweeper-themed grid with drag, undo, accordion panels, results, confirm dialog, help dialog, share dialog
 - **Landing page**: `timesweep-landing.html` — Win95-themed create form with calendar picker, SVG icons, recent events
 
 These prototypes are the source of truth for all UI decisions documented above.
