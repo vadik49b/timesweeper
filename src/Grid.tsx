@@ -89,6 +89,13 @@ export default function Grid(props: Props) {
   let statusTimer: ReturnType<typeof setTimeout> | null = null
   let shareInputRef!: HTMLInputElement
 
+  function goToLanding() {
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }
+  }
+
   function addMinutes(hhmm: string, minutes: number) {
     const [h, m] = hhmm.split(':').map(Number)
     const total = h * 60 + m + minutes
@@ -516,9 +523,9 @@ export default function Grid(props: Props) {
               <MineIcon size={16} /> TimeSweeper — {event()!.name}
             </span>
             <div class="win95-window__title-buttons">
-              <div class="win95-window__title-button r">─</div>
-              <div class="win95-window__title-button r">□</div>
-              <div class="win95-window__title-button r">×</div>
+              <div class="win95-window__title-button r" onClick={goToLanding}>
+                ×
+              </div>
             </div>
           </div>
 
