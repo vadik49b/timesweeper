@@ -120,6 +120,18 @@ export default function Grid(props: Props) {
   })
 
   const totalParticipants = createMemo(() => event()?.participants.length ?? 0)
+  const participantsWithAvailability = createMemo(() => {
+    const ev = event()
+    if (!ev) return 0
+    const spd = slotsPerDay(ev)
+    return ev.participants.filter((p) => {
+      if (p.name === currentName()) {
+        return recordToFlat(myState, ev.dates, spd).some((v) => v > 0)
+      }
+      return p.slots.some((v) => v > 0)
+    }).length
+  })
+  const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
 
   function loadParticipantSlots(ev: AppEvent, name: string) {
     const spd = slotsPerDay(ev)
@@ -293,7 +305,7 @@ export default function Grid(props: Props) {
     () => participantList().find((p) => p.key === currentName())?.label ?? currentName(),
   )
 
-  const eventUrl = createMemo(() => `https://timesweeper.app/e/${props.eventId}`)
+  const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
   const dayCountClass = createMemo(() => `grid-table--days-${Math.min(Math.max(days().length, 1), 7)}`)
   const heatmapDayCountClass = createMemo(
     () => `heatmap-grid--days-${Math.min(Math.max(days().length, 1), 7)}`,
@@ -528,80 +540,89 @@ export default function Grid(props: Props) {
                   <div class="grid-view__panel-header" onClick={() => setBestCollapsed(!bestCollapsed())}>
                     <div class="grid-view__panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
                     <span>
-                      Results · {totalParticipants()}/{event()!.maxParticipants} participants
+                      Suggestions · {participantsWithAvailability()}/{totalParticipants()} shared availability
                     </span>
                     <hr />
                   </div>
                   <Show when={!bestCollapsed()}>
                     <div class="grid-view__panel-body">
                       <Show
-                        when={bestTimes().length > 0}
+                        when={canShowSuggestions()}
                         fallback={
-                          <div class="results__empty">No availability yet</div>
+                          <div class="results__empty">
+                            Not enough participants yet to suggest times.
+                          </div>
                         }
                       >
-                        <div class="results">
-                          <For each={bestTimes()}>
-                            {(slot, i) => {
-                              const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
-                              const breakdown = () => {
-                                const parts: string[] = []
-                                if (myVal() === 1)
-                                  parts.push('<span class="results__tag results__tag--yes">✔ You</span>')
-                                else if (myVal() === 2)
-                                  parts.push('<span class="results__tag results__tag--maybe">? You</span>')
-                                Object.entries(others()).forEach(([name, data]) => {
-                                  const v = data[slot.dk]?.[slot.ti] ?? 0
-                                  const n = name.charAt(0).toUpperCase() + name.slice(1)
-                                  if (v === 1)
+                        <Show
+                          when={bestTimes().length > 0}
+                          fallback={<div class="results__empty">No suggested times yet</div>}
+                        >
+                          <div class="results">
+                            <For each={bestTimes()}>
+                              {(slot, i) => {
+                                const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
+                                const breakdown = () => {
+                                  const parts: string[] = []
+                                  if (myVal() === 1)
+                                    parts.push('<span class="results__tag results__tag--yes">✔ You</span>')
+                                  else if (myVal() === 2)
                                     parts.push(
-                                      `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
+                                      '<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> You</span>',
                                     )
-                                  else if (v === 2)
-                                    parts.push(
-                                      `<span class="results__tag results__tag--maybe">? ${n}</span>`,
-                                    )
-                                })
-                                return parts.join(' · ')
-                              }
-                              return (
-                                <div
-                                  classList={{ 'results__row': true, 'results__row--best': i() === 0 }}
-                                >
-                                  <div class="results__main">
-                                    <div class="results__line">
-                                      {MEDALS[i()]}{' '}
-                                      <b>
-                                        {slot.day} {slot.time}
-                                      </b>{' '}
-                                      · {slot.score}/{totalParticipants()}
+                                  Object.entries(others()).forEach(([name, data]) => {
+                                    const v = data[slot.dk]?.[slot.ti] ?? 0
+                                    const n = name.charAt(0).toUpperCase() + name.slice(1)
+                                    if (v === 1)
+                                      parts.push(
+                                        `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
+                                      )
+                                    else if (v === 2)
+                                      parts.push(
+                                        `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
+                                      )
+                                  })
+                                  return parts.join(' · ')
+                                }
+                                return (
+                                  <div
+                                    classList={{ 'results__row': true, 'results__row--best': i() === 0 }}
+                                  >
+                                    <div class="results__main">
+                                      <div class="results__line">
+                                        {MEDALS[i()]}{' '}
+                                        <b>
+                                          {slot.day} {slot.time}
+                                        </b>{' '}
+                                        · {slot.score}/{totalParticipants()}
+                                      </div>
+                                      <div
+                                        class="results__breakdown"
+                                        innerHTML={breakdown()}
+                                      />
                                     </div>
                                     <div
-                                      class="results__breakdown"
-                                      innerHTML={breakdown()}
-                                    />
+                                      class="dialog-btn r"
+                                      classList={{ 'results__confirm-btn': true }}
+                                      onClick={() => openConfirm(slot.day, slot.time)}
+                                    >
+                                      <span class="hk">C</span>onfirm
+                                    </div>
                                   </div>
-                                  <div
-                                    class="dialog-btn r"
-                                    classList={{ 'results__confirm-btn': true }}
-                                    onClick={() => openConfirm(slot.day, slot.time)}
-                                  >
-                                    <span class="hk">C</span>onfirm
-                                  </div>
-                                </div>
-                              )
-                            }}
-                          </For>
-                          <div class="results__custom">
-                            <div
-                              class="dialog-btn r"
-                              classList={{ 'results__custom-btn': true }}
-                              onClick={() => openConfirm(null, null)}
-                            >
-                              Pick a different time...
+                                )
+                              }}
+                            </For>
+                            <div class="results__custom">
+                              <div
+                                class="dialog-btn r"
+                                classList={{ 'results__custom-btn': true }}
+                                onClick={() => openConfirm(null, null)}
+                              >
+                                Pick a different time...
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </Show>
                       </Show>
                     </div>
                   </Show>
@@ -754,7 +775,7 @@ export default function Grid(props: Props) {
           <div class="dialog-overlay">
             <div class="dialog r">
               <div class="win95-window__title-bar">
-                <span>Share Event</span>
+                <span>Share Link</span>
                 <div class="win95-window__title-buttons">
                   <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
                     ×

@@ -613,6 +613,9 @@ body {
 .results__tag--maybe {
   color: #404040;
 }
+.results__maybe-mark {
+  color: #ff0000;
+}
 .results__confirm-btn {
   font-size: 12px;
   padding: 2px 8px;
