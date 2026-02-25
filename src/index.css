@@ -903,17 +903,6 @@ body {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
 }
 
-.status-row {
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  margin-top: 6px;
-  font-size: 11px;
-}
-.status-row .grid-view__status-segment:last-child {
-  flex: 0 0 auto;
-}
-
 .how-section {
   width: 100%;
   max-width: 420px;

@@ -74,7 +74,6 @@ export default function Landing(props: Props) {
   const [eventName, setEventName] = createSignal('')
   const [timeStart, setTimeStart] = createSignal('14:00')
   const [timeEnd, setTimeEnd] = createSignal('22:00')
-  const [status, setStatus] = createSignal('Ready')
   const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
 
   onMount(async () => {
@@ -149,14 +148,8 @@ export default function Landing(props: Props) {
     }
   }
 
-  function flash(msg: string) {
-    setStatus(msg)
-    setTimeout(() => setStatus('Ready'), 2000)
-  }
-
   function addParticipant() {
     if (participants().length >= 5) {
-      flash('Max 5 participants (free plan)')
       return
     }
     setParticipants([...participants(), ''])
@@ -175,12 +168,10 @@ export default function Landing(props: Props) {
 
   async function create() {
     if (!eventName().trim()) {
-      flash('Enter an event name')
       return
     }
     const dates = Object.keys(selectedDates()).sort()
     if (dates.length === 0) {
-      flash('Pick at least one date')
       return
     }
     const timeRange = { start: timeStart(), end: timeEnd() }
@@ -343,11 +334,6 @@ export default function Landing(props: Props) {
 
       <div class="create-btn r" onClick={create}>
         <span class="hk">C</span>reate Event
-      </div>
-
-      <div class="status-row">
-        <div class="ss st">{status()}</div>
-        <div class="ss st">Free plan | 5 participants max</div>
       </div>
 
       <div class="how-section">
