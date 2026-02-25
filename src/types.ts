@@ -28,10 +28,6 @@ export interface AppEvent {
   participants: Participant[]
 }
 
-export function generateId(): string {
-  return Math.random().toString(36).slice(2, 10)
-}
-
 export function slotsPerDay(event: AppEvent): number {
   const [sh, sm] = event.timeRange.start.split(':').map(Number)
   const [eh, em] = event.timeRange.end.split(':').map(Number)

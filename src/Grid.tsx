@@ -1,7 +1,14 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
-import { getEvent, saveEvent, updateParticipantSlots } from './db'
+import {
+  getEvent,
+  getSelectedParticipant,
+  saveEvent,
+  setSelectedParticipant,
+  updateParticipantSlots,
+} from './db'
 import Win95Field from './components/Win95Field'
+import Win95Button from './components/Win95Button'
 import {
   type AppEvent,
   type SlotValue,
@@ -38,6 +45,9 @@ function MineIcon({ size = 16 }: { size?: number }) {
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
+  const [isLoading, setIsLoading] = createSignal(true)
+  const [showNamePicker, setShowNamePicker] = createSignal(false)
+  const [newParticipantName, setNewParticipantName] = createSignal('')
 
   const days = createMemo(() => {
     const ev = event()
@@ -72,13 +82,6 @@ export default function Grid(props: Props) {
     const ev = event()
     if (!ev) return []
     return ev.participants.map((p) => ({ key: p.name, label: p.name }))
-  })
-  const nameOptions = createMemo(() => {
-    const list = participantList().map((p) => ({ value: p.key, label: p.label }))
-    if ((event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)) {
-      list.push({ value: '_add', label: '+ Add yourself...' })
-    }
-    return list
   })
 
   const [focusMode, setFocusMode] = createSignal(false)
@@ -245,34 +248,52 @@ export default function Grid(props: Props) {
     }
   }
 
-  async function onNameChange(value: string) {
-    if (value === '_add') {
-      const name = prompt('Your name:')
-      if (name?.trim()) {
-        const trimmed = name.trim()
-        const ev = event()
-        if (ev && ev.participants.length < ev.maxParticipants) {
-          const spd = slotsPerDay(ev)
-          const newP: Participant = {
-            name: trimmed,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
-            visitedAt: Date.now(),
-            updatedAt: null,
-          }
-          const updated = { ...ev, participants: [...ev.participants, newP] }
-          await saveEvent(updated)
-          setEvent(updated)
-          loadParticipantSlots(updated, trimmed)
-          setCurrentName(trimmed)
-        }
-      }
-    } else {
-      await persistCurrentSlots()
-      const ev = event()!
-      loadParticipantSlots(ev, value)
-      setCurrentName(value)
+  async function selectParticipant(name: string) {
+    const ev = event()
+    if (!ev) return
+    const now = Date.now()
+    const idx = ev.participants.findIndex((p) => p.name === name)
+    if (idx === -1) return
+    const updated: AppEvent = {
+      ...ev,
+      participants: ev.participants.map((p, i) => (i === idx ? { ...p, visitedAt: now } : p)),
     }
+    await saveEvent(updated)
+    await setSelectedParticipant(updated.id, name)
+    setEvent(updated)
+    loadParticipantSlots(updated, name)
+    setCurrentName(name)
+    setShowNamePicker(false)
+  }
+
+  async function addParticipantFromPicker() {
+    const trimmed = newParticipantName().trim()
+    if (!trimmed) return
+    const ev = event()
+    if (!ev || ev.participants.length >= ev.maxParticipants) return
+
+    const existing = ev.participants.find((p) => p.name.toLowerCase() === trimmed.toLowerCase())
+    if (existing) {
+      await selectParticipant(existing.name)
+      return
+    }
+
+    const spd = slotsPerDay(ev)
+    const newP: Participant = {
+      name: trimmed,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
+      visitedAt: Date.now(),
+      updatedAt: null,
+    }
+    const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
+    await saveEvent(updated)
+    await setSelectedParticipant(updated.id, trimmed)
+    setEvent(updated)
+    loadParticipantSlots(updated, trimmed)
+    setCurrentName(trimmed)
+    setNewParticipantName('')
+    setShowNamePicker(false)
   }
 
   const currentLabel = createMemo(
@@ -309,10 +330,17 @@ export default function Grid(props: Props) {
     const ev = await getEvent(props.eventId)
     if (ev) {
       setEvent(ev)
-      const firstName = ev.participants[0]?.name ?? ''
-      setCurrentName(firstName)
-      if (firstName) loadParticipantSlots(ev, firstName)
+      const savedName = await getSelectedParticipant(ev.id)
+      const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
+      if (savedName && exists) {
+        loadParticipantSlots(ev, savedName)
+        setCurrentName(savedName)
+        setShowNamePicker(false)
+      } else {
+        setShowNamePicker(true)
+      }
     }
+    setIsLoading(false)
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -383,7 +411,11 @@ export default function Grid(props: Props) {
 
   return (
     <div class="grid-view">
-      <Show when={event()} fallback={<div class="grid-view__loading">Loading...</div>}>
+      <Show when={!isLoading()} fallback={<div class="grid-view__loading">Loading...</div>}>
+        <Show
+          when={event()}
+          fallback={<div class="grid-view__loading">Event not found on this device.</div>}
+        >
         <div class="grid-view__window r">
           {/* Title bar */}
           <div class="win95-window__title-bar">
@@ -413,17 +445,20 @@ export default function Grid(props: Props) {
 
             {/* Control bar */}
             <div class="grid-view__control-bar s">
-              <Win95Field
-                kind="select"
-                value={currentName()}
-                options={nameOptions()}
-                wrapperClass="grid-controls__name"
-                controlClass="grid-controls__input"
-                onChange={onNameChange}
-              />
-              <div class="grid-view__share-button r" onClick={openShareDialog}>
-                <span class="hk">S</span>hare
+              <div class="grid-controls__left">
+                <div class="grid-controls__identity">
+                  Hi, <span class="grid-controls__name">{currentName() || 'choose your name'}</span>
+                </div>
+                <Win95Button
+                  class="grid-controls__change-btn"
+                  onClick={() => setShowNamePicker(true)}
+                >
+                  Modify...
+                </Win95Button>
               </div>
+              <Win95Button class="grid-view__share-button" onClick={openShareDialog}>
+                <span class="hk">S</span>hare
+              </Win95Button>
             </div>
 
             {/* Two-panel layout */}
@@ -676,6 +711,48 @@ export default function Grid(props: Props) {
 
         {/* === DIALOGS === */}
 
+        <Show when={showNamePicker()}>
+          <div class="dialog-overlay">
+            <div class="dialog dialog--name-picker r">
+              <div class="win95-window__title-bar">
+                <span>Pick Your Name</span>
+              </div>
+              <div class="dialog-body">
+                <p class="participant-picker__lead">Choose your name to start editing availability.</p>
+                <div class="participant-picker__list">
+                  <For each={event()!.participants}>
+                    {(p) => (
+                      <div
+                        class="dialog-btn r participant-picker__item"
+                        classList={{ 'participant-picker__item--selected': currentName() === p.name }}
+                        onClick={() => selectParticipant(p.name)}
+                      >
+                        {p.name}
+                      </div>
+                    )}
+                  </For>
+                </div>
+                <Show when={event()!.participants.length < event()!.maxParticipants}>
+                  <label class="participant-picker__label">I'm not in the list</label>
+                  <Win95Field
+                    kind="input"
+                    value={newParticipantName()}
+                    placeholder="Participant name"
+                    wrapperClass="dialog__field"
+                    controlClass="dialog__control"
+                    onInput={setNewParticipantName}
+                  />
+                  <div class="dialog-buttons">
+                    <div class="dialog-btn r" onClick={addParticipantFromPicker}>
+                      Add participant
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </div>
+          </div>
+        </Show>
+
         <Show when={dialog() === 'share'}>
           <div class="dialog-overlay">
             <div class="dialog r">
@@ -828,6 +905,7 @@ export default function Grid(props: Props) {
               </div>
             </div>
           </div>
+        </Show>
         </Show>
       </Show>
     </div>

@@ -7,16 +7,25 @@ interface TimeSweeper extends DBSchema {
     value: AppEvent
     indexes: { 'by-created': number }
   }
+  localState: {
+    key: string
+    value: { eventId: string; participantName: string }
+  }
 }
 
 let dbp: Promise<IDBPDatabase<TimeSweeper>> | null = null
 
 function getDB() {
   if (!dbp) {
-    dbp = openDB<TimeSweeper>('timesweeper', 1, {
+    dbp = openDB<TimeSweeper>('timesweeper', 2, {
       upgrade(db) {
-        const store = db.createObjectStore('events', { keyPath: 'id' })
-        store.createIndex('by-created', 'created')
+        if (!db.objectStoreNames.contains('events')) {
+          const store = db.createObjectStore('events', { keyPath: 'id' })
+          store.createIndex('by-created', 'created')
+        }
+        if (!db.objectStoreNames.contains('localState')) {
+          db.createObjectStore('localState', { keyPath: 'eventId' })
+        }
       },
     })
   }
@@ -53,4 +62,15 @@ export async function updateParticipantSlots(
     event.participants[idx] = { ...event.participants[idx], slots, updatedAt }
   }
   await db.put('events', event)
+}
+
+export async function getSelectedParticipant(eventId: string): Promise<string | null> {
+  const db = await getDB()
+  const row = await db.get('localState', eventId)
+  return row?.participantName ?? null
+}
+
+export async function setSelectedParticipant(eventId: string, participantName: string): Promise<void> {
+  const db = await getDB()
+  await db.put('localState', { eventId, participantName })
 }

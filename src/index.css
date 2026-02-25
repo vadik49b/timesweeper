@@ -51,6 +51,18 @@ body {
 .hk {
   text-decoration: underline;
 }
+.win95-button {
+  font-family: var(--ui);
+  font-size: 12px;
+  padding: 3px 8px;
+  cursor: pointer;
+  background: var(--bg);
+  white-space: nowrap;
+  user-select: none;
+}
+.win95-button:active {
+  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+}
 
 /* === SHARED: WIN95 FIELD === */
 .win95-field__frame {
@@ -71,7 +83,7 @@ body {
   width: 100%;
   min-width: 0;
   display: block;
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: 15px;
   padding: 2px 4px;
   border: none;
@@ -139,7 +151,7 @@ body {
   margin-bottom: 10px;
 }
 .dialog__control {
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: 14px;
 }
 .dialog-buttons {
@@ -148,7 +160,7 @@ body {
   justify-content: flex-end;
 }
 .dialog-btn {
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: 14px;
   padding: 4px 20px;
   cursor: pointer;
@@ -179,12 +191,12 @@ body {
   padding: 20px;
 }
 
-/* Win95 window — also sets VT323 for everything inside */
+/* Win95 window */
 .grid-view__window {
   background: var(--bg);
   width: 100%;
   max-width: 900px;
-  font-family: var(--mono);
+  font-family: var(--ui);
 }
 
 .win95-window__title-bar {
@@ -242,23 +254,25 @@ body {
   margin-bottom: 6px;
   gap: 6px;
 }
-.grid-controls__name {
-  flex: 1;
+.grid-controls__left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
-.grid-controls__input {
-  font-family: var(--mono);
-  font-size: 15px;
-}
-.grid-view__share-button {
-  font-family: var(--mono);
-  font-size: 14px;
-  padding: 3px 8px;
-  cursor: pointer;
-  background: var(--bg);
+.grid-controls__identity {
+  font-size: 13px;
+  color: #202020;
   white-space: nowrap;
 }
-.grid-view__share-button:active {
-  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+.grid-controls__name {
+  text-decoration: underline;
+}
+.grid-controls__change-btn {
+  padding: 2px 8px;
+}
+.grid-view__share-button {
+  margin-left: auto;
 }
 
 .grid-view__panels {
@@ -340,7 +354,7 @@ body {
 }
 .availability-grid__day {
   text-align: center;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: bold;
   padding: 2px 0 4px;
   color: #000;
@@ -352,7 +366,7 @@ body {
   align-items: center;
   justify-content: flex-end;
   padding-right: 3px;
-  font-size: 12px;
+  font-size: 10px;
   color: #404040;
   height: var(--cell);
 }
@@ -363,7 +377,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 17px;
+  font-size: 15px;
   background: var(--bg);
   border: 2px solid;
   border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
@@ -379,7 +393,7 @@ body {
 }
 .availability-grid__cell.availability-grid__cell--yes .availability-grid__icon {
   color: #006800;
-  font-size: 16px;
+  font-size: 14px;
   pointer-events: none;
 }
 .availability-grid__cell.availability-grid__cell--maybe {
@@ -389,7 +403,7 @@ body {
 }
 .availability-grid__cell.availability-grid__cell--maybe .availability-grid__icon {
   color: #000;
-  font-size: 16px;
+  font-size: 14px;
   pointer-events: none;
 }
 
@@ -608,6 +622,9 @@ body {
 .dialog--confirm {
   max-width: 340px;
 }
+.dialog--name-picker {
+  max-width: 360px;
+}
 .dialog-body--help {
   font-size: 15px;
   line-height: 1.6;
@@ -651,13 +668,40 @@ body {
   margin-bottom: 10px;
 }
 .confirm__control {
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: 15px;
 }
 .confirm__note {
   font-size: 12px;
   color: #404040;
   margin-bottom: 10px;
+}
+.participant-picker__lead {
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: normal;
+}
+.participant-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.participant-picker__item {
+  width: 100%;
+  text-align: left;
+  min-width: 0;
+}
+.participant-picker__item--selected {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+.participant-picker__label {
+  margin-bottom: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: normal;
 }
 
 /* Status & function bars */

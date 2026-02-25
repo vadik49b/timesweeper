@@ -1,5 +1,6 @@
-import { createSignal, createMemo, onMount, For } from 'solid-js'
-import { generateId, computeTimeSlots, type AppEvent } from './types'
+import { createSignal, createMemo, onMount, For, Index } from 'solid-js'
+import { nanoid } from 'nanoid'
+import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents } from './db'
 import Win95Field from './components/Win95Field'
 
@@ -60,7 +61,7 @@ function FlagIcon() {
 }
 
 interface Props {
-  onCreateEvent: (id: string) => void
+  onOpenEvent: (id: string) => void
 }
 
 export default function Landing(props: Props) {
@@ -72,8 +73,8 @@ export default function Landing(props: Props) {
   const [selectedDates, setSelectedDates] = createSignal<Record<string, boolean>>({})
   const [participants, setParticipants] = createSignal(['', ''])
   const [eventName, setEventName] = createSignal('')
-  const [timeStart, setTimeStart] = createSignal('14:00')
-  const [timeEnd, setTimeEnd] = createSignal('22:00')
+  const [timeStart, setTimeStart] = createSignal('10:00')
+  const [timeEnd, setTimeEnd] = createSignal('18:00')
   const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
 
   onMount(async () => {
@@ -156,7 +157,7 @@ export default function Landing(props: Props) {
   }
 
   function removeParticipant(i: number) {
-    if (participants().length <= 1) return
+    if (i === 0 || participants().length <= 1) return
     setParticipants(participants().filter((_, idx) => idx !== i))
   }
 
@@ -174,19 +175,21 @@ export default function Landing(props: Props) {
     if (dates.length === 0) {
       return
     }
+    const participantNames = participants().map((p) => p.trim()).filter(Boolean)
+    if (participantNames.length === 0) {
+      return
+    }
     const timeRange = { start: timeStart(), end: timeEnd() }
     const spd = computeTimeSlots(timeRange).length
     const event: AppEvent = {
-      id: generateId(),
+      id: nanoid(),
       name: eventName().trim(),
       created: Date.now(),
       status: 'open',
       maxParticipants: 5,
       dates,
       timeRange,
-      participants: participants()
-        .filter((p) => p.trim())
-        .map((name) => ({
+      participants: participantNames.map((name) => ({
           name: name.trim(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
@@ -195,20 +198,8 @@ export default function Landing(props: Props) {
         })),
     }
     await saveEvent(event)
-    props.onCreateEvent(event.id)
+    props.onOpenEvent(event.id)
   }
-
-  document.addEventListener('keydown', (e) => {
-    if ((document.activeElement as HTMLElement)?.tagName === 'INPUT') return
-    if (e.key === 'a' || e.key === 'A') {
-      e.preventDefault()
-      addParticipant()
-    }
-    if (e.key === 'c' || e.key === 'C') {
-      e.preventDefault()
-      create()
-    }
-  })
 
   return (
     <div class="landing">
@@ -285,7 +276,7 @@ export default function Landing(props: Props) {
         </div>
 
         <div class="field">
-          <label>Time range:</label>
+          <label>What times might work?</label>
           <div class="time-range">
             <Win95Field
               kind="select"
@@ -309,23 +300,25 @@ export default function Landing(props: Props) {
 
         <div class="field">
           <label>Who's in?</label>
-          <For each={participants()}>
+          <Index each={participants()}>
             {(p, i) => (
               <div class="participant-row">
                 <Win95Field
                   kind="input"
-                  value={p}
-                  placeholder={i() === 0 ? 'Your name' : 'Name'}
+                  value={p()}
+                  placeholder={i === 0 ? 'You' : `Person ${i + 1}`}
                   wrapperClass="landing__participant-field"
                   controlClass="landing__control landing__control--input"
-                  onInput={(value) => updateParticipant(i(), value)}
+                  onInput={(value) => updateParticipant(i, value)}
                 />
-                <div class="p-rm r" onClick={() => removeParticipant(i())}>
-                  x
-                </div>
+                {i > 0 && (
+                  <div class="p-rm r" onClick={() => removeParticipant(i)}>
+                    x
+                  </div>
+                )}
               </div>
             )}
-          </For>
+          </Index>
           <div class="add-btn r" onClick={addParticipant}>
             + <span class="hk">A</span>dd person
           </div>
@@ -370,7 +363,7 @@ export default function Landing(props: Props) {
             <div class="recent-empty">No recent events</div>
           ) : (
             recentEvents().map((e) => (
-              <div class="recent-item">
+              <div class="recent-item" onClick={() => props.onOpenEvent(e.id)}>
                 <span class="flag-ico">
                   <FlagIcon />
                 </span>
