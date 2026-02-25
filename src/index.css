@@ -402,7 +402,7 @@ body {
   border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
 }
 .availability-grid__cell.availability-grid__cell--maybe .availability-grid__icon {
-  color: #000;
+  color: #ff0000;
   font-size: 14px;
   pointer-events: none;
 }
@@ -415,6 +415,21 @@ body {
   padding: 3px 0 5px;
   font-size: 12px;
   color: #404040;
+}
+.availability-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.availability-legend__label {
+  min-width: 0;
+}
+.availability-legend__arrow {
+  color: #404040;
+}
+.availability-legend--mini {
+  gap: 3px;
 }
 .grid-view__legend-cell {
   display: inline-flex;
@@ -436,6 +451,7 @@ body {
 }
 .grid-view__legend-cell--flagged {
   background: var(--bg);
+  color: #ff0000;
 }
 
 /* Heatmap */
@@ -684,14 +700,21 @@ body {
 }
 .participant-picker__list {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 4px;
   margin-bottom: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
 }
 .participant-picker__item {
-  width: 100%;
-  text-align: left;
-  min-width: 0;
+  width: auto;
+  min-width: fit-content;
+  text-align: center;
+  padding: 2px 8px;
+  font-size: 12px;
+  flex: 0 0 auto;
 }
 .participant-picker__item--selected {
   outline: 1px dotted #000;

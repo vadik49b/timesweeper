@@ -9,6 +9,8 @@ import {
 } from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
+import AvailabilityLegend from './components/AvailabilityLegend'
+import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
   type SlotValue,
@@ -25,23 +27,6 @@ interface Props {
 }
 
 type UndoEntry = { dk: string; ti: number; prev: number }
-
-function MineIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-      <line x1="8" y1="1" x2="8" y2="4" stroke="black" stroke-width="1.5" />
-      <line x1="8" y1="12" x2="8" y2="15" stroke="black" stroke-width="1.5" />
-      <line x1="1" y1="8" x2="4" y2="8" stroke="black" stroke-width="1.5" />
-      <line x1="12" y1="8" x2="15" y2="8" stroke="black" stroke-width="1.5" />
-      <line x1="3" y1="3" x2="5" y2="5" stroke="black" stroke-width="1.2" />
-      <line x1="11" y1="3" x2="13" y2="5" stroke="black" stroke-width="1.2" />
-      <line x1="3" y1="13" x2="5" y2="11" stroke="black" stroke-width="1.2" />
-      <line x1="11" y1="13" x2="13" y2="11" stroke="black" stroke-width="1.2" />
-      <circle cx="8" cy="8" r="4" fill="black" />
-      <rect x="6" y="6" width="2" height="2" fill="white" />
-    </svg>
-  )
-}
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
@@ -219,6 +204,14 @@ export default function Grid(props: Props) {
     setConfirmedSlotLabel(`${confirmDay()} ${confirmTime()}`)
   }
 
+  function closeOpenDialog() {
+    if (showNamePicker()) {
+      setShowNamePicker(false)
+      return
+    }
+    if (dialog()) setDialog(null)
+  }
+
   function flashStatus(message: string) {
     setStatusFlash(message)
     if (statusTimer) clearTimeout(statusTimer)
@@ -343,6 +336,11 @@ export default function Grid(props: Props) {
     setIsLoading(false)
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeOpenDialog()
+        return
+      }
       if (
         (e.target as HTMLElement).tagName === 'INPUT' ||
         (e.target as HTMLElement).tagName === 'SELECT'
@@ -474,13 +472,7 @@ export default function Grid(props: Props) {
                   <Show when={!editCollapsed()}>
                     <div class="grid-view__panel-body">
                       <div class="grid-view__legend">
-                        <span class="grid-view__legend-cell" /> no →
-                        <span class="grid-view__legend-cell grid-view__legend-cell--open grid-view__legend-cell--yes">
-                          ✔
-                        </span>{' '}
-                        yes →
-                        <span class="grid-view__legend-cell grid-view__legend-cell--flagged">?</span> maybe →
-                        <span class="grid-view__legend-cell" /> no
+                        <AvailabilityLegend withLabels />
                       </div>
                       <div class={`availability-grid ${dayCountClass()}`}>
                         <div class="availability-grid__corner" />
@@ -716,6 +708,11 @@ export default function Grid(props: Props) {
             <div class="dialog dialog--name-picker r">
               <div class="win95-window__title-bar">
                 <span>Pick Your Name</span>
+                <div class="win95-window__title-buttons">
+                  <div class="win95-window__title-button r" onClick={() => setShowNamePicker(false)}>
+                    ×
+                  </div>
+                </div>
               </div>
               <div class="dialog-body">
                 <p class="participant-picker__lead">Choose your name to start editing availability.</p>
@@ -813,17 +810,7 @@ export default function Grid(props: Props) {
                 <p class="help__step">
                   <b>2.</b> Click a cell to mark availability:
                   <br />
-                  <span class="help__cycle">
-                    <span class="grid-view__legend-cell help__mini-cell" /> →{' '}
-                    <span class="grid-view__legend-cell grid-view__legend-cell--open grid-view__legend-cell--yes help__mini-cell">
-                      ✔
-                    </span>{' '}
-                    →{' '}
-                    <span class="grid-view__legend-cell grid-view__legend-cell--flagged help__mini-cell">
-                      ?
-                    </span>{' '}
-                    → <span class="grid-view__legend-cell help__mini-cell" />
-                  </span>
+                  <AvailabilityLegend mini class="help__cycle" />
                 </p>
                 <p class="help__step">
                   <b>3.</b> Click and drag to fill multiple cells at once
