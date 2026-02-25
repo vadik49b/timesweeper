@@ -113,6 +113,18 @@ export default function Grid(props: Props) {
     return stamp.slice(0, 15) + 'Z'
   }
 
+  function icsEscape(text: string) {
+    return text
+      .replace(/\\/g, '\\\\')
+      .replace(/\n/g, '\\n')
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;')
+  }
+
+  function eventLink() {
+    return `${window.location.origin}/e/${props.eventId}`
+  }
+
   // --- Logic ---
   function heat(dk: string, ti: number) {
     let c = 0
@@ -178,6 +190,7 @@ export default function Grid(props: Props) {
   }
 
   function dragStart(dk: string, ti: number) {
+    if (isConfirmed()) return
     dragging = true
     draggedCells = new Set()
     dragUndoBatch = []
@@ -190,6 +203,7 @@ export default function Grid(props: Props) {
   }
 
   function dragOver(dk: string, ti: number) {
+    if (isConfirmed()) return
     const key = `${dk}-${ti}`
     if (draggedCells.has(key)) return
     const prev = myState[dk]?.[ti] ?? 0
@@ -209,6 +223,7 @@ export default function Grid(props: Props) {
   }
 
   function doUndo() {
+    if (isConfirmed()) return
     if (!undoStack.length) return
     const batch = undoStack.pop()!
     batch.forEach((u) => setMyState(u.dk, u.ti, u.prev))
@@ -288,12 +303,8 @@ export default function Grid(props: Props) {
     }
   }
 
-  const currentParticipant = createMemo(() =>
-    event()?.participants.find((p) => p.name === currentName()),
-  )
-  const currentTimezone = createMemo(
-    () => currentParticipant()?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-  )
+  const createdByName = createMemo(() => event()?.participants[0]?.name ?? 'Unknown')
+  const currentTimezone = createMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
 
   const confirmedInfo = createMemo(() => {
     const ev = event()
@@ -306,15 +317,33 @@ export default function Grid(props: Props) {
       slot: ev.confirmedSlot,
     }
   })
+  const isConfirmed = createMemo(() => !!confirmedInfo())
 
-  const confirmedSummary = createMemo(() => {
+  const confirmedPickedLine = createMemo(() => {
     const info = confirmedInfo()
     if (!info) return ''
-    return `Confirmed: ${info.dayLabel} ${info.start}`
+    return `${info.dayLabel} ${info.start} (${currentTimezone()})`
+  })
+  const participantsLine = createMemo(() => {
+    const ev = event()
+    if (!ev) return ''
+    return ev.participants.map((p) => p.name).join(', ')
+  })
+  const summaryDetailsText = createMemo(() => {
+    const ev = event()
+    const info = confirmedInfo()
+    if (!ev || !info) return ''
+    const end = times().find((t) => t.value === info.slot.endTime)?.label ?? info.slot.endTime
+    return [
+      `Event: ${ev.name}`,
+      `Created by: ${createdByName()}`,
+      `When: ${info.dayLabel} ${info.start}-${end} (${currentTimezone()})`,
+      `Participants: ${participantsLine()}`,
+    ].join('\n')
   })
 
   async function copyConfirmedSummary() {
-    const summary = confirmedSummary()
+    const summary = summaryDetailsText()
     if (!summary) return
     try {
       await navigator.clipboard.writeText(summary)
@@ -330,6 +359,14 @@ export default function Grid(props: Props) {
     if (!info || !ev) return
     const dtStart = toUtcStamp(info.slot.date, info.slot.startTime)
     const dtEnd = toUtcStamp(info.slot.date, info.slot.endTime)
+    const description = [
+      `Event: ${ev.name}`,
+      `Status: confirmed`,
+      `Link: ${eventLink()}`,
+      `Created by: ${createdByName()}`,
+      `When: ${info.dayLabel} ${info.start} (${currentTimezone()})`,
+      `Participants (${ev.participants.length}): ${participantsLine()}`,
+    ].join('\n')
     const payload = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -339,7 +376,10 @@ export default function Grid(props: Props) {
       `DTSTAMP:${toUtcStamp(info.slot.date, info.slot.startTime)}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,
-      `SUMMARY:${ev.name}`,
+      'STATUS:CONFIRMED',
+      `SUMMARY:${icsEscape(`TimeSweeper: ${ev.name}`)}`,
+      `DESCRIPTION:${icsEscape(description)}`,
+      `URL:${icsEscape(eventLink())}`,
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n')
@@ -385,7 +425,7 @@ export default function Grid(props: Props) {
     const spd = slotsPerDay(ev)
     const newP: Participant = {
       name: trimmed,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: '',
       slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
       visitedAt: Date.now(),
       updatedAt: null,
@@ -536,9 +576,11 @@ export default function Grid(props: Props) {
                 <div class="grid-view__deck-display">
                   Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
                 </div>
-                <Win95Button class="grid-view__deck-modify" onClick={() => setShowNamePicker(true)}>
-                  Switch...
-                </Win95Button>
+                <Show when={!isConfirmed()}>
+                  <Win95Button class="grid-view__deck-modify" onClick={() => setShowNamePicker(true)}>
+                    Switch...
+                  </Win95Button>
+                </Show>
               </div>
               <div class="grid-view__deck-actions">
                 <Win95Button class="grid-view__deck-share" onClick={openShareDialog}>
@@ -624,17 +666,6 @@ export default function Grid(props: Props) {
                   </div>
                   <Show when={!bestCollapsed()}>
                     <div class="grid-view__panel-body">
-                      <Show when={confirmedInfo()}>
-                        <div class="confirmed-box s">
-                          <div class="confirmed-box__title">Confirmed time</div>
-                          <div class="confirmed-box__line">{confirmedSummary()}</div>
-                          <div class="confirmed-box__actions">
-                            <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
-                            <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
-                            <Win95Button onClick={undoConfirmedTime}>Undo</Win95Button>
-                          </div>
-                        </div>
-                      </Show>
                       <Show
                         when={canShowSuggestions()}
                         fallback={
@@ -803,6 +834,44 @@ export default function Grid(props: Props) {
                 <span class="grid-view__function-key">F5</span> <span class="hk">C</span>onfirm
               </div>
             </div>
+              <Show when={isConfirmed()}>
+                <div class="grid-view__confirmed-overlay">
+                  <div class="grid-view__confirmed-box r">
+                  <div class="grid-view__confirmed-title">Time confirmed</div>
+                    <div class="grid-view__confirmed-details">
+                      <div>
+                        <b>Event:</b> {event()!.name}
+                      </div>
+                    <div>
+                      <b>Created by:</b> {createdByName()}
+                    </div>
+                    <div>
+                      <b>When:</b> {confirmedPickedLine()}
+                    </div>
+                    <div>
+                      <b>Participants:</b> {participantsLine()}
+                    </div>
+                  </div>
+                  <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
+                    <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
+                    <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
+                  </div>
+                  <div class="grid-view__confirmed-separator" />
+                  <div class="grid-view__confirmed-secondary">
+                    <div class="grid-view__confirmed-undo-row">
+                      <div class="grid-view__confirmed-undo-help">
+                        Availability is locked because a time was picked.
+                        <br />
+                        Need changes? Undo confirmation first.
+                      </div>
+                      <Win95Button class="grid-view__confirmed-undo-btn" onClick={undoConfirmedTime}>
+                        Undo confirmation
+                      </Win95Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Show>
           </div>
           {/* /grid-view__window-body */}
         </div>

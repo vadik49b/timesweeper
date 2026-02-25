@@ -229,6 +229,7 @@ body {
 }
 
 .grid-view__window-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   padding: 6px;
@@ -286,7 +287,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1;
+  height: 100%;
   min-height: 0;
   overflow: auto;
   padding-right: 1px;
@@ -592,28 +593,66 @@ body {
   font-size: 14px;
   padding: 4px 2px;
 }
-.confirmed-box {
-  margin: 0 2px 8px;
-  padding: 5px 6px;
-}
-.confirmed-box__title {
-  font-size: 12px;
-  font-weight: bold;
-  margin-bottom: 3px;
-}
-.confirmed-box__line {
-  font-size: 12px;
-  line-height: 1.35;
-  margin-bottom: 6px;
-}
-.confirmed-box__actions {
+.grid-view__confirmed-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: rgba(192, 192, 192, 0.88);
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
-.confirmed-box__actions .win95-button {
-  padding: 2px 8px;
-  font-size: 11px;
+.grid-view__confirmed-box {
+  max-width: 460px;
+  width: 100%;
+  padding: 28px;
+  box-shadow: 2px 2px 0 #000;
+  background: var(--bg);
+}
+.grid-view__confirmed-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 14px;
+}
+.grid-view__confirmed-details {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+.grid-view__confirmed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.grid-view__confirmed-actions--primary {
+  margin-bottom: 0;
+}
+.grid-view__confirmed-separator {
+  margin: 20px 0;
+  border-top: 1px solid var(--blo);
+  border-bottom: 1px solid var(--bhi);
+}
+.grid-view__confirmed-secondary {
+  padding: 2px 0 0;
+  margin-top: 14px;
+}
+.grid-view__confirmed-undo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.grid-view__confirmed-undo-help {
+  font-size: 12px;
+  color: #303030;
+  line-height: 1.35;
+  margin-bottom: 0;
+}
+.grid-view__confirmed-undo-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  flex-shrink: 0;
 }
 .results__empty {
   font-size: 14px;

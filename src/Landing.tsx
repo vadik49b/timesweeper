@@ -168,7 +168,7 @@ export default function Landing(props: Props) {
       timeRange,
       participants: participantNames.map((name) => ({
           name: name.trim(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: '',
           slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
           visitedAt: null,
           updatedAt: null,
