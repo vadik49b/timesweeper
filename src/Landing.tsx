@@ -1,4 +1,7 @@
-import { createSignal, createMemo, For } from 'solid-js'
+import { createSignal, createMemo, onMount, For } from 'solid-js'
+import { generateId, computeTimeSlots, type AppEvent } from './types'
+import { saveEvent, listEvents } from './db'
+import Win95Field from './components/Win95Field'
 
 const MONTHS = [
   'January',
@@ -57,7 +60,7 @@ function FlagIcon() {
 }
 
 interface Props {
-  onCreateEvent: () => void
+  onCreateEvent: (id: string) => void
 }
 
 export default function Landing(props: Props) {
@@ -72,6 +75,12 @@ export default function Landing(props: Props) {
   const [timeStart, setTimeStart] = createSignal('14:00')
   const [timeEnd, setTimeEnd] = createSignal('22:00')
   const [status, setStatus] = createSignal('Ready')
+  const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
+
+  onMount(async () => {
+    const events = await listEvents()
+    setRecentEvents(events.slice(0, 5))
+  })
 
   const calDays = createMemo(() => {
     const year = calYear(),
@@ -164,16 +173,38 @@ export default function Landing(props: Props) {
     setParticipants(next)
   }
 
-  function create() {
+  async function create() {
     if (!eventName().trim()) {
       flash('Enter an event name')
       return
     }
-    if (Object.keys(selectedDates()).length === 0) {
+    const dates = Object.keys(selectedDates()).sort()
+    if (dates.length === 0) {
       flash('Pick at least one date')
       return
     }
-    props.onCreateEvent()
+    const timeRange = { start: timeStart(), end: timeEnd() }
+    const spd = computeTimeSlots(timeRange).length
+    const event: AppEvent = {
+      id: generateId(),
+      name: eventName().trim(),
+      created: Date.now(),
+      status: 'open',
+      maxParticipants: 5,
+      dates,
+      timeRange,
+      participants: participants()
+        .filter((p) => p.trim())
+        .map((name) => ({
+          name: name.trim(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
+          visitedAt: null,
+          updatedAt: null,
+        })),
+    }
+    await saveEvent(event)
+    props.onCreateEvent(event.id)
   }
 
   document.addEventListener('keydown', (e) => {
@@ -212,20 +243,20 @@ export default function Landing(props: Props) {
       <div class="form-card r">
         <div class="field">
           <label>Event name:</label>
-          <div class="input-wrap s">
-            <input
-              type="text"
-              placeholder="e.g. Game Night, Intro Call"
-              autofocus
-              value={eventName()}
-              onInput={(e) => setEventName(e.currentTarget.value)}
-            />
-          </div>
+          <Win95Field
+            kind="input"
+            value={eventName()}
+            placeholder="e.g. Game Night, Intro Call"
+            autoFocus
+            wrapperClass="landing__event-name"
+            controlClass="landing__control landing__control--input"
+            onInput={setEventName}
+          />
         </div>
 
         <div class="field">
           <label>Pick dates:</label>
-          <div class="s" style={{ padding: '4px' }}>
+          <div class="landing__calendar s">
             <div class="cal-header">
               <div class="cal-nav r" onClick={() => calNav(-1)}>
                 &lt;
@@ -258,39 +289,30 @@ export default function Landing(props: Props) {
                 )}
               </For>
             </div>
-            <div
-              style={{
-                'font-size': '10px',
-                color: '#808080',
-                'margin-top': '4px',
-                'text-align': 'center',
-              }}
-            >
-              {selectedDateLabels()}
-            </div>
+            <div class="landing__date-summary">{selectedDateLabels()}</div>
           </div>
         </div>
 
         <div class="field">
           <label>Time range:</label>
           <div class="time-range">
-            <div class="s" style={{ flex: '1' }}>
-              <div class="sel-inner">
-                <select value={timeStart()} onChange={(e) => setTimeStart(e.currentTarget.value)}>
-                  <For each={TIMES}>{(t) => <option value={t.value}>{t.label}</option>}</For>
-                </select>
-                <div class="sel-arrow r">&#9660;</div>
-              </div>
-            </div>
+            <Win95Field
+              kind="select"
+              value={timeStart()}
+              options={TIMES}
+              wrapperClass="landing__time-select"
+              controlClass="landing__control"
+              onChange={setTimeStart}
+            />
             <span>to</span>
-            <div class="s" style={{ flex: '1' }}>
-              <div class="sel-inner">
-                <select value={timeEnd()} onChange={(e) => setTimeEnd(e.currentTarget.value)}>
-                  <For each={TIMES}>{(t) => <option value={t.value}>{t.label}</option>}</For>
-                </select>
-                <div class="sel-arrow r">&#9660;</div>
-              </div>
-            </div>
+            <Win95Field
+              kind="select"
+              value={timeEnd()}
+              options={TIMES}
+              wrapperClass="landing__time-select"
+              controlClass="landing__control"
+              onChange={setTimeEnd}
+            />
           </div>
         </div>
 
@@ -299,14 +321,14 @@ export default function Landing(props: Props) {
           <For each={participants()}>
             {(p, i) => (
               <div class="participant-row">
-                <div class="s" style={{ flex: '1' }}>
-                  <input
-                    type="text"
-                    placeholder={i() === 0 ? 'Your name' : 'Name'}
-                    value={p}
-                    onInput={(e) => updateParticipant(i(), e.currentTarget.value)}
-                  />
-                </div>
+                <Win95Field
+                  kind="input"
+                  value={p}
+                  placeholder={i() === 0 ? 'Your name' : 'Name'}
+                  wrapperClass="landing__participant-field"
+                  controlClass="landing__control landing__control--input"
+                  onInput={(value) => updateParticipant(i(), value)}
+                />
                 <div class="p-rm r" onClick={() => removeParticipant(i())}>
                   x
                 </div>
@@ -358,19 +380,25 @@ export default function Landing(props: Props) {
             <span>Your recent events</span>
             <hr />
           </div>
-          {[
-            { name: 'Investor Call', date: 'Mar 1' },
-            { name: 'D&D Session', date: 'Feb 20' },
-            { name: 'Team Standup', date: 'Feb 15' },
-          ].map((e) => (
-            <div class="recent-item">
-              <span class="flag-ico">
-                <FlagIcon />
-              </span>
-              {e.name}
-              <span class="recent-date">| {e.date}</span>
-            </div>
-          ))}
+          {recentEvents().length === 0 ? (
+            <div class="recent-empty">No recent events</div>
+          ) : (
+            recentEvents().map((e) => (
+              <div class="recent-item">
+                <span class="flag-ico">
+                  <FlagIcon />
+                </span>
+                {e.name}
+                <span class="recent-date">
+                  |{' '}
+                  {new Date(e.created).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -379,7 +407,7 @@ export default function Landing(props: Props) {
         <br />
         Timezones handled automatically
         <br />
-        <span style={{ 'margin-top': '4px', display: 'inline-block' }}>
+        <span class="footer-links">
           timesweeper.app | <a href="#">About</a>
         </span>
       </div>

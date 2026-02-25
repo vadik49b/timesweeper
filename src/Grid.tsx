@@ -1,34 +1,22 @@
-import { createSignal, createMemo, onMount, onCleanup, For, Show } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
+import { createStore, reconcile } from 'solid-js/store'
+import { getEvent, saveEvent, updateParticipantSlots } from './db'
+import Win95Field from './components/Win95Field'
+import {
+  type AppEvent,
+  type SlotValue,
+  type Participant,
+  slotsPerDay,
+  computeTimeSlots,
+  formatDateLabel,
+  flatToRecord,
+  recordToFlat,
+} from './types'
 
-const DAYS = [
-  { label: 'Mon 2', key: 'mon' },
-  { label: 'Tue 3', key: 'tue' },
-  { label: 'Wed 4', key: 'wed' },
-  { label: 'Thu 5', key: 'thu' },
-  { label: 'Fri 6', key: 'fri' },
-]
+interface Props {
+  eventId: string
+}
 
-const TIMES = [
-  '2:00',
-  '2:30',
-  '3:00',
-  '3:30',
-  '4:00',
-  '4:30',
-  '5:00',
-  '5:30',
-  '6:00',
-  '6:30',
-  '7:00',
-  '7:30',
-  '8:00',
-  '8:30',
-  '9:00',
-  '9:30',
-]
-
-type Participant = { key: string; label: string }
 type UndoEntry = { dk: string; ti: number; prev: number }
 
 function MineIcon({ size = 16 }: { size?: number }) {
@@ -48,18 +36,50 @@ function MineIcon({ size = 16 }: { size?: number }) {
   )
 }
 
-export default function Grid() {
-  // --- State ---
-  const [myState, setMyState] = createStore<Record<string, number[]>>(
-    Object.fromEntries(DAYS.map((d) => [d.key, new Array(TIMES.length).fill(0)])),
-  )
+export default function Grid(props: Props) {
+  const [event, setEvent] = createSignal<AppEvent | null>(null)
 
-  const [participants, setParticipants] = createSignal<Participant[]>([
-    { key: 'jamie', label: 'Jamie (EST)' },
-    { key: 'alex', label: 'Alex (CET)' },
-    { key: 'sam', label: 'Sam (JST)' },
-  ])
-  const [currentName, setCurrentName] = createSignal('jamie')
+  const days = createMemo(() => {
+    const ev = event()
+    if (!ev) return []
+    return ev.dates.map((ds) => ({ key: ds, label: formatDateLabel(ds) }))
+  })
+
+  const times = createMemo(() => {
+    const ev = event()
+    if (!ev) return []
+    return computeTimeSlots(ev.timeRange)
+  })
+
+  const [myState, setMyState] = createStore<Record<string, number[]>>({})
+  const [currentName, setCurrentName] = createSignal('')
+
+  // Read-only slots for all other participants
+  const others = createMemo(() => {
+    const ev = event()
+    if (!ev) return {}
+    const cur = currentName()
+    const spd = slotsPerDay(ev)
+    const result: Record<string, Record<string, number[]>> = {}
+    ev.participants.forEach((p) => {
+      if (p.name === cur) return
+      result[p.name] = flatToRecord(p.slots, ev.dates, spd)
+    })
+    return result
+  })
+
+  const participantList = createMemo(() => {
+    const ev = event()
+    if (!ev) return []
+    return ev.participants.map((p) => ({ key: p.name, label: p.name }))
+  })
+  const nameOptions = createMemo(() => {
+    const list = participantList().map((p) => ({ value: p.key, label: p.label }))
+    if ((event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)) {
+      list.push({ value: '_add', label: '+ Add yourself...' })
+    }
+    return list
+  })
 
   const [focusMode, setFocusMode] = createSignal(false)
   const [editCollapsed, setEditCollapsed] = createSignal(false)
@@ -68,27 +88,11 @@ export default function Grid() {
 
   type Dialog = null | 'share' | 'help' | 'confirm'
   const [dialog, setDialog] = createSignal<Dialog>(null)
-  const [confirmDay, setConfirmDay] = createSignal(DAYS[0].label)
-  const [confirmTime, setConfirmTime] = createSignal(TIMES[0])
-
-  const [statusLeft, setStatusLeft] = createSignal('Ready')
-  const [statusMid, setStatusMid] = createSignal('')
-
-  // Mock other participants' availability
-  const others: Record<string, Record<string, number[]>> = {
-    alex: Object.fromEntries(
-      DAYS.map((d) => [
-        d.key,
-        TIMES.map(() => (Math.random() > 0.45 ? (Math.random() > 0.3 ? 1 : 2) : 0)),
-      ]),
-    ),
-    sam: Object.fromEntries(
-      DAYS.map((d) => [
-        d.key,
-        TIMES.map(() => (Math.random() > 0.55 ? (Math.random() > 0.4 ? 1 : 2) : 0)),
-      ]),
-    ),
-  }
+  const [confirmDay, setConfirmDay] = createSignal('')
+  const [confirmTime, setConfirmTime] = createSignal('')
+  const [statusFlash, setStatusFlash] = createSignal('')
+  const [copyStatus, setCopyStatus] = createSignal('')
+  const [confirmedSlotLabel, setConfirmedSlotLabel] = createSignal('')
 
   // Non-reactive drag state
   let dragging = false
@@ -97,15 +101,15 @@ export default function Grid() {
   let dragUndoBatch: UndoEntry[] = []
   let undoStack: UndoEntry[][] = []
   let statusTimer: ReturnType<typeof setTimeout> | null = null
-  let nameSelectRef!: HTMLSelectElement
+  let shareInputRef!: HTMLInputElement
 
   // --- Logic ---
   function heat(dk: string, ti: number) {
     let c = 0
-    const m = myState[dk][ti]
+    const m = myState[dk]?.[ti] ?? 0
     if (m === 1) c += 1
     else if (m === 2) c += 0.5
-    Object.values(others).forEach((p) => {
+    Object.values(others()).forEach((p) => {
       const v = p[dk]?.[ti] ?? 0
       if (v === 1) c += 1
       else if (v === 2) c += 0.5
@@ -114,22 +118,48 @@ export default function Grid() {
   }
 
   const bestTimes = createMemo(() => {
+    const d = days()
+    const t = times()
     const slots: { day: string; time: string; score: number; dk: string; ti: number }[] = []
-    DAYS.forEach((d) =>
-      TIMES.forEach((t, ti) => {
-        const h = heat(d.key, ti)
-        if (h > 0) slots.push({ day: d.label, time: t, score: h, dk: d.key, ti })
+    d.forEach((day) =>
+      t.forEach((slot, ti) => {
+        const h = heat(day.key, ti)
+        if (h > 0) slots.push({ day: day.label, time: slot.label, score: h, dk: day.key, ti })
       }),
     )
     slots.sort((a, b) => b.score - a.score)
     return slots.slice(0, 3)
   })
 
+  const totalParticipants = createMemo(() => event()?.participants.length ?? 0)
+
+  function loadParticipantSlots(ev: AppEvent, name: string) {
+    const spd = slotsPerDay(ev)
+    const p = ev.participants.find((pp) => pp.name === name)
+    if (p) {
+      setMyState(reconcile(flatToRecord(p.slots, ev.dates, spd)))
+    } else {
+      const empty: Record<string, number[]> = {}
+      ev.dates.forEach((ds) => {
+        empty[ds] = new Array(spd).fill(0)
+      })
+      setMyState(reconcile(empty))
+    }
+  }
+
+  async function persistCurrentSlots() {
+    const ev = event()
+    if (!ev || !currentName()) return
+    const spd = slotsPerDay(ev)
+    const flat = recordToFlat(myState, ev.dates, spd)
+    await updateParticipantSlots(ev.id, currentName(), flat, Date.now())
+  }
+
   function dragStart(dk: string, ti: number) {
     dragging = true
     draggedCells = new Set()
     dragUndoBatch = []
-    const prev = myState[dk][ti]
+    const prev = myState[dk]?.[ti] ?? 0
     dragTargetState = (prev + 1) % 3
     dragUndoBatch.push({ dk, ti, prev })
     setMyState(dk, ti, dragTargetState)
@@ -140,7 +170,7 @@ export default function Grid() {
   function dragOver(dk: string, ti: number) {
     const key = `${dk}-${ti}`
     if (draggedCells.has(key)) return
-    const prev = myState[dk][ti]
+    const prev = myState[dk]?.[ti] ?? 0
     dragUndoBatch.push({ dk, ti, prev })
     setMyState(dk, ti, dragTargetState)
     draggedCells.add(key)
@@ -153,12 +183,14 @@ export default function Grid() {
     if (dragUndoBatch.length > 0) undoStack.push([...dragUndoBatch])
     dragUndoBatch = []
     draggedCells = new Set()
+    persistCurrentSlots()
   }
 
   function doUndo() {
     if (!undoStack.length) return
     const batch = undoStack.pop()!
     batch.forEach((u) => setMyState(u.dk, u.ti, u.prev))
+    persistCurrentSlots()
   }
 
   function toggleFocus() {
@@ -171,55 +203,117 @@ export default function Grid() {
       setBestCollapsed(false)
       setGroupCollapsed(false)
     }
-    setStatusLeft(next ? '🔒 Focus ON' : 'Ready')
   }
 
   function openConfirm(day: string | null, time: string | null) {
-    setConfirmDay(day ?? DAYS[0].label)
-    setConfirmTime(time ?? TIMES[0])
+    setConfirmDay(day ?? days()[0]?.label ?? '')
+    setConfirmTime(time ?? times()[0]?.label ?? '')
     setDialog('confirm')
   }
 
   function doConfirm() {
     setDialog(null)
-    setStatusLeft('✅ Confirmed')
-    setStatusMid(`${confirmDay()} ${confirmTime()}`)
+    setConfirmedSlotLabel(`${confirmDay()} ${confirmTime()}`)
+  }
+
+  function flashStatus(message: string) {
+    setStatusFlash(message)
+    if (statusTimer) clearTimeout(statusTimer)
+    statusTimer = setTimeout(() => setStatusFlash(''), 2000)
+  }
+
+  function openShareDialog() {
+    setCopyStatus('')
+    setDialog('share')
   }
 
   async function copyLink(url: string) {
+    let copied = false
     try {
       await navigator.clipboard.writeText(url)
+      copied = true
     } catch {
-      /* fallback */
+      shareInputRef.focus()
+      shareInputRef.select()
+      if (document.execCommand) copied = document.execCommand('copy')
     }
-    const prev = statusMid()
-    setStatusMid('Link copied to clipboard')
-    if (statusTimer) clearTimeout(statusTimer)
-    statusTimer = setTimeout(() => setStatusMid(prev), 2000)
+    if (copied) {
+      setCopyStatus('Copied to clipboard')
+      flashStatus('Link copied to clipboard')
+    } else {
+      setCopyStatus('Select and press Command+C')
+    }
   }
 
-  function onNameChange(e: Event) {
-    const sel = e.currentTarget as HTMLSelectElement
-    if (sel.value === '_add') {
+  async function onNameChange(value: string) {
+    if (value === '_add') {
       const name = prompt('Your name:')
-      if (name) {
-        const key = name.toLowerCase().replace(/\s+/g, '')
-        setParticipants([...participants(), { key, label: name }])
-        setCurrentName(key)
-      } else {
-        sel.value = currentName()
+      if (name?.trim()) {
+        const trimmed = name.trim()
+        const ev = event()
+        if (ev && ev.participants.length < ev.maxParticipants) {
+          const spd = slotsPerDay(ev)
+          const newP: Participant = {
+            name: trimmed,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
+            visitedAt: Date.now(),
+            updatedAt: null,
+          }
+          const updated = { ...ev, participants: [...ev.participants, newP] }
+          await saveEvent(updated)
+          setEvent(updated)
+          loadParticipantSlots(updated, trimmed)
+          setCurrentName(trimmed)
+        }
       }
     } else {
-      setCurrentName(sel.value)
+      await persistCurrentSlots()
+      const ev = event()!
+      loadParticipantSlots(ev, value)
+      setCurrentName(value)
     }
   }
 
   const currentLabel = createMemo(
-    () => participants().find((p) => p.key === currentName())?.label ?? currentName(),
+    () => participantList().find((p) => p.key === currentName())?.label ?? currentName(),
   )
 
-  // Global event listeners
-  onMount(() => {
+  const eventUrl = createMemo(() => `https://timesweeper.app/e/${props.eventId}`)
+  const dayCountClass = createMemo(() => `grid-table--days-${Math.min(Math.max(days().length, 1), 7)}`)
+  const heatmapDayCountClass = createMemo(
+    () => `heatmap-grid--days-${Math.min(Math.max(days().length, 1), 7)}`,
+  )
+  const confirmDayOptions = createMemo(() => days().map((d) => ({ value: d.label, label: d.label })))
+  const confirmTimeOptions = createMemo(() =>
+    times().map((t) => ({ value: t.label, label: t.label })),
+  )
+  const statusLeft = createMemo(() => {
+    if (statusFlash()) return statusFlash()
+    const parts = [currentName() ? `Editing: ${currentLabel()}` : 'No participants yet']
+    if (focusMode()) parts.push('Focus ON')
+    if (confirmedSlotLabel()) parts.push(`Confirmed | ${confirmedSlotLabel()}`)
+    return parts.join(' | ')
+  })
+
+  createEffect(() => {
+    if (dialog() !== 'share') return
+    queueMicrotask(() => {
+      shareInputRef.focus()
+      shareInputRef.select()
+    })
+  })
+
+  // Global event listeners + initial load
+  onMount(async () => {
+    const ev = await getEvent(props.eventId)
+    if (ev) {
+      setEvent(ev)
+      const firstName = ev.participants[0]?.name ?? ''
+      setCurrentName(firstName)
+      if (firstName) loadParticipantSlots(ev, firstName)
+    }
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (
         (e.target as HTMLElement).tagName === 'INPUT' ||
@@ -244,7 +338,15 @@ export default function Grid() {
       }
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
-        setDialog('share')
+        openShareDialog()
+      }
+      if (e.key === 'F3') {
+        e.preventDefault()
+        openShareDialog()
+      }
+      if (e.key === 'F5') {
+        e.preventDefault()
+        openConfirm(null, null)
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault()
@@ -278,480 +380,455 @@ export default function Grid() {
   })
 
   const MEDALS = ['🥇', '🥈', '🥉']
-  const EVENT_URL = 'https://timesweeper.app/e/a1b2c3d4'
 
   return (
     <div class="grid-view">
-      <div class="win r">
-        {/* Title bar */}
-        <div class="tbar">
-          <span style={{ display: 'flex', 'align-items': 'center', gap: '4px' }}>
-            <MineIcon size={16} /> TimeSweeper — Intro Call
-          </span>
-          <div class="tbtns">
-            <div class="tbtn r">─</div>
-            <div class="tbtn r">□</div>
-            <div class="tbtn r">×</div>
-          </div>
-        </div>
-
-        <div class="wb">
-          {/* Menu bar */}
-          <div class="mbar">
-            <div class="mi">
-              <span class="hk">G</span>ame
-            </div>
-            <div class="mi">
-              <span class="hk">V</span>iew
-            </div>
-            <div class="mi" onClick={() => setDialog('help')}>
-              <span class="hk">H</span>elp
+      <Show when={event()} fallback={<div class="grid-view__loading">Loading...</div>}>
+        <div class="grid-view__window r">
+          {/* Title bar */}
+          <div class="win95-window__title-bar">
+            <span class="grid-view__title">
+              <MineIcon size={16} /> TimeSweeper — {event()!.name}
+            </span>
+            <div class="win95-window__title-buttons">
+              <div class="win95-window__title-button r">─</div>
+              <div class="win95-window__title-button r">□</div>
+              <div class="win95-window__title-button r">×</div>
             </div>
           </div>
 
-          {/* Control bar */}
-          <div class="cbar s">
-            <div class="sel-wrap s">
-              <div class="sel-inner">
-                <select ref={nameSelectRef} value={currentName()} onChange={onNameChange}>
-                  <For each={participants()}>{(p) => <option value={p.key}>{p.label}</option>}</For>
-                  <option value="_add">+ Add yourself...</option>
-                </select>
-                <div class="sel-arrow r">▼</div>
+          <div class="grid-view__window-body">
+            {/* Menu bar */}
+            <div class="grid-view__menu-bar">
+              <div class="grid-view__menu-item">
+                <span class="hk">G</span>ame
+              </div>
+              <div class="grid-view__menu-item">
+                <span class="hk">V</span>iew
+              </div>
+              <div class="grid-view__menu-item" onClick={() => setDialog('help')}>
+                <span class="hk">H</span>elp
               </div>
             </div>
-            <div class="share-btn r" onClick={() => setDialog('share')}>
-              <span class="hk">S</span>hare
-            </div>
-          </div>
 
-          {/* Two-panel layout */}
-          <div class="panels">
-            {/* Panel: Your availability */}
-            <div class="panel">
-              <div class="gwrap s">
-                <div class="panel-header" onClick={() => setEditCollapsed(!editCollapsed())}>
-                  <div class="panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
-                  <span>Your availability</span>
-                  <hr />
-                </div>
-                <Show when={!editCollapsed()}>
-                  <div class="panel-body">
-                    <div class="legend">
-                      <span class="lc" /> no →
-                      <span class="lc lc-open" style={{ color: '#006800' }}>
-                        ✔
-                      </span>{' '}
-                      yes →<span class="lc">?</span> maybe →
-                      <span class="lc" /> no
-                    </div>
-                    <div
-                      class="gtable"
-                      style={{
-                        'grid-template-columns': `38px repeat(${DAYS.length}, var(--cell))`,
-                      }}
-                    >
-                      <div style={{ height: '22px' }} />
-                      <For each={DAYS}>{(d) => <div class="chdr">{d.label}</div>}</For>
-                      <For each={TIMES}>
-                        {(t, ti) => (
-                          <>
-                            <div class="tlbl">{t}</div>
-                            <For each={DAYS}>
-                              {(d) => (
-                                <div
-                                  classList={{
-                                    cell: true,
-                                    opened: myState[d.key][ti()] === 1,
-                                    flagged: myState[d.key][ti()] === 2,
-                                  }}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault()
-                                    dragStart(d.key, ti())
-                                  }}
-                                  onMouseEnter={() => {
-                                    if (dragging) dragOver(d.key, ti())
-                                  }}
-                                  onTouchStart={(e) => {
-                                    e.preventDefault()
-                                    dragStart(d.key, ti())
-                                  }}
-                                  data-day={d.key}
-                                  data-ti={String(ti())}
-                                >
-                                  <Show when={myState[d.key][ti()] === 1}>
-                                    <span class="ico">✔</span>
-                                  </Show>
-                                  <Show when={myState[d.key][ti()] === 2}>
-                                    <span class="ico">?</span>
-                                  </Show>
-                                </div>
-                              )}
-                            </For>
-                          </>
-                        )}
-                      </For>
-                    </div>
+            {/* Control bar */}
+            <div class="grid-view__control-bar s">
+              <Win95Field
+                kind="select"
+                value={currentName()}
+                options={nameOptions()}
+                wrapperClass="grid-controls__name"
+                controlClass="grid-controls__input"
+                onChange={onNameChange}
+              />
+              <div class="grid-view__share-button r" onClick={openShareDialog}>
+                <span class="hk">S</span>hare
+              </div>
+            </div>
+
+            {/* Two-panel layout */}
+            <div class="grid-view__panels">
+              {/* Panel: Your availability */}
+              <div class="grid-view__panel">
+                <div class="grid-view__panel-frame s">
+                  <div class="grid-view__panel-header" onClick={() => setEditCollapsed(!editCollapsed())}>
+                    <div class="grid-view__panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
+                    <span>Your availability</span>
+                    <hr />
                   </div>
-                </Show>
-              </div>
-            </div>
-
-            {/* Panel: Results + Group heatmap */}
-            <div class="panel">
-              <div class="gwrap s">
-                {/* Results sub-panel */}
-                <div class="panel-header" onClick={() => setBestCollapsed(!bestCollapsed())}>
-                  <div class="panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
-                  <span>Results · 3/5 participants</span>
-                  <hr />
-                </div>
-                <Show when={!bestCollapsed()}>
-                  <div class="panel-body">
-                    <Show
-                      when={bestTimes().length > 0}
-                      fallback={
-                        <div style={{ 'font-size': '14px', padding: '4px 2px', color: '#808080' }}>
-                          No availability yet
-                        </div>
-                      }
-                    >
-                      <div style={{ 'font-size': '14px', padding: '4px 2px' }}>
-                        <For each={bestTimes()}>
-                          {(slot, i) => {
-                            const myVal = () => myState[slot.dk][slot.ti]
-                            const breakdown = () => {
-                              const parts: string[] = []
-                              if (myVal() === 1)
-                                parts.push('<span style="color:#006800">✔ You</span>')
-                              else if (myVal() === 2)
-                                parts.push('<span style="color:#404040">? You</span>')
-                              Object.entries(others).forEach(([name, data]) => {
-                                const v = data[slot.dk]?.[slot.ti] ?? 0
-                                const n = name.charAt(0).toUpperCase() + name.slice(1)
-                                if (v === 1) parts.push(`<span style="color:#006800">✔ ${n}</span>`)
-                                else if (v === 2)
-                                  parts.push(`<span style="color:#404040">? ${n}</span>`)
-                              })
-                              return parts.join(' · ')
-                            }
-                            return (
-                              <div
-                                style={{
-                                  'margin-bottom': '4px',
-                                  padding: '3px 4px',
-                                  display: 'flex',
-                                  'align-items': 'flex-start',
-                                  gap: '6px',
-                                  background: i() === 0 ? '#e8e8e8' : '',
-                                }}
-                              >
-                                <div style={{ flex: '1' }}>
-                                  <div>
-                                    {MEDALS[i()]}{' '}
-                                    <b>
-                                      {slot.day} {slot.time}
-                                    </b>{' '}
-                                    · {slot.score}/3
-                                  </div>
-                                  <div
-                                    style={{
-                                      'font-size': '12px',
-                                      'margin-left': '22px',
-                                      color: '#404040',
-                                    }}
-                                    innerHTML={breakdown()}
-                                  />
-                                </div>
-                                <div
-                                  class="dialog-btn r"
-                                  style={{
-                                    'font-size': '12px',
-                                    padding: '2px 8px',
-                                    'min-width': '0',
-                                    'flex-shrink': '0',
-                                    cursor: 'pointer',
-                                  }}
-                                  onClick={() => openConfirm(slot.day, slot.time)}
-                                >
-                                  <span class="hk">C</span>onfirm
-                                </div>
-                              </div>
-                            )
-                          }}
-                        </For>
-                        <div style={{ 'margin-top': '6px', padding: '3px 4px' }}>
-                          <div
-                            class="dialog-btn r"
-                            style={{
-                              'font-size': '13px',
-                              padding: '3px 10px',
-                              'min-width': '0',
-                              cursor: 'pointer',
-                              display: 'inline-block',
-                            }}
-                            onClick={() => openConfirm(null, null)}
-                          >
-                            Pick a different time...
-                          </div>
-                        </div>
+                  <Show when={!editCollapsed()}>
+                    <div class="grid-view__panel-body">
+                      <div class="grid-view__legend">
+                        <span class="grid-view__legend-cell" /> no →
+                        <span class="grid-view__legend-cell grid-view__legend-cell--open grid-view__legend-cell--yes">
+                          ✔
+                        </span>{' '}
+                        yes →
+                        <span class="grid-view__legend-cell grid-view__legend-cell--flagged">?</span> maybe →
+                        <span class="grid-view__legend-cell" /> no
                       </div>
-                    </Show>
-                  </div>
-                </Show>
-
-                {/* Group heatmap sub-panel */}
-                <div
-                  class="panel-header"
-                  style={{ 'margin-top': '4px' }}
-                  onClick={() => setGroupCollapsed(!groupCollapsed())}
-                >
-                  <div class="panel-toggle">{groupCollapsed() ? '▸' : '▾'}</div>
-                  <span>Group availability</span>
-                  <hr />
-                </div>
-                <Show when={!groupCollapsed()}>
-                  <div class="panel-body">
-                    <div class="hmleg">
-                      <span>
-                        <span class="hmsw" style={{ background: '#c0c0c0' }} />0
-                      </span>
-                      <span>
-                        <span class="hmsw" style={{ background: '#b0d0b0' }} />
-                        <b style={{ color: 'var(--num-1)' }}>1</b>
-                      </span>
-                      <span>
-                        <span class="hmsw" style={{ background: '#80b880' }} />
-                        <b style={{ color: 'var(--num-2)' }}>2</b>
-                      </span>
-                      <span>
-                        <span class="hmsw" style={{ background: '#50a050' }} />
-                        <b style={{ color: 'var(--num-3)' }}>3</b>
-                      </span>
-                    </div>
-                    <div
-                      class="hmgrid"
-                      style={{
-                        'grid-template-columns': `30px repeat(${DAYS.length}, var(--hm-cell))`,
-                      }}
-                    >
-                      <div style={{ height: '16px' }} />
-                      <For each={DAYS}>{(d) => <div class="hmchdr">{d.label}</div>}</For>
-                      <For each={TIMES}>
-                        {(t, ti) => (
-                          <>
-                            <div class="hmtlbl">{t}</div>
-                            <For each={DAYS}>
-                              {(d) => {
-                                const h = () => heat(d.key, ti())
-                                return (
+                      <div class={`availability-grid ${dayCountClass()}`}>
+                        <div class="availability-grid__corner" />
+                        <For each={days()}>{(d) => <div class="availability-grid__day">{d.label}</div>}</For>
+                        <For each={times()}>
+                          {(t, ti) => (
+                            <>
+                              <div class="availability-grid__time">{t.label}</div>
+                              <For each={days()}>
+                                {(d) => (
                                   <div
                                     classList={{
-                                      hmc: true,
-                                      h0: h() === 0,
-                                      h1: h() === 1,
-                                      h2: h() === 2,
-                                      h3: h() >= 3,
+                                      "availability-grid__cell": true,
+                                      "availability-grid__cell--yes": myState[d.key]?.[ti()] === 1,
+                                      "availability-grid__cell--maybe": myState[d.key]?.[ti()] === 2,
                                     }}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault()
+                                      dragStart(d.key, ti())
+                                    }}
+                                    onMouseEnter={() => {
+                                      if (dragging) dragOver(d.key, ti())
+                                    }}
+                                    onTouchStart={(e) => {
+                                      e.preventDefault()
+                                      dragStart(d.key, ti())
+                                    }}
+                                    data-day={d.key}
+                                    data-ti={String(ti())}
                                   >
-                                    <span class={`n${Math.min(h(), 5)}`}>{h() > 0 ? h() : ''}</span>
+                                    <Show when={myState[d.key]?.[ti()] === 1}>
+                                      <span class="availability-grid__icon">✔</span>
+                                    </Show>
+                                    <Show when={myState[d.key]?.[ti()] === 2}>
+                                      <span class="availability-grid__icon">?</span>
+                                    </Show>
                                   </div>
-                                )
-                              }}
-                            </For>
-                          </>
-                        )}
-                      </For>
+                                )}
+                              </For>
+                            </>
+                          )}
+                        </For>
+                      </div>
                     </div>
+                  </Show>
+                </div>
+              </div>
+
+              {/* Panel: Results + Group heatmap */}
+              <div class="grid-view__panel">
+                <div class="grid-view__panel-frame s">
+                  {/* Results sub-panel */}
+                  <div class="grid-view__panel-header" onClick={() => setBestCollapsed(!bestCollapsed())}>
+                    <div class="grid-view__panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
+                    <span>
+                      Results · {totalParticipants()}/{event()!.maxParticipants} participants
+                    </span>
+                    <hr />
                   </div>
-                </Show>
-              </div>
-            </div>
-          </div>
-          {/* /panels */}
+                  <Show when={!bestCollapsed()}>
+                    <div class="grid-view__panel-body">
+                      <Show
+                        when={bestTimes().length > 0}
+                        fallback={
+                          <div class="results__empty">No availability yet</div>
+                        }
+                      >
+                        <div class="results">
+                          <For each={bestTimes()}>
+                            {(slot, i) => {
+                              const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
+                              const breakdown = () => {
+                                const parts: string[] = []
+                                if (myVal() === 1)
+                                  parts.push('<span class="results__tag results__tag--yes">✔ You</span>')
+                                else if (myVal() === 2)
+                                  parts.push('<span class="results__tag results__tag--maybe">? You</span>')
+                                Object.entries(others()).forEach(([name, data]) => {
+                                  const v = data[slot.dk]?.[slot.ti] ?? 0
+                                  const n = name.charAt(0).toUpperCase() + name.slice(1)
+                                  if (v === 1)
+                                    parts.push(
+                                      `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
+                                    )
+                                  else if (v === 2)
+                                    parts.push(
+                                      `<span class="results__tag results__tag--maybe">? ${n}</span>`,
+                                    )
+                                })
+                                return parts.join(' · ')
+                              }
+                              return (
+                                <div
+                                  classList={{ 'results__row': true, 'results__row--best': i() === 0 }}
+                                >
+                                  <div class="results__main">
+                                    <div class="results__line">
+                                      {MEDALS[i()]}{' '}
+                                      <b>
+                                        {slot.day} {slot.time}
+                                      </b>{' '}
+                                      · {slot.score}/{totalParticipants()}
+                                    </div>
+                                    <div
+                                      class="results__breakdown"
+                                      innerHTML={breakdown()}
+                                    />
+                                  </div>
+                                  <div
+                                    class="dialog-btn r"
+                                    classList={{ 'results__confirm-btn': true }}
+                                    onClick={() => openConfirm(slot.day, slot.time)}
+                                  >
+                                    <span class="hk">C</span>onfirm
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          </For>
+                          <div class="results__custom">
+                            <div
+                              class="dialog-btn r"
+                              classList={{ 'results__custom-btn': true }}
+                              onClick={() => openConfirm(null, null)}
+                            >
+                              Pick a different time...
+                            </div>
+                          </div>
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
 
-          {/* Status bar */}
-          <div class="sbar">
-            <div class="ss st">{statusLeft()}</div>
-            <div class="ss st">{statusMid()}</div>
-            <div class="ss st">Editing: {currentLabel()}</div>
-          </div>
-
-          {/* Function bar */}
-          <div class="fbar">
-            <div class="fi" onClick={doUndo}>
-              <span class="fk">F1</span> <span class="hk">U</span>ndo
-            </div>
-            <div class="fi" onClick={toggleFocus}>
-              <span class="fk">F2</span> <span class="hk">F</span>ocus
-            </div>
-            <div class="fi" onClick={() => setDialog('share')}>
-              <span class="fk">F3</span> <span class="hk">S</span>hare
-            </div>
-            <div class="fi" onClick={() => openConfirm(null, null)}>
-              <span class="fk">F5</span> <span class="hk">C</span>onfirm
-            </div>
-          </div>
-        </div>
-        {/* /wb */}
-      </div>
-      {/* /win */}
-
-      {/* === DIALOGS === */}
-
-      <Show when={dialog() === 'share'}>
-        <div class="dialog-overlay">
-          <div class="dialog r">
-            <div class="tbar">
-              <span>Share Event</span>
-              <div class="tbtns">
-                <div class="tbtn r" onClick={() => setDialog(null)}>
-                  ×
+                  {/* Group heatmap sub-panel */}
+                  <div
+                    class="grid-view__panel-header"
+                    classList={{ 'grid-view__panel-header--spaced': true }}
+                    onClick={() => setGroupCollapsed(!groupCollapsed())}
+                  >
+                    <div class="grid-view__panel-toggle">{groupCollapsed() ? '▸' : '▾'}</div>
+                    <span>Group availability</span>
+                    <hr />
+                  </div>
+                  <Show when={!groupCollapsed()}>
+                    <div class="grid-view__panel-body">
+                      <div class="heatmap-legend">
+                        <span>
+                          <span class="heatmap-legend__swatch heatmap-legend__swatch--0" />0
+                        </span>
+                        <span>
+                          <span class="heatmap-legend__swatch heatmap-legend__swatch--1" />
+                          <b class="heatmap-legend__value heatmap-legend__value--1">1</b>
+                        </span>
+                        <span>
+                          <span class="heatmap-legend__swatch heatmap-legend__swatch--2" />
+                          <b class="heatmap-legend__value heatmap-legend__value--2">2</b>
+                        </span>
+                        <span>
+                          <span class="heatmap-legend__swatch heatmap-legend__swatch--3" />
+                          <b class="heatmap-legend__value heatmap-legend__value--3">3</b>
+                        </span>
+                      </div>
+                      <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
+                        <div class="heatmap-grid__corner" />
+                        <For each={days()}>{(d) => <div class="heatmap-grid__day">{d.label}</div>}</For>
+                        <For each={times()}>
+                          {(t, ti) => (
+                            <>
+                              <div class="heatmap-grid__time">{t.label}</div>
+                              <For each={days()}>
+                                {(d) => {
+                                  const h = () => heat(d.key, ti())
+                                  return (
+                                    <div
+                                      classList={{
+                                        "heatmap-grid__cell": true,
+                                        "heatmap-grid__cell--0": h() === 0,
+                                        "heatmap-grid__cell--1": h() === 1,
+                                        "heatmap-grid__cell--2": h() === 2,
+                                        "heatmap-grid__cell--3": h() >= 3,
+                                      }}
+                                    >
+                                      <span
+                                        class={`heatmap-grid__value heatmap-grid__value--${Math.min(h(), 5)}`}
+                                      >
+                                        {h() > 0 ? h() : ''}
+                                      </span>
+                                    </div>
+                                  )
+                                }}
+                              </For>
+                            </>
+                          )}
+                        </For>
+                      </div>
+                    </div>
+                  </Show>
                 </div>
               </div>
             </div>
-            <div class="dialog-body">
-              <label>Send this link to participants:</label>
-              <div class="dialog-input-wrap s">
-                <input
-                  class="dialog-input"
-                  value={EVENT_URL}
+            {/* /panels */}
+
+            {/* Status bar */}
+            <div class="grid-view__status-bar">
+              <div class="grid-view__status-segment st">{statusLeft()}</div>
+              <div class="grid-view__status-segment st">timesweeper.app</div>
+            </div>
+
+            {/* Function bar */}
+            <div class="grid-view__function-bar">
+              <div class="grid-view__function-item" onClick={doUndo}>
+                <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
+              </div>
+              <div class="grid-view__function-item" onClick={toggleFocus}>
+                <span class="grid-view__function-key">F2</span> <span class="hk">F</span>ocus
+              </div>
+              <div class="grid-view__function-item" onClick={openShareDialog}>
+                <span class="grid-view__function-key">F3</span> <span class="hk">S</span>hare
+              </div>
+              <div class="grid-view__function-item" onClick={() => openConfirm(null, null)}>
+                <span class="grid-view__function-key">F5</span> <span class="hk">C</span>onfirm
+              </div>
+            </div>
+          </div>
+          {/* /grid-view__window-body */}
+        </div>
+        {/* /grid-view__window */}
+
+        {/* === DIALOGS === */}
+
+        <Show when={dialog() === 'share'}>
+          <div class="dialog-overlay">
+            <div class="dialog r">
+              <div class="win95-window__title-bar">
+                <span>Share Event</span>
+                <div class="win95-window__title-buttons">
+                  <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                    ×
+                  </div>
+                </div>
+              </div>
+              <div class="dialog-body">
+                <label>Send this link to participants:</label>
+                <Win95Field
+                  kind="input"
+                  type="url"
+                  value={eventUrl()}
                   readOnly
-                  onClick={(e) => (e.currentTarget as HTMLInputElement).select()}
+                  wrapperClass="dialog__field"
+                  controlClass="dialog__control"
+                  inputRef={(el) => {
+                    shareInputRef = el
+                  }}
+                  onClick={() => shareInputRef.select()}
                 />
-              </div>
-              <div class="dialog-buttons">
-                <div class="dialog-btn r" onClick={() => copyLink(EVENT_URL)}>
-                  <span class="hk">C</span>opy
+                <div class="dialog-buttons">
+                  <div class="dialog-btn r" onClick={() => copyLink(eventUrl())}>
+                    <span class="hk">C</span>opy
+                  </div>
+                  <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                    Close
+                  </div>
                 </div>
-                <div class="dialog-btn r" onClick={() => setDialog(null)}>
-                  Close
-                </div>
+                <div class="copy-status">{copyStatus()}</div>
               </div>
             </div>
           </div>
-        </div>
-      </Show>
+        </Show>
 
-      <Show when={dialog() === 'help'}>
-        <div class="dialog-overlay">
-          <div class="dialog r" style={{ 'max-width': '380px' }}>
-            <div class="tbar">
-              <span>Help — TimeSweeper</span>
-              <div class="tbtns">
-                <div class="tbtn r" onClick={() => setDialog(null)}>
-                  ×
+        <Show when={dialog() === 'help'}>
+          <div class="dialog-overlay">
+            <div class="dialog dialog--help r">
+              <div class="win95-window__title-bar">
+                <span>Help — TimeSweeper</span>
+                <div class="win95-window__title-buttons">
+                  <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                    ×
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="dialog-body" style={{ 'font-size': '15px', 'line-height': '1.6' }}>
-              <p style={{ 'margin-bottom': '8px' }}>
-                <b>How to use TimeSweeper:</b>
-              </p>
-              <p style={{ 'margin-bottom': '6px' }}>
-                <b>1.</b> Pick your name from the dropdown
-              </p>
-              <p style={{ 'margin-bottom': '6px' }}>
-                <b>2.</b> Click a cell to mark availability:
-                <br />
-                <span style={{ 'margin-left': '16px' }}>
-                  <span class="lc" style={{ 'vertical-align': 'middle' }} /> →{' '}
-                  <span class="lc lc-open" style={{ 'vertical-align': 'middle', color: '#006800' }}>
-                    ✔
-                  </span>{' '}
-                  →{' '}
-                  <span class="lc" style={{ 'vertical-align': 'middle' }}>
-                    ?
-                  </span>{' '}
-                  → <span class="lc" style={{ 'vertical-align': 'middle' }} />
-                </span>
-              </p>
-              <p style={{ 'margin-bottom': '6px' }}>
-                <b>3.</b> Click and drag to fill multiple cells at once
-              </p>
-              <p style={{ 'margin-bottom': '6px' }}>
-                <b>4.</b> Check "Group availability" to see when everyone is free
-              </p>
-              <p style={{ 'margin-bottom': '6px' }}>
-                <b>5.</b> Click <b>Share</b> to send the link to others
-              </p>
-              <p style={{ 'margin-bottom': '10px' }}>
-                <b>6.</b> When the group agrees, click <b>Confirm</b>
-              </p>
-              <p style={{ 'margin-bottom': '10px', 'font-size': '13px', color: '#404040' }}>
-                <b>Keyboard shortcuts:</b>
-                <br />
-                <span style={{ 'margin-left': '16px' }}>F1 / U — Undo</span>
-                <br />
-                <span style={{ 'margin-left': '16px' }}>F2 / F — Focus mode</span>
-                <br />
-                <span style={{ 'margin-left': '16px' }}>S — Share link</span>
-                <br />
-                <span style={{ 'margin-left': '16px' }}>Ctrl+Z — Undo</span>
-              </p>
-              <div class="dialog-buttons">
-                <div class="dialog-btn r" onClick={() => setDialog(null)}>
-                  OK
+              <div class="dialog-body dialog-body--help">
+                <p class="help__lead">
+                  <b>How to use TimeSweeper:</b>
+                </p>
+                <p class="help__step">
+                  <b>1.</b> Pick your name from the dropdown
+                </p>
+                <p class="help__step">
+                  <b>2.</b> Click a cell to mark availability:
+                  <br />
+                  <span class="help__cycle">
+                    <span class="grid-view__legend-cell help__mini-cell" /> →{' '}
+                    <span class="grid-view__legend-cell grid-view__legend-cell--open grid-view__legend-cell--yes help__mini-cell">
+                      ✔
+                    </span>{' '}
+                    →{' '}
+                    <span class="grid-view__legend-cell grid-view__legend-cell--flagged help__mini-cell">
+                      ?
+                    </span>{' '}
+                    → <span class="grid-view__legend-cell help__mini-cell" />
+                  </span>
+                </p>
+                <p class="help__step">
+                  <b>3.</b> Click and drag to fill multiple cells at once
+                </p>
+                <p class="help__step">
+                  <b>4.</b> Check "Group availability" to see when everyone is free
+                </p>
+                <p class="help__step">
+                  <b>5.</b> Click <b>Share</b> to send the link to others
+                </p>
+                <p class="help__step help__step--last">
+                  <b>6.</b> When the group agrees, click <b>Confirm</b>
+                </p>
+                <p class="help__keys">
+                  <b>Keyboard shortcuts:</b>
+                  <br />
+                  <span class="help__key-line">F1 / U — Undo</span>
+                  <br />
+                  <span class="help__key-line">F2 / F — Focus mode</span>
+                  <br />
+                  <span class="help__key-line">S — Share link</span>
+                  <br />
+                  <span class="help__key-line">Ctrl+Z — Undo</span>
+                </p>
+                <div class="dialog-buttons">
+                  <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                    OK
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </Show>
+        </Show>
 
-      <Show when={dialog() === 'confirm'}>
-        <div class="dialog-overlay">
-          <div class="dialog r" style={{ 'max-width': '340px' }}>
-            <div class="tbar">
-              <span>Confirm Time</span>
-              <div class="tbtns">
-                <div class="tbtn r" onClick={() => setDialog(null)}>
-                  ×
+        <Show when={dialog() === 'confirm'}>
+          <div class="dialog-overlay">
+            <div class="dialog dialog--confirm r">
+              <div class="win95-window__title-bar">
+                <span>Confirm Time</span>
+                <div class="win95-window__title-buttons">
+                  <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                    ×
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="dialog-body" style={{ 'font-size': '15px' }}>
-              <p style={{ 'margin-bottom': '8px' }}>Confirm this time for everyone?</p>
-              <label style={{ 'margin-bottom': '2px' }}>Day:</label>
-              <div class="sel-wrap s" style={{ 'margin-bottom': '8px' }}>
-                <div class="sel-inner">
-                  <select
-                    value={confirmDay()}
-                    onChange={(e) => setConfirmDay(e.currentTarget.value)}
-                  >
-                    <For each={DAYS}>{(d) => <option value={d.label}>{d.label}</option>}</For>
-                  </select>
-                  <div class="sel-arrow r">▼</div>
-                </div>
-              </div>
-              <label style={{ 'margin-bottom': '2px' }}>Time:</label>
-              <div class="sel-wrap s" style={{ 'margin-bottom': '10px' }}>
-                <div class="sel-inner">
-                  <select
-                    value={confirmTime()}
-                    onChange={(e) => setConfirmTime(e.currentTarget.value)}
-                  >
-                    <For each={TIMES}>{(t) => <option value={t}>{t}</option>}</For>
-                  </select>
-                  <div class="sel-arrow r">▼</div>
-                </div>
-              </div>
-              <p style={{ 'font-size': '12px', color: '#404040', 'margin-bottom': '10px' }}>
-                Everyone will see the confirmed time.
-                <br />
-                This can be undone later.
-              </p>
-              <div class="dialog-buttons">
-                <div class="dialog-btn r" onClick={doConfirm}>
-                  <span class="hk">C</span>onfirm
-                </div>
-                <div class="dialog-btn r" onClick={() => setDialog(null)}>
-                  Cancel
+              <div class="dialog-body dialog-body--confirm">
+                <p class="confirm__lead">Confirm this time for everyone?</p>
+                <label class="confirm__label">Day:</label>
+                <Win95Field
+                  kind="select"
+                  value={confirmDay()}
+                  options={confirmDayOptions()}
+                  wrapperClass="confirm__field confirm__field--day"
+                  controlClass="confirm__control"
+                  onChange={setConfirmDay}
+                />
+                <label class="confirm__label">Time:</label>
+                <Win95Field
+                  kind="select"
+                  value={confirmTime()}
+                  options={confirmTimeOptions()}
+                  wrapperClass="confirm__field confirm__field--time"
+                  controlClass="confirm__control"
+                  onChange={setConfirmTime}
+                />
+                <p class="confirm__note">
+                  Everyone will see the confirmed time.
+                  <br />
+                  This can be undone later.
+                </p>
+                <div class="dialog-buttons">
+                  <div class="dialog-btn r" onClick={doConfirm}>
+                    <span class="hk">C</span>onfirm
+                  </div>
+                  <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                    Cancel
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </Show>
       </Show>
     </div>
   )

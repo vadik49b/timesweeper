@@ -3,11 +3,11 @@ import Landing from './Landing'
 import Grid from './Grid'
 
 export default function App() {
-  const [view, setView] = createSignal<'landing' | 'grid'>('landing')
+  const [eventId, setEventId] = createSignal<string | null>(null)
 
   return (
-    <Show when={view() === 'landing'} fallback={<Grid />}>
-      <Landing onCreateEvent={() => setView('grid')} />
+    <Show when={eventId() === null} fallback={<Grid eventId={eventId()!} />}>
+      <Landing onCreateEvent={(id: string) => setEventId(id)} />
     </Show>
   )
 }
