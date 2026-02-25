@@ -440,35 +440,24 @@ export default function Grid(props: Props) {
           </div>
 
           <div class="grid-view__window-body">
-            {/* Menu bar */}
-            <div class="grid-view__menu-bar">
-              <div class="grid-view__menu-item">
-                <span class="hk">G</span>ame
-              </div>
-              <div class="grid-view__menu-item">
-                <span class="hk">V</span>iew
-              </div>
-              <div class="grid-view__menu-item" onClick={() => setDialog('help')}>
-                <span class="hk">H</span>elp
-              </div>
-            </div>
-
-            {/* Control bar */}
-            <div class="grid-view__control-bar s">
-              <div class="grid-controls__left">
-                <div class="grid-controls__identity">
-                  Hi, <span class="grid-controls__name">{currentName() || 'choose your name'}</span>
+            {/* Minesweeper-style control deck */}
+            <div class="grid-view__deck s">
+              <div class="grid-view__deck-left">
+                <div class="grid-view__deck-display">
+                  Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
                 </div>
-                <Win95Button
-                  class="grid-controls__change-btn"
-                  onClick={() => setShowNamePicker(true)}
-                >
-                  Modify...
+                <Win95Button class="grid-view__deck-modify" onClick={() => setShowNamePicker(true)}>
+                  Switch...
                 </Win95Button>
               </div>
-              <Win95Button class="grid-view__share-button" onClick={openShareDialog}>
-                <span class="hk">S</span>hare
-              </Win95Button>
+              <div class="grid-view__deck-actions">
+                <Win95Button class="grid-view__deck-share" onClick={openShareDialog}>
+                  <span class="hk">S</span>hare
+                </Win95Button>
+                <Win95Button class="grid-view__deck-help" onClick={() => setDialog('help')}>
+                  <span class="hk">H</span>elp
+                </Win95Button>
+              </div>
             </div>
 
             {/* Two-panel layout */}
