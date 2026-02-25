@@ -7,6 +7,13 @@ import {
   setSelectedParticipant,
   updateParticipantSlots,
 } from './db'
+import {
+  connectEventSocket,
+  flushPendingSync,
+  pullRemoteEvent,
+  queueEventSync,
+  queueParticipantSync,
+} from './sync'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import AvailabilityLegend from './components/AvailabilityLegend'
@@ -181,12 +188,77 @@ export default function Grid(props: Props) {
     }
   }
 
+  function mergeRemoteIntoLocal(local: AppEvent, remote: AppEvent): AppEvent {
+    const localByName = new Map(local.participants.map((p) => [p.name, p]))
+    const mergedParticipants = remote.participants.map((rp) => {
+      const lp = localByName.get(rp.name)
+      if (!lp) return rp
+      const lu = lp.updatedAt ?? 0
+      const ru = rp.updatedAt ?? 0
+      return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt } : rp
+    })
+    return { ...remote, participants: mergedParticipants }
+  }
+
+  async function applyRemoteEvent(remote: AppEvent) {
+    const local = event()
+    const next = local ? mergeRemoteIntoLocal(local, remote) : remote
+    await saveEvent(next)
+    setEvent(next)
+    const selected = currentName()
+    if (selected && next.participants.some((p) => p.name === selected)) {
+      loadParticipantSlots(next, selected)
+    }
+  }
+
+  async function applyRemoteParticipantUpdate(
+    eventId: string,
+    participantName: string,
+    slots: SlotValue[],
+    updatedAt: number,
+  ) {
+    const ev = event()
+    if (!ev || ev.id !== eventId) return
+    const idx = ev.participants.findIndex((p) => p.name === participantName)
+    if (idx === -1) return
+    const currentUpdated = ev.participants[idx].updatedAt ?? 0
+    if (currentUpdated >= updatedAt) return
+    const updated: AppEvent = {
+      ...ev,
+      participants: ev.participants.map((p, i) =>
+        i === idx ? { ...p, slots, updatedAt } : p,
+      ),
+    }
+    await saveEvent(updated)
+    setEvent(updated)
+    if (participantName === currentName()) {
+      loadParticipantSlots(updated, participantName)
+    }
+  }
+
   async function persistCurrentSlots() {
     const ev = event()
     if (!ev || !currentName()) return
     const spd = slotsPerDay(ev)
     const flat = recordToFlat(myState, ev.dates, spd)
-    await updateParticipantSlots(ev.id, currentName(), flat, Date.now())
+    const prevFlat = ev.participants.find((p) => p.name === currentName())?.slots ?? []
+    const changes: Array<{ i: number; v: SlotValue }> = []
+    for (let i = 0; i < flat.length; i++) {
+      const prev = prevFlat[i] ?? 0
+      const next = flat[i] ?? 0
+      if (prev !== next) changes.push({ i, v: next as SlotValue })
+    }
+    if (changes.length === 0) return
+    const updatedAt = Date.now()
+    await updateParticipantSlots(ev.id, currentName(), flat, updatedAt)
+    setEvent({
+      ...ev,
+      participants: ev.participants.map((p) =>
+        p.name === currentName() ? { ...p, slots: flat, updatedAt } : p,
+      ),
+    })
+    await queueParticipantSync(ev.id, currentName(), changes, updatedAt)
+    await flushPendingSync()
   }
 
   function dragStart(dk: string, ti: number) {
@@ -252,6 +324,8 @@ export default function Grid(props: Props) {
       },
     }
     void saveEvent(updated)
+    void queueEventSync(updated)
+    void flushPendingSync()
     setEvent(updated)
     flashStatus('Confirmed time updated')
     setDialog(null)
@@ -262,6 +336,8 @@ export default function Grid(props: Props) {
     if (!ev) return
     const updated: AppEvent = { ...ev, status: 'open', confirmedSlot: undefined }
     void saveEvent(updated)
+    void queueEventSync(updated)
+    void flushPendingSync()
     setEvent(updated)
     flashStatus('Confirmation removed')
   }
@@ -432,12 +508,26 @@ export default function Grid(props: Props) {
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
+    await queueEventSync(updated)
+    await flushPendingSync()
     await setSelectedParticipant(updated.id, trimmed)
     setEvent(updated)
     loadParticipantSlots(updated, trimmed)
     setCurrentName(trimmed)
     setNewParticipantName('')
     setShowNamePicker(false)
+  }
+
+  async function initializeSelectedParticipant(ev: AppEvent) {
+    const savedName = await getSelectedParticipant(ev.id)
+    const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
+    if (savedName && exists) {
+      loadParticipantSlots(ev, savedName)
+      setCurrentName(savedName)
+      setShowNamePicker(false)
+    } else {
+      setShowNamePicker(true)
+    }
   }
 
   const currentLabel = createMemo(
@@ -468,21 +558,68 @@ export default function Grid(props: Props) {
     })
   })
 
+  createEffect(() => {
+    if (!isConfirmed()) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    onCleanup(() => {
+      document.body.style.overflow = prevOverflow
+    })
+  })
+
   // Global event listeners + initial load
   onMount(async () => {
-    const ev = await getEvent(props.eventId)
-    if (ev) {
-      setEvent(ev)
-      const savedName = await getSelectedParticipant(ev.id)
-      const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
-      if (savedName && exists) {
-        loadParticipantSlots(ev, savedName)
-        setCurrentName(savedName)
-        setShowNamePicker(false)
-      } else {
-        setShowNamePicker(true)
+    const localEvent = await getEvent(props.eventId)
+    if (localEvent) {
+      setEvent(localEvent)
+      await initializeSelectedParticipant(localEvent)
+    }
+
+    try {
+      const remote = await pullRemoteEvent(props.eventId)
+      if (remote) {
+        await applyRemoteEvent(remote)
+        await initializeSelectedParticipant(remote)
+      } else if (localEvent) {
+        // Event exists locally but not on server yet: seed remote once.
+        await queueEventSync(localEvent)
+        await flushPendingSync()
+      }
+    } catch {
+      // Keep local-only mode when backend is unavailable.
+    }
+    await flushPendingSync()
+
+    const disconnectSocket = connectEventSocket(props.eventId, {
+      onEventUpdated: (remote) => {
+        void applyRemoteEvent(remote)
+      },
+      onParticipantUpdated: (eventId, participantName, slots, updatedAt) => {
+        void applyRemoteParticipantUpdate(eventId, participantName, slots, updatedAt)
+      },
+    })
+
+    const onOnline = () => {
+      void flushPendingSync()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void flushPendingSync()
+        void pullRemoteEvent(props.eventId).then((remote) => {
+          if (remote) void applyRemoteEvent(remote)
+        })
       }
     }
+    const pollId = window.setInterval(() => {
+      if (!navigator.onLine) return
+      void pullRemoteEvent(props.eventId).then((remote) => {
+        if (remote) void applyRemoteEvent(remote)
+      })
+      void flushPendingSync()
+    }, 15000)
+    window.addEventListener('online', onOnline)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     setIsLoading(false)
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -538,6 +675,10 @@ export default function Grid(props: Props) {
     document.addEventListener('touchcancel', dragEnd)
 
     onCleanup(() => {
+      disconnectSocket()
+      window.clearInterval(pollId)
+      window.removeEventListener('online', onOnline)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('mouseup', dragEnd)
       document.removeEventListener('mouseleave', dragEnd)

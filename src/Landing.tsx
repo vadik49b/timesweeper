@@ -2,6 +2,7 @@ import { createSignal, createMemo, onMount, For, Index } from 'solid-js'
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents, setSelectedParticipant } from './db'
+import { queueEventSync, flushPendingSync } from './sync'
 import Win95Field from './components/Win95Field'
 import MineIcon from './icons/MineIcon'
 import FlagIcon from './icons/FlagIcon'
@@ -175,6 +176,8 @@ export default function Landing(props: Props) {
         })),
     }
     await saveEvent(event)
+    await queueEventSync(event)
+    await flushPendingSync()
     await setSelectedParticipant(event.id, participantNames[0])
     props.onOpenEvent(event.id)
   }

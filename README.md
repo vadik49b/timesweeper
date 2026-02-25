@@ -1,28 +1,53 @@
-## Usage
+## Setup
 
 ```bash
-$ npm install # or pnpm install or yarn install
+npm install
 ```
 
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
+## Run Locally (Frontend + Cloudflare API)
 
-## Available Scripts
+1. Start the Worker API in one terminal:
 
-In the project directory, you can run:
+```bash
+npm run dev:api
+```
 
-### `npm run dev`
+2. Start the frontend in another terminal:
 
-Runs the app in the development mode.<br>
-Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
+```bash
+npm run dev
+```
 
-### `npm run build`
+3. Open `http://localhost:5173`
 
-Builds the app for production to the `dist` folder.<br>
-It correctly bundles Solid in production mode and optimizes the build for the best performance.
+The Vite dev server proxies `/api` and WebSocket `/api/*` traffic to Wrangler on `127.0.0.1:8787`.
 
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
+## Cloudflare API
 
-## Deployment
+The Worker + Durable Object API lives in:
+- `worker/src/worker.ts`
+- `wrangler.toml`
 
-Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)
+Implemented endpoints:
+- `GET /api/events/:eventId`
+- `PUT /api/events/:eventId`
+- `PUT /api/events/:eventId/participants/:participantName` with `{ changes, updatedAt }`
+- `GET /api/events/:eventId/ws` (WebSocket)
+
+WebSocket messages:
+- `{ type: "event.updated", event }`
+- `{ type: "participant.updated", eventId, participantName, slots, updatedAt }`
+
+## Sync Test Checklist
+
+1. Open the same event link in two browser tabs.
+2. In tab A, update availability.
+3. Verify tab B updates live (WebSocket), or within 15s (poll fallback).
+4. Disable network in DevTools, make edits, re-enable network.
+5. Verify queued sync flushes and both tabs converge.
+
+## Deploy API
+
+```bash
+npm run deploy:api
+```

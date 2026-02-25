@@ -594,9 +594,9 @@ body {
   padding: 4px 2px;
 }
 .grid-view__confirmed-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 120;
   background: rgba(192, 192, 192, 0.88);
   display: flex;
   align-items: center;
@@ -605,7 +605,9 @@ body {
 }
 .grid-view__confirmed-box {
   max-width: 460px;
-  width: 100%;
+  width: min(460px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   padding: 28px;
   box-shadow: 2px 2px 0 #000;
   background: var(--bg);
@@ -653,6 +655,17 @@ body {
   font-size: 12px;
   padding: 4px 12px;
   flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .grid-view__confirmed-overlay {
+    padding: 8px;
+  }
+  .grid-view__confirmed-box {
+    width: calc(100vw - 12px);
+    max-height: calc(100dvh - 12px);
+    padding: 18px;
+  }
 }
 .results__empty {
   font-size: 14px;
@@ -771,6 +784,21 @@ body {
   font-size: 12px;
   color: #404040;
   margin-bottom: 10px;
+}
+
+@media (max-width: 700px) {
+  .dialog--confirm {
+    width: calc(100vw - 12px);
+    max-width: none;
+    max-height: calc(100dvh - 12px);
+    margin: 6px;
+    display: flex;
+    flex-direction: column;
+  }
+  .dialog--confirm .dialog-body--confirm {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 .participant-picker__lead {
   margin-bottom: 8px;
