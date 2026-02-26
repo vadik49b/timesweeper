@@ -9,7 +9,7 @@ interface TimeSweeper extends DBSchema {
   }
   localState: {
     key: string
-    value: { eventId: string; participantName: string }
+    value: { eventId: string; participantName: string; publishedAt?: number | null }
   }
   pendingSync: {
     key: number
@@ -22,6 +22,7 @@ export interface ParticipantSyncPayload {
   eventId: string
   participantName: string
   changes: Array<{ i: number; v: SlotValue }>
+  baseVersion: number
   updatedAt: number
 }
 
@@ -80,13 +81,14 @@ export async function updateParticipantSlots(
   name: string,
   slots: SlotValue[],
   updatedAt: number,
+  version?: number,
 ): Promise<void> {
   const db = await getDB()
   const event = await db.get('events', eventId)
   if (!event) return
   const idx = event.participants.findIndex((p) => p.name === name)
   if (idx !== -1) {
-    event.participants[idx] = { ...event.participants[idx], slots, updatedAt }
+    event.participants[idx] = { ...event.participants[idx], slots, updatedAt, version }
   }
   await db.put('events', event)
 }
@@ -102,7 +104,28 @@ export async function setSelectedParticipant(
   participantName: string,
 ): Promise<void> {
   const db = await getDB()
-  await db.put('localState', { eventId, participantName })
+  const existing = await db.get('localState', eventId)
+  await db.put('localState', {
+    eventId,
+    participantName,
+    publishedAt: existing?.publishedAt ?? null,
+  })
+}
+
+export async function getPublishedAt(eventId: string): Promise<number | null> {
+  const db = await getDB()
+  const row = await db.get('localState', eventId)
+  return row?.publishedAt ?? null
+}
+
+export async function setPublishedAt(eventId: string, publishedAt: number): Promise<void> {
+  const db = await getDB()
+  const existing = await db.get('localState', eventId)
+  await db.put('localState', {
+    eventId,
+    participantName: existing?.participantName ?? '',
+    publishedAt,
+  })
 }
 
 export async function enqueueSyncOp(op: SyncOp): Promise<number> {

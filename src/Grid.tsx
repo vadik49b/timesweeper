@@ -199,9 +199,14 @@ export default function Grid(props: Props) {
     const mergedParticipants = remote.participants.map((rp) => {
       const lp = localByName.get(rp.name)
       if (!lp) return rp
+      const lv = lp.version ?? 0
+      const rv = rp.version ?? 0
+      if (lv !== rv) {
+        return lv > rv ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
+      }
       const lu = lp.updatedAt ?? 0
       const ru = rp.updatedAt ?? 0
-      return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt } : rp
+      return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
     })
     const mergedRemote: AppEvent = { ...remote, participants: mergedParticipants }
     if (!preferLocalMeta) return mergedRemote
@@ -233,16 +238,21 @@ export default function Grid(props: Props) {
     participantName: string,
     slots: SlotValue[],
     updatedAt: number,
+    version: number,
   ) {
     const ev = event()
     if (!ev || ev.id !== eventId) return
     const idx = ev.participants.findIndex((p) => p.name === participantName)
     if (idx === -1) return
+    const currentVersion = ev.participants[idx].version ?? 0
+    if (currentVersion > version) return
     const currentUpdated = ev.participants[idx].updatedAt ?? 0
-    if (currentUpdated >= updatedAt) return
+    if (currentVersion === version && currentUpdated >= updatedAt) return
     const updated: AppEvent = {
       ...ev,
-      participants: ev.participants.map((p, i) => (i === idx ? { ...p, slots, updatedAt } : p)),
+      participants: ev.participants.map((p, i) =>
+        i === idx ? { ...p, slots, updatedAt, version } : p,
+      ),
     }
     await saveEvent(updated)
     setEvent(updated)
@@ -265,14 +275,16 @@ export default function Grid(props: Props) {
     }
     if (changes.length === 0) return
     const updatedAt = Date.now()
-    await updateParticipantSlots(ev.id, currentName(), flat, updatedAt)
+    const prevVersion = ev.participants.find((p) => p.name === currentName())?.version ?? 0
+    const nextVersion = prevVersion + 1
+    await updateParticipantSlots(ev.id, currentName(), flat, updatedAt, nextVersion)
     setEvent({
       ...ev,
       participants: ev.participants.map((p) =>
-        p.name === currentName() ? { ...p, slots: flat, updatedAt } : p,
+        p.name === currentName() ? { ...p, slots: flat, updatedAt, version: nextVersion } : p,
       ),
     })
-    await queueParticipantSync(ev.id, currentName(), changes, updatedAt)
+    await queueParticipantSync(ev.id, currentName(), changes, prevVersion, updatedAt)
     await flushPendingSync()
   }
 
@@ -522,6 +534,7 @@ export default function Grid(props: Props) {
       slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
       visitedAt: Date.now(),
       updatedAt: null,
+      version: 0,
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
@@ -617,8 +630,8 @@ export default function Grid(props: Props) {
       onEventUpdated: (remote) => {
         void applyRemoteEvent(remote)
       },
-      onParticipantUpdated: (eventId, participantName, slots, updatedAt) => {
-        void applyRemoteParticipantUpdate(eventId, participantName, slots, updatedAt)
+      onParticipantUpdated: (eventId, participantName, slots, updatedAt, version) => {
+        void applyRemoteParticipantUpdate(eventId, participantName, slots, updatedAt, version)
       },
     })
 

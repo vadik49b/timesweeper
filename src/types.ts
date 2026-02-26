@@ -8,6 +8,7 @@ export interface Participant {
   slots: SlotValue[]
   visitedAt: number | null
   updatedAt: number | null
+  version?: number
 }
 
 export interface ConfirmedSlot {

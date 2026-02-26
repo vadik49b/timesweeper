@@ -6,6 +6,7 @@ interface Participant {
   slots: SlotValue[]
   visitedAt: number | null
   updatedAt: number | null
+  version?: number
 }
 
 interface ConfirmedSlot {
@@ -28,6 +29,7 @@ interface AppEvent {
 
 interface Env {
   EVENT_ROOMS: DurableObjectNamespace<EventRoom>
+  ALLOW_LOCALHOST_ORIGIN?: string
 }
 
 const ALLOWED_ORIGINS = new Set([
@@ -40,9 +42,24 @@ function isAllowedOrigin(origin: string | null): boolean {
   return ALLOWED_ORIGINS.has(origin)
 }
 
-function corsHeaders(request: Request): Record<string, string> {
+function shouldAllowLocalhost(env: Env): boolean {
+  return env.ALLOW_LOCALHOST_ORIGIN === 'true'
+}
+
+function isLocalhostOrigin(origin: string): boolean {
+  return origin === 'http://localhost:5173'
+}
+
+function isAllowedOriginForEnv(origin: string | null, env: Env): boolean {
+  if (!origin) return true
+  if (isAllowedOrigin(origin)) return true
+  if (shouldAllowLocalhost(env) && isLocalhostOrigin(origin)) return true
+  return false
+}
+
+function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get('Origin')
-  if (!origin || !isAllowedOrigin(origin)) return {}
+  if (!origin || !isAllowedOriginForEnv(origin, env)) return {}
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
@@ -51,19 +68,19 @@ function corsHeaders(request: Request): Record<string, string> {
   }
 }
 
-function json(data: unknown, request: Request, status = 200): Response {
+function json(data: unknown, request: Request, env: Env, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
-      ...corsHeaders(request),
+      ...corsHeaders(request, env),
     },
   })
 }
 
-function noContent(request: Request, status = 204): Response {
-  return new Response(null, { status, headers: corsHeaders(request) })
+function noContent(request: Request, env: Env, status = 204): Response {
+  return new Response(null, { status, headers: corsHeaders(request, env) })
 }
 
 async function readJson<T>(req: Request): Promise<T | null> {
@@ -98,13 +115,13 @@ function matchEventPath(
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (!isAllowedOrigin(request.headers.get('Origin'))) {
-      return json({ error: 'origin_not_allowed' }, request, 403)
+    if (!isAllowedOriginForEnv(request.headers.get('Origin'), env)) {
+      return json({ error: 'origin_not_allowed' }, request, env, 403)
     }
-    if (request.method === 'OPTIONS') return noContent(request)
+    if (request.method === 'OPTIONS') return noContent(request, env)
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
-    if (!route) return json({ error: 'not_found' }, request, 404)
+    if (!route) return json({ error: 'not_found' }, request, env, 404)
     const id = env.EVENT_ROOMS.idFromName(route.eventId)
     const stub = env.EVENT_ROOMS.get(id)
     return stub.fetch(request)
@@ -113,10 +130,12 @@ export default {
 
 export class EventRoom {
   private state: DurableObjectState
+  private env: Env
   private clients: Set<WebSocket>
 
-  constructor(state: DurableObjectState) {
+  constructor(state: DurableObjectState, env: Env) {
     this.state = state
+    this.env = env
     this.clients = new Set()
   }
 
@@ -150,19 +169,19 @@ export class EventRoom {
   }
 
   async fetch(request: Request): Promise<Response> {
-    if (!isAllowedOrigin(request.headers.get('Origin'))) {
-      return json({ error: 'origin_not_allowed' }, request, 403)
+    if (!isAllowedOriginForEnv(request.headers.get('Origin'), this.env)) {
+      return json({ error: 'origin_not_allowed' }, request, this.env, 403)
     }
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
-    if (!route) return json({ error: 'not_found' }, request, 404)
+    if (!route) return json({ error: 'not_found' }, request, this.env, 404)
 
     if (route.kind === 'ws') {
       if (request.headers.get('Upgrade') !== 'websocket') {
-        return json({ error: 'expected_websocket_upgrade' }, request, 426)
+        return json({ error: 'expected_websocket_upgrade' }, request, this.env, 426)
       }
-      if (!isAllowedOrigin(request.headers.get('Origin'))) {
-        return json({ error: 'origin_not_allowed' }, request, 403)
+      if (!isAllowedOriginForEnv(request.headers.get('Origin'), this.env)) {
+        return json({ error: 'origin_not_allowed' }, request, this.env, 403)
       }
       const pair = new WebSocketPair()
       const [client, server] = Object.values(pair)
@@ -174,41 +193,57 @@ export class EventRoom {
     if (route.kind === 'event') {
       if (request.method === 'GET') {
         const event = await this.getEvent()
-        if (!event) return json({ error: 'event_not_found' }, request, 404)
-        return json(event, request)
+        if (!event) return json({ error: 'event_not_found' }, request, this.env, 404)
+        return json(event, request, this.env)
       }
       if (request.method === 'PUT') {
         const event = await readJson<AppEvent>(request)
         if (!event || typeof event.id !== 'string')
-          return json({ error: 'invalid_event_payload' }, request, 400)
+          return json({ error: 'invalid_event_payload' }, request, this.env, 400)
         if (event.id !== route.eventId) {
-          return json({ error: 'event_id_mismatch' }, request, 400)
+          return json({ error: 'event_id_mismatch' }, request, this.env, 400)
         }
-        await this.setEvent(event)
-        this.broadcast({ type: 'event.updated', event })
-        return json({ ok: true }, request)
+        const normalized: AppEvent = {
+          ...event,
+          participants: event.participants.map((p) => ({ ...p, version: p.version ?? 0 })),
+        }
+        await this.setEvent(normalized)
+        this.broadcast({ type: 'event.updated', event: normalized })
+        return json({ ok: true }, request, this.env)
       }
-      return json({ error: 'method_not_allowed' }, request, 405)
+      return json({ error: 'method_not_allowed' }, request, this.env, 405)
     }
 
-    if (request.method !== 'PUT') return json({ error: 'method_not_allowed' }, request, 405)
+    if (request.method !== 'PUT')
+      return json({ error: 'method_not_allowed' }, request, this.env, 405)
     const body = await readJson<{
       changes?: Array<{ i: number; v: SlotValue }>
+      baseVersion?: number
       updatedAt?: number
     }>(request)
     const changes = body?.changes
+    const baseVersion = body?.baseVersion
     const updatedAt = body?.updatedAt
-    if (!Array.isArray(changes) || typeof updatedAt !== 'number') {
-      return json({ error: 'invalid_participant_payload' }, request, 400)
+    if (!Array.isArray(changes) || typeof updatedAt !== 'number' || typeof baseVersion !== 'number') {
+      return json({ error: 'invalid_participant_payload' }, request, this.env, 400)
     }
     const event = await this.getEvent()
-    if (!event) return json({ error: 'event_not_found' }, request, 404)
+    if (!event) return json({ error: 'event_not_found' }, request, this.env, 404)
     const idx = event.participants.findIndex((p) => p.name === route.participantName)
-    if (idx === -1) return json({ error: 'participant_not_found' }, request, 404)
+    if (idx === -1) return json({ error: 'participant_not_found' }, request, this.env, 404)
 
     const participant = event.participants[idx]
+    const currentVersion = participant.version ?? 0
+    if (currentVersion !== baseVersion) {
+      return json(
+        { error: 'version_conflict', currentVersion, updatedAt: participant.updatedAt ?? null },
+        request,
+        this.env,
+        409,
+      )
+    }
     if ((participant.updatedAt ?? 0) >= updatedAt) {
-      return json({ ok: true, stale: true }, request)
+      return json({ ok: true, stale: true }, request, this.env)
     }
 
     const nextSlots = [...participant.slots]
@@ -219,10 +254,11 @@ export class EventRoom {
       nextSlots[change.i] = change.v
     }
 
+    const nextVersion = currentVersion + 1
     const nextEvent: AppEvent = {
       ...event,
       participants: event.participants.map((p, i) =>
-        i === idx ? { ...p, slots: nextSlots, updatedAt } : p,
+        i === idx ? { ...p, slots: nextSlots, updatedAt, version: nextVersion } : p,
       ),
     }
 
@@ -233,7 +269,8 @@ export class EventRoom {
       participantName: route.participantName,
       slots: nextSlots,
       updatedAt,
+      version: nextVersion,
     })
-    return json({ ok: true }, request)
+    return json({ ok: true, version: nextVersion }, request, this.env)
   }
 }

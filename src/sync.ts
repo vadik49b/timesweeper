@@ -24,17 +24,17 @@ function wsBase() {
 
 async function sendSyncOp(op: SyncOp): Promise<void> {
   if (op.kind === 'participant') {
-    const { eventId, participantName, changes, updatedAt } = op.payload
-    const sendParticipant = () =>
+    const { eventId, participantName, changes, baseVersion, updatedAt } = op.payload
+    const sendParticipant = (version: number) =>
       fetch(
         `${apiBase()}/events/${encodeURIComponent(eventId)}/participants/${encodeURIComponent(participantName)}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ changes, updatedAt }),
+          body: JSON.stringify({ changes, baseVersion: version, updatedAt }),
         },
       )
-    let resp = await sendParticipant()
+    let resp = await sendParticipant(baseVersion)
     if (resp.status === 404) {
       // Server doesn't have this event yet; seed it from local cache, then retry once.
       const local = await getEvent(eventId)
@@ -44,7 +44,13 @@ async function sendSyncOp(op: SyncOp): Promise<void> {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(local),
         })
-        if (seedResp.ok) resp = await sendParticipant()
+        if (seedResp.ok) resp = await sendParticipant(baseVersion)
+      }
+    }
+    if (resp.status === 409) {
+      const conflict = (await resp.json().catch(() => null)) as { currentVersion?: number } | null
+      if (typeof conflict?.currentVersion === 'number') {
+        resp = await sendParticipant(conflict.currentVersion)
       }
     }
     if (!resp.ok) throw new Error(`participant sync failed: ${resp.status}`)
@@ -63,11 +69,12 @@ export async function queueParticipantSync(
   eventId: string,
   participantName: string,
   changes: Array<{ i: number; v: SlotValue }>,
+  baseVersion: number,
   updatedAt: number,
 ): Promise<void> {
   await enqueueSyncOp({
     kind: 'participant',
-    payload: { eventId, participantName, changes, updatedAt },
+    payload: { eventId, participantName, changes, baseVersion, updatedAt },
     createdAt: Date.now(),
   })
 }
@@ -78,6 +85,20 @@ export async function queueEventSync(event: AppEvent): Promise<void> {
     payload: { event },
     createdAt: Date.now(),
   })
+}
+
+export async function publishEventNow(event: AppEvent): Promise<boolean> {
+  if (!navigator.onLine) return false
+  try {
+    const resp = await fetch(`${apiBase()}/events/${encodeURIComponent(event.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    })
+    return resp.ok
+  } catch {
+    return false
+  }
 }
 
 export async function flushPendingSync(): Promise<void> {
@@ -111,6 +132,7 @@ type WsEventMessage =
       participantName: string
       slots: SlotValue[]
       updatedAt: number
+      version: number
     }
 
 export interface SyncSocketHandlers {
@@ -120,6 +142,7 @@ export interface SyncSocketHandlers {
     participantName: string,
     slots: SlotValue[],
     updatedAt: number,
+    version: number,
   ) => void
 }
 
@@ -137,7 +160,13 @@ export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers
       if (msg.type === 'event.updated') {
         handlers.onEventUpdated(msg.event)
       } else if (msg.type === 'participant.updated') {
-        handlers.onParticipantUpdated(msg.eventId, msg.participantName, msg.slots, msg.updatedAt)
+        handlers.onParticipantUpdated(
+          msg.eventId,
+          msg.participantName,
+          msg.slots,
+          msg.updatedAt,
+          msg.version,
+        )
       }
     } catch {
       // Ignore malformed server messages.

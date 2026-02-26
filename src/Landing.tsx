@@ -1,8 +1,8 @@
 import { createSignal, createMemo, onMount, For, Index } from 'solid-js'
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
-import { saveEvent, listEvents, setSelectedParticipant } from './db'
-import { queueEventSync, flushPendingSync } from './sync'
+import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from './db'
+import { publishEventNow, queueEventSync, flushPendingSync } from './sync'
 import Win95Field from './components/Win95Field'
 import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
@@ -175,16 +175,23 @@ export default function Landing(props: Props) {
         slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
         visitedAt: null,
         updatedAt: null,
+        version: 0,
       })),
     }
     await saveEvent(event)
     await setSelectedParticipant(event.id, participantNames[0])
     props.onOpenEvent(event.id)
-    void queueEventSync(event)
-      .then(() => flushPendingSync())
-      .catch(() => {
-        // Keep create flow local-first; sync retries in background.
-      })
+    void (async () => {
+      const published = await publishEventNow(event)
+      if (published) {
+        await setPublishedAt(event.id, Date.now())
+        return
+      }
+      await queueEventSync(event)
+      await flushPendingSync()
+    })().catch(() => {
+      // Keep create flow local-first; sync retries in background.
+    })
   }
 
   return (

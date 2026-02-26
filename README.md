@@ -26,17 +26,17 @@ The Vite dev server proxies `/api` and WebSocket `/api/*` traffic to Wrangler on
 
 The Worker + Durable Object API lives in:
 - `worker/src/worker.ts`
-- `wrangler.toml`
+- `worker/wrangler.toml`
 
 Implemented endpoints:
 - `GET /api/events/:eventId`
 - `PUT /api/events/:eventId`
-- `PUT /api/events/:eventId/participants/:participantName` with `{ changes, updatedAt }`
+- `PUT /api/events/:eventId/participants/:participantName` with `{ changes, baseVersion, updatedAt }`
 - `GET /api/events/:eventId/ws` (WebSocket)
 
 WebSocket messages:
 - `{ type: "event.updated", event }`
-- `{ type: "participant.updated", eventId, participantName, slots, updatedAt }`
+- `{ type: "participant.updated", eventId, participantName, slots, updatedAt, version }`
 
 ## Sync Test Checklist
 
