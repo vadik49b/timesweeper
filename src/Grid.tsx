@@ -37,7 +37,6 @@ type UndoEntry = { dk: string; ti: number; prev: number }
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
-  const [isLoading, setIsLoading] = createSignal(true)
   const [isFetchingRemote, setIsFetchingRemote] = createSignal(false)
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
   const [showNamePicker, setShowNamePicker] = createSignal(false)
@@ -577,10 +576,8 @@ export default function Grid(props: Props) {
   }
 
   async function retryLoadFromWorker() {
-    setIsLoading(true)
     setLoadError('none')
     await loadFromWorkerInBackground()
-    setIsLoading(false)
   }
 
   const currentLabel = createMemo(
@@ -735,7 +732,6 @@ export default function Grid(props: Props) {
         if (localEvent) {
           setEvent(localEvent)
           await initializeSelectedParticipant(localEvent)
-          setIsLoading(false)
         }
       } catch {
         // Never block local rendering when sync/indexeddb init fails.
@@ -750,8 +746,6 @@ export default function Grid(props: Props) {
         }
       } catch {
         // Keep local-only mode when backend is unavailable.
-      } finally {
-        if (!localEvent) setIsLoading(false)
       }
       await flushPendingSync().catch(() => {})
     })()
@@ -764,7 +758,6 @@ export default function Grid(props: Props) {
     return 'Loading participant list...'
   })
 
-  const canRetryLoad = createMemo(() => !isLoading() && loadError() !== 'none')
   const shouldShowNamePickerDialog = createMemo(
     () =>
       showNamePicker() ||
@@ -1125,21 +1118,14 @@ export default function Grid(props: Props) {
               </div>
             </div>
             <div class="dialog-body">
-              <Show
-                when={event()}
-                fallback={
-                  <div class="participant-picker__loading">
-                    <p class="participant-picker__lead">{loadingOverlayText()}</p>
-                    <Show when={canRetryLoad()}>
-                      <div class="dialog-buttons">
-                        <div class="dialog-btn r" onClick={() => void retryLoadFromWorker()}>
-                          Retry
-                        </div>
+                  <Show
+                    when={event()}
+                    fallback={
+                      <div class="participant-picker__loading">
+                        <p class="participant-picker__lead">{loadingOverlayText()}</p>
                       </div>
-                    </Show>
-                  </div>
-                }
-              >
+                    }
+                  >
                 <p class="participant-picker__lead">
                   Choose your participant name to start editing availability.
                 </p>
