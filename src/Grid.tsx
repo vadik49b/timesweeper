@@ -37,6 +37,7 @@ type UndoEntry = { dk: string; ti: number; prev: number }
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
+  const [localReady, setLocalReady] = createSignal(false)
   const [isFetchingRemote, setIsFetchingRemote] = createSignal(false)
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
   const [showNamePicker, setShowNamePicker] = createSignal(false)
@@ -90,6 +91,7 @@ export default function Grid(props: Props) {
 
   let undoStack: UndoEntry[][] = []
   let statusTimer: ReturnType<typeof setTimeout> | null = null
+  let persistTimer: ReturnType<typeof setTimeout> | undefined
   let shareInputRef!: HTMLInputElement
 
   function goToLanding() {
@@ -280,6 +282,11 @@ export default function Grid(props: Props) {
     await flushPendingSync()
   }
 
+  function schedulePersist() {
+    clearTimeout(persistTimer)
+    persistTimer = setTimeout(() => persistCurrentSlots(), 50)
+  }
+
   function cycleCell(dk: string, ti: number) {
     if (isConfirmed()) return
     const prev = myState[dk]?.[ti] ?? 0
@@ -288,7 +295,7 @@ export default function Grid(props: Props) {
     undoStack.push([{ dk, ti, prev }])
     setMyState(dk, ti, next)
     if (navigator.vibrate) navigator.vibrate(10)
-    persistCurrentSlots()
+    schedulePersist()
   }
 
   function doUndo() {
@@ -296,7 +303,7 @@ export default function Grid(props: Props) {
     if (!undoStack.length) return
     const batch = undoStack.pop()!
     batch.forEach((u) => setMyState(u.dk, u.ti, u.prev))
-    persistCurrentSlots()
+    schedulePersist()
   }
 
   function openConfirm(day: string | null, time: string | null) {
@@ -720,6 +727,8 @@ export default function Grid(props: Props) {
         }
       } catch {
         // Never block local rendering when sync/indexeddb init fails.
+      } finally {
+        setLocalReady(true)
       }
 
       try {
@@ -752,6 +761,7 @@ export default function Grid(props: Props) {
 
   return (
     <div class="grid-view">
+      <Show when={localReady()} fallback={null}>
       <div class="grid-view__window r">
         {/* Title bar */}
         <div class="win95-window__title-bar">
@@ -1273,6 +1283,7 @@ export default function Grid(props: Props) {
             </div>
           </div>
         </div>
+      </Show>
       </Show>
     </div>
   )

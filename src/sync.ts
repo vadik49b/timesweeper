@@ -94,17 +94,24 @@ export async function publishEventNow(event: AppEvent): Promise<boolean> {
   }
 }
 
+let flushing = false
+
 export async function flushPendingSync(): Promise<void> {
-  if (!navigator.onLine) return
-  const pending = await listPendingSyncOps()
-  for (const op of pending) {
-    try {
-      await sendSyncOp(op)
-      await removePendingSyncOp(op.id)
-    } catch {
-      // Stop on first failure to preserve ordering and retry later.
-      break
+  if (flushing || !navigator.onLine) return
+  flushing = true
+  try {
+    const pending = await listPendingSyncOps()
+    for (const op of pending) {
+      try {
+        await sendSyncOp(op)
+        await removePendingSyncOp(op.id)
+      } catch {
+        // Stop on first failure to preserve ordering and retry later.
+        break
+      }
     }
+  } finally {
+    flushing = false
   }
 }
 
