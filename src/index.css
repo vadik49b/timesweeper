@@ -734,7 +734,16 @@ body {
   max-width: 340px;
 }
 .dialog--name-picker {
+  width: min(360px, calc(100vw - 12px));
   max-width: 360px;
+}
+.dialog--name-picker .dialog-body {
+  min-height: 186px;
+}
+.participant-picker__loading {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
 }
 .dialog-body--help {
   font-size: 15px;

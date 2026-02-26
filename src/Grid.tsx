@@ -2,7 +2,6 @@ import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show }
 import { createStore, reconcile } from 'solid-js/store'
 import {
   getEvent,
-  hasPendingSyncForEvent,
   getSelectedParticipant,
   saveEvent,
   setSelectedParticipant,
@@ -39,6 +38,7 @@ type UndoEntry = { dk: string; ti: number; prev: number }
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
   const [isLoading, setIsLoading] = createSignal(true)
+  const [isFetchingRemote, setIsFetchingRemote] = createSignal(false)
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
   const [showNamePicker, setShowNamePicker] = createSignal(false)
   const [newParticipantName, setNewParticipantName] = createSignal('')
@@ -190,11 +190,7 @@ export default function Grid(props: Props) {
     }
   }
 
-  function mergeRemoteIntoLocal(
-    local: AppEvent,
-    remote: AppEvent,
-    preferLocalMeta: boolean,
-  ): AppEvent {
+  function mergeRemoteIntoLocal(local: AppEvent, remote: AppEvent): AppEvent {
     const localByName = new Map(local.participants.map((p) => [p.name, p]))
     const mergedParticipants = remote.participants.map((rp) => {
       const lp = localByName.get(rp.name)
@@ -209,12 +205,8 @@ export default function Grid(props: Props) {
       return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
     })
     const mergedRemote: AppEvent = { ...remote, participants: mergedParticipants }
-    if (!preferLocalMeta) return mergedRemote
     return {
       ...mergedRemote,
-      name: local.name,
-      status: local.status,
-      confirmedSlot: local.confirmedSlot,
       dates: local.dates,
       timeRange: local.timeRange,
       maxParticipants: local.maxParticipants,
@@ -223,14 +215,22 @@ export default function Grid(props: Props) {
 
   async function applyRemoteEvent(remote: AppEvent) {
     const local = event()
-    const pendingLocal = await hasPendingSyncForEvent(remote.id)
-    const next = local ? mergeRemoteIntoLocal(local, remote, pendingLocal) : remote
-    await saveEvent(next)
+    if (!local) {
+      setEvent(remote)
+      const selected = currentName()
+      if (selected && remote.participants.some((p) => p.name === selected)) {
+        loadParticipantSlots(remote, selected)
+      }
+      void saveEvent(remote).catch(() => {})
+      return
+    }
+    const next = mergeRemoteIntoLocal(local, remote)
     setEvent(next)
     const selected = currentName()
     if (selected && next.participants.some((p) => p.name === selected)) {
       loadParticipantSlots(next, selected)
     }
+    void saveEvent(next).catch(() => {})
   }
 
   async function applyRemoteParticipantUpdate(
@@ -559,17 +559,20 @@ export default function Grid(props: Props) {
   }
 
   async function loadFromWorkerInBackground() {
+    setIsFetchingRemote(true)
     try {
       const remote = await pullRemoteEvent(props.eventId)
       if (remote) {
         await applyRemoteEvent(remote)
-        await initializeSelectedParticipant(remote)
+        void initializeSelectedParticipant(remote)
         setLoadError('none')
         return
       }
       setLoadError('not-found')
     } catch {
       setLoadError('network')
+    } finally {
+      setIsFetchingRemote(false)
     }
   }
 
@@ -755,567 +758,568 @@ export default function Grid(props: Props) {
   })
 
   const RANKS = ['1.', '2.', '3.']
+  const loadingOverlayText = createMemo(() => {
+    if (loadError() === 'network') return 'Could not reach server to load this event.'
+    if (loadError() === 'not-found') return 'Event not found in local cache or on server.'
+    return 'Loading participant list...'
+  })
+
+  const canRetryLoad = createMemo(() => !isLoading() && loadError() !== 'none')
+  const shouldShowNamePickerDialog = createMemo(
+    () =>
+      showNamePicker() ||
+      (!event() &&
+        (isFetchingRemote() || loadError() === 'network' || loadError() === 'not-found')),
+  )
 
   return (
     <div class="grid-view">
-      <Show when={!isLoading()} fallback={<div class="grid-view__loading">Loading...</div>}>
-        <Show
-          when={event()}
-          fallback={
-            <div class="grid-view__loading">
-              <Show
-                when={loadError() === 'network'}
-                fallback={
-                  <Show when={loadError() === 'not-found'} fallback={<span>Loading event...</span>}>
-                    <span>Event not found in local cache or on server.</span>
-                  </Show>
-                }
-              >
-                <span>Could not reach server to load this event.</span>
+      <div class="grid-view__window r">
+        {/* Title bar */}
+        <div class="win95-window__title-bar">
+              <span class="grid-view__title">
+                <MineIcon size={16} /> TimeSweeper — {event()?.name ?? 'Opening event'}
+              </span>
+          <div class="win95-window__title-buttons">
+            <div class="win95-window__title-button r" onClick={goToLanding}>
+              ×
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-view__window-body">
+          {/* Minesweeper-style control deck */}
+          <div class="grid-view__deck s">
+            <div class="grid-view__deck-left">
+              <div class="grid-view__deck-display">
+                Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
+              </div>
+              <Show when={!isConfirmed()}>
+                <Win95Button class="grid-view__deck-modify" onClick={() => setShowNamePicker(true)}>
+                  Switch...
+                </Win95Button>
               </Show>
             </div>
-          }
-        >
-          <div class="grid-view__window r">
-            {/* Title bar */}
+            <div class="grid-view__deck-actions">
+              <Win95Button class="grid-view__deck-share" onClick={openShareDialog}>
+                <span class="hk">S</span>hare
+              </Win95Button>
+              <Win95Button class="grid-view__deck-help" onClick={() => setDialog('help')}>
+                <span class="hk">H</span>elp
+              </Win95Button>
+            </div>
+          </div>
+          {/* Two-panel layout */}
+          <div class="grid-view__panels">
+            {/* Panel: Your availability */}
+            <div class="grid-view__panel">
+              <div class="grid-view__panel-frame s">
+                <div
+                  class="grid-view__panel-header"
+                  onClick={() => setEditCollapsed(!editCollapsed())}
+                >
+                  <div class="grid-view__panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
+                  <span>Your availability ({currentTimezone()})</span>
+                  <hr />
+                </div>
+                <Show when={!editCollapsed()}>
+                  <div class="grid-view__panel-body">
+                    <div class="grid-view__legend">
+                      <AvailabilityLegend withLabels />
+                    </div>
+                    <div class={`availability-grid ${dayCountClass()}`}>
+                      <div class="availability-grid__corner" />
+                      <For each={days()}>
+                        {(d) => <div class="availability-grid__day">{d.label}</div>}
+                      </For>
+                      <For each={times()}>
+                        {(t, ti) => (
+                          <>
+                            <div class="availability-grid__time">{t.label}</div>
+                            <For each={days()}>
+                              {(d) => (
+                                <div
+                                  classList={{
+                                    'availability-grid__cell': true,
+                                    'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
+                                    'availability-grid__cell--maybe': myState[d.key]?.[ti()] === 2,
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault()
+                                    dragStart(d.key, ti())
+                                  }}
+                                  onMouseEnter={() => {
+                                    if (dragging) dragOver(d.key, ti())
+                                  }}
+                                  onTouchStart={(e) => {
+                                    e.preventDefault()
+                                    dragStart(d.key, ti())
+                                  }}
+                                  data-day={d.key}
+                                  data-ti={String(ti())}
+                                >
+                                  <Show when={myState[d.key]?.[ti()] === 1}>
+                                    <span class="availability-grid__icon">✔</span>
+                                  </Show>
+                                  <Show when={myState[d.key]?.[ti()] === 2}>
+                                    <span class="availability-grid__icon">?</span>
+                                  </Show>
+                                </div>
+                              )}
+                            </For>
+                          </>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </div>
+
+            {/* Panel: Results + Group heatmap */}
+            <div class="grid-view__panel">
+              <div class="grid-view__panel-frame s">
+                {/* Results sub-panel */}
+                <div
+                  class="grid-view__panel-header"
+                  onClick={() => setBestCollapsed(!bestCollapsed())}
+                >
+                  <div class="grid-view__panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
+                  <span>
+                    Suggestions · {participantsWithAvailability()}/{totalParticipants()} shared
+                    availability
+                  </span>
+                  <hr />
+                </div>
+                <Show when={!bestCollapsed()}>
+                  <div class="grid-view__panel-body">
+                    <Show
+                      when={canShowSuggestions()}
+                      fallback={
+                        <div class="results__empty">
+                          Not enough participants yet to suggest times.
+                        </div>
+                      }
+                    >
+                      <Show
+                        when={bestTimes().length > 0}
+                        fallback={<div class="results__empty">No suggested times yet</div>}
+                      >
+                        <div class="results">
+                          <For each={bestTimes()}>
+                            {(slot, i) => {
+                              const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
+                              const breakdown = () => {
+                                const parts: string[] = []
+                                if (myVal() === 1)
+                                  parts.push(
+                                    '<span class="results__tag results__tag--yes">✔ You</span>',
+                                  )
+                                else if (myVal() === 2)
+                                  parts.push(
+                                    '<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> You</span>',
+                                  )
+                                Object.entries(others()).forEach(([name, data]) => {
+                                  const v = data[slot.dk]?.[slot.ti] ?? 0
+                                  const n = name.charAt(0).toUpperCase() + name.slice(1)
+                                  if (v === 1)
+                                    parts.push(
+                                      `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
+                                    )
+                                  else if (v === 2)
+                                    parts.push(
+                                      `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
+                                    )
+                                })
+                                return parts.join(' · ')
+                              }
+                              return (
+                                <div
+                                  classList={{
+                                    results__row: true,
+                                    'results__row--best': i() === 0,
+                                  }}
+                                >
+                                  <div class="results__main">
+                                    <div class="results__line">
+                                      <span class="results__rank">{RANKS[i()]}</span>{' '}
+                                      <b>
+                                        {slot.day} {slot.time}
+                                      </b>{' '}
+                                      · {slot.score}/{totalParticipants()}
+                                    </div>
+                                    <div class="results__breakdown" innerHTML={breakdown()} />
+                                  </div>
+                                  <div
+                                    class="dialog-btn r"
+                                    classList={{ 'results__confirm-btn': true }}
+                                    onClick={() => openConfirm(slot.day, slot.time)}
+                                  >
+                                    <span class="hk">C</span>onfirm
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          </For>
+                          <div class="results__custom">
+                            <div
+                              class="dialog-btn r"
+                              classList={{ 'results__custom-btn': true }}
+                              onClick={() => openConfirm(null, null)}
+                            >
+                              Pick a different time...
+                            </div>
+                          </div>
+                        </div>
+                      </Show>
+                    </Show>
+                  </div>
+                </Show>
+
+                {/* Group heatmap sub-panel */}
+                <div
+                  class="grid-view__panel-header"
+                  classList={{ 'grid-view__panel-header--spaced': true }}
+                  onClick={() => setGroupCollapsed(!groupCollapsed())}
+                >
+                  <div class="grid-view__panel-toggle">{groupCollapsed() ? '▸' : '▾'}</div>
+                  <span>Group availability</span>
+                  <hr />
+                </div>
+                <Show when={!groupCollapsed()}>
+                  <div class="grid-view__panel-body">
+                    <div class="heatmap-legend">
+                      <span>
+                        <span class="heatmap-legend__swatch heatmap-legend__swatch--0" />0
+                      </span>
+                      <span>
+                        <span class="heatmap-legend__swatch heatmap-legend__swatch--1" />
+                        <b class="heatmap-legend__value heatmap-legend__value--1">1</b>
+                      </span>
+                      <span>
+                        <span class="heatmap-legend__swatch heatmap-legend__swatch--2" />
+                        <b class="heatmap-legend__value heatmap-legend__value--2">2</b>
+                      </span>
+                      <span>
+                        <span class="heatmap-legend__swatch heatmap-legend__swatch--3" />
+                        <b class="heatmap-legend__value heatmap-legend__value--3">3</b>
+                      </span>
+                    </div>
+                    <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
+                      <div class="heatmap-grid__corner" />
+                      <For each={days()}>
+                        {(d) => <div class="heatmap-grid__day">{d.label}</div>}
+                      </For>
+                      <For each={times()}>
+                        {(t, ti) => (
+                          <>
+                            <div class="heatmap-grid__time">{t.label}</div>
+                            <For each={days()}>
+                              {(d) => {
+                                const h = () => heat(d.key, ti())
+                                return (
+                                  <div
+                                    classList={{
+                                      'heatmap-grid__cell': true,
+                                      'heatmap-grid__cell--0': h() === 0,
+                                      'heatmap-grid__cell--1': h() === 1,
+                                      'heatmap-grid__cell--2': h() === 2,
+                                      'heatmap-grid__cell--3': h() >= 3,
+                                    }}
+                                  >
+                                    <span
+                                      class={`heatmap-grid__value heatmap-grid__value--${Math.min(h(), 5)}`}
+                                    >
+                                      {h() > 0 ? h() : ''}
+                                    </span>
+                                  </div>
+                                )
+                              }}
+                            </For>
+                          </>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </div>
+          </div>
+          {/* /panels */}
+
+          {/* Status bar */}
+          <div class="grid-view__status-bar">
+            <div class="grid-view__status-segment st">{statusLeft()}</div>
+            <div class="grid-view__status-segment st">timesweeper.app</div>
+          </div>
+
+          {/* Function bar */}
+          <div class="grid-view__function-bar">
+            <div class="grid-view__function-item" onClick={doUndo}>
+              <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
+            </div>
+            <div class="grid-view__function-item" onClick={openShareDialog}>
+              <span class="grid-view__function-key">F3</span> <span class="hk">S</span>hare
+            </div>
+            <div class="grid-view__function-item" onClick={() => openConfirm(null, null)}>
+              <span class="grid-view__function-key">F5</span> <span class="hk">C</span>onfirm
+            </div>
+          </div>
+          <Show when={isConfirmed()}>
+            <div class="grid-view__confirmed-overlay">
+              <div class="grid-view__confirmed-box r">
+                <div class="grid-view__confirmed-title">Time confirmed</div>
+                <div class="grid-view__confirmed-details">
+                  <div>
+                    <b>Event:</b> {event()!.name}
+                  </div>
+                  <div>
+                    <b>Created by:</b> {createdByName()}
+                  </div>
+                  <div>
+                    <b>When:</b> {confirmedPickedLine()}
+                  </div>
+                  <div>
+                    <b>Participants:</b> {participantsLine()}
+                  </div>
+                </div>
+                <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
+                  <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
+                  <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
+                </div>
+                <div class="grid-view__confirmed-separator" />
+                <div class="grid-view__confirmed-secondary">
+                  <div class="grid-view__confirmed-undo-row">
+                    <div class="grid-view__confirmed-undo-help">
+                      Availability is locked because a time was picked.
+                      <br />
+                      Need changes? Undo confirmation first.
+                    </div>
+                    <Win95Button class="grid-view__confirmed-undo-btn" onClick={undoConfirmedTime}>
+                      Undo confirmation
+                    </Win95Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Show>
+        </div>
+        {/* /grid-view__window-body */}
+      </div>
+      {/* /grid-view__window */}
+
+      {/* === DIALOGS === */}
+
+      <Show when={shouldShowNamePickerDialog()}>
+        <div class="dialog-overlay">
+          <div class="dialog dialog--name-picker r">
             <div class="win95-window__title-bar">
-              <span class="grid-view__title">
-                <MineIcon size={16} /> TimeSweeper — {event()!.name}
-              </span>
+              <span>Choose participant</span>
               <div class="win95-window__title-buttons">
-                <div class="win95-window__title-button r" onClick={goToLanding}>
+                <div
+                  class="win95-window__title-button r"
+                  onClick={() => (event() ? setShowNamePicker(false) : goToLanding())}
+                >
                   ×
                 </div>
               </div>
             </div>
-
-            <div class="grid-view__window-body">
-              {/* Minesweeper-style control deck */}
-              <div class="grid-view__deck s">
-                <div class="grid-view__deck-left">
-                  <div class="grid-view__deck-display">
-                    Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
-                  </div>
-                  <Show when={!isConfirmed()}>
-                    <Win95Button
-                      class="grid-view__deck-modify"
-                      onClick={() => setShowNamePicker(true)}
-                    >
-                      Switch...
-                    </Win95Button>
-                  </Show>
-                </div>
-                <div class="grid-view__deck-actions">
-                  <Win95Button class="grid-view__deck-share" onClick={openShareDialog}>
-                    <span class="hk">S</span>hare
-                  </Win95Button>
-                  <Win95Button class="grid-view__deck-help" onClick={() => setDialog('help')}>
-                    <span class="hk">H</span>elp
-                  </Win95Button>
-                </div>
-              </div>
-              {/* Two-panel layout */}
-              <div class="grid-view__panels">
-                {/* Panel: Your availability */}
-                <div class="grid-view__panel">
-                  <div class="grid-view__panel-frame s">
-                    <div
-                      class="grid-view__panel-header"
-                      onClick={() => setEditCollapsed(!editCollapsed())}
-                    >
-                      <div class="grid-view__panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
-                      <span>Your availability ({currentTimezone()})</span>
-                      <hr />
-                    </div>
-                    <Show when={!editCollapsed()}>
-                      <div class="grid-view__panel-body">
-                        <div class="grid-view__legend">
-                          <AvailabilityLegend withLabels />
-                        </div>
-                        <div class={`availability-grid ${dayCountClass()}`}>
-                          <div class="availability-grid__corner" />
-                          <For each={days()}>
-                            {(d) => <div class="availability-grid__day">{d.label}</div>}
-                          </For>
-                          <For each={times()}>
-                            {(t, ti) => (
-                              <>
-                                <div class="availability-grid__time">{t.label}</div>
-                                <For each={days()}>
-                                  {(d) => (
-                                    <div
-                                      classList={{
-                                        'availability-grid__cell': true,
-                                        'availability-grid__cell--yes':
-                                          myState[d.key]?.[ti()] === 1,
-                                        'availability-grid__cell--maybe':
-                                          myState[d.key]?.[ti()] === 2,
-                                      }}
-                                      onMouseDown={(e) => {
-                                        e.preventDefault()
-                                        dragStart(d.key, ti())
-                                      }}
-                                      onMouseEnter={() => {
-                                        if (dragging) dragOver(d.key, ti())
-                                      }}
-                                      onTouchStart={(e) => {
-                                        e.preventDefault()
-                                        dragStart(d.key, ti())
-                                      }}
-                                      data-day={d.key}
-                                      data-ti={String(ti())}
-                                    >
-                                      <Show when={myState[d.key]?.[ti()] === 1}>
-                                        <span class="availability-grid__icon">✔</span>
-                                      </Show>
-                                      <Show when={myState[d.key]?.[ti()] === 2}>
-                                        <span class="availability-grid__icon">?</span>
-                                      </Show>
-                                    </div>
-                                  )}
-                                </For>
-                              </>
-                            )}
-                          </For>
+            <div class="dialog-body">
+              <Show
+                when={event()}
+                fallback={
+                  <div class="participant-picker__loading">
+                    <p class="participant-picker__lead">{loadingOverlayText()}</p>
+                    <Show when={canRetryLoad()}>
+                      <div class="dialog-buttons">
+                        <div class="dialog-btn r" onClick={() => void retryLoadFromWorker()}>
+                          Retry
                         </div>
                       </div>
                     </Show>
                   </div>
-                </div>
-
-                {/* Panel: Results + Group heatmap */}
-                <div class="grid-view__panel">
-                  <div class="grid-view__panel-frame s">
-                    {/* Results sub-panel */}
-                    <div
-                      class="grid-view__panel-header"
-                      onClick={() => setBestCollapsed(!bestCollapsed())}
-                    >
-                      <div class="grid-view__panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
-                      <span>
-                        Suggestions · {participantsWithAvailability()}/{totalParticipants()} shared
-                        availability
-                      </span>
-                      <hr />
-                    </div>
-                    <Show when={!bestCollapsed()}>
-                      <div class="grid-view__panel-body">
-                        <Show
-                          when={canShowSuggestions()}
-                          fallback={
-                            <div class="results__empty">
-                              Not enough participants yet to suggest times.
-                            </div>
-                          }
-                        >
-                          <Show
-                            when={bestTimes().length > 0}
-                            fallback={<div class="results__empty">No suggested times yet</div>}
-                          >
-                            <div class="results">
-                              <For each={bestTimes()}>
-                                {(slot, i) => {
-                                  const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
-                                  const breakdown = () => {
-                                    const parts: string[] = []
-                                    if (myVal() === 1)
-                                      parts.push(
-                                        '<span class="results__tag results__tag--yes">✔ You</span>',
-                                      )
-                                    else if (myVal() === 2)
-                                      parts.push(
-                                        '<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> You</span>',
-                                      )
-                                    Object.entries(others()).forEach(([name, data]) => {
-                                      const v = data[slot.dk]?.[slot.ti] ?? 0
-                                      const n = name.charAt(0).toUpperCase() + name.slice(1)
-                                      if (v === 1)
-                                        parts.push(
-                                          `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
-                                        )
-                                      else if (v === 2)
-                                        parts.push(
-                                          `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
-                                        )
-                                    })
-                                    return parts.join(' · ')
-                                  }
-                                  return (
-                                    <div
-                                      classList={{
-                                        results__row: true,
-                                        'results__row--best': i() === 0,
-                                      }}
-                                    >
-                                      <div class="results__main">
-                                        <div class="results__line">
-                                          <span class="results__rank">{RANKS[i()]}</span>{' '}
-                                          <b>
-                                            {slot.day} {slot.time}
-                                          </b>{' '}
-                                          · {slot.score}/{totalParticipants()}
-                                        </div>
-                                        <div class="results__breakdown" innerHTML={breakdown()} />
-                                      </div>
-                                      <div
-                                        class="dialog-btn r"
-                                        classList={{ 'results__confirm-btn': true }}
-                                        onClick={() => openConfirm(slot.day, slot.time)}
-                                      >
-                                        <span class="hk">C</span>onfirm
-                                      </div>
-                                    </div>
-                                  )
-                                }}
-                              </For>
-                              <div class="results__custom">
-                                <div
-                                  class="dialog-btn r"
-                                  classList={{ 'results__custom-btn': true }}
-                                  onClick={() => openConfirm(null, null)}
-                                >
-                                  Pick a different time...
-                                </div>
-                              </div>
-                            </div>
-                          </Show>
-                        </Show>
+                }
+              >
+                <p class="participant-picker__lead">
+                  Choose your participant name to start editing availability.
+                </p>
+                    <div class="participant-picker__list">
+                      <For each={event()?.participants ?? []}>
+                        {(p) => (
+                          <div
+                            class="dialog-btn r participant-picker__item"
+                        classList={{
+                          'participant-picker__item--selected': currentName() === p.name,
+                        }}
+                        onClick={() => selectParticipant(p.name)}
+                      >
+                        {p.name}
                       </div>
-                    </Show>
-
-                    {/* Group heatmap sub-panel */}
-                    <div
-                      class="grid-view__panel-header"
-                      classList={{ 'grid-view__panel-header--spaced': true }}
-                      onClick={() => setGroupCollapsed(!groupCollapsed())}
-                    >
-                      <div class="grid-view__panel-toggle">{groupCollapsed() ? '▸' : '▾'}</div>
-                      <span>Group availability</span>
-                      <hr />
-                    </div>
-                    <Show when={!groupCollapsed()}>
-                      <div class="grid-view__panel-body">
-                        <div class="heatmap-legend">
-                          <span>
-                            <span class="heatmap-legend__swatch heatmap-legend__swatch--0" />0
-                          </span>
-                          <span>
-                            <span class="heatmap-legend__swatch heatmap-legend__swatch--1" />
-                            <b class="heatmap-legend__value heatmap-legend__value--1">1</b>
-                          </span>
-                          <span>
-                            <span class="heatmap-legend__swatch heatmap-legend__swatch--2" />
-                            <b class="heatmap-legend__value heatmap-legend__value--2">2</b>
-                          </span>
-                          <span>
-                            <span class="heatmap-legend__swatch heatmap-legend__swatch--3" />
-                            <b class="heatmap-legend__value heatmap-legend__value--3">3</b>
-                          </span>
-                        </div>
-                        <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
-                          <div class="heatmap-grid__corner" />
-                          <For each={days()}>
-                            {(d) => <div class="heatmap-grid__day">{d.label}</div>}
-                          </For>
-                          <For each={times()}>
-                            {(t, ti) => (
-                              <>
-                                <div class="heatmap-grid__time">{t.label}</div>
-                                <For each={days()}>
-                                  {(d) => {
-                                    const h = () => heat(d.key, ti())
-                                    return (
-                                      <div
-                                        classList={{
-                                          'heatmap-grid__cell': true,
-                                          'heatmap-grid__cell--0': h() === 0,
-                                          'heatmap-grid__cell--1': h() === 1,
-                                          'heatmap-grid__cell--2': h() === 2,
-                                          'heatmap-grid__cell--3': h() >= 3,
-                                        }}
-                                      >
-                                        <span
-                                          class={`heatmap-grid__value heatmap-grid__value--${Math.min(h(), 5)}`}
-                                        >
-                                          {h() > 0 ? h() : ''}
-                                        </span>
-                                      </div>
-                                    )
-                                  }}
-                                </For>
-                              </>
-                            )}
-                          </For>
-                        </div>
-                      </div>
-                    </Show>
-                  </div>
+                    )}
+                  </For>
                 </div>
-              </div>
-              {/* /panels */}
-
-              {/* Status bar */}
-              <div class="grid-view__status-bar">
-                <div class="grid-view__status-segment st">{statusLeft()}</div>
-                <div class="grid-view__status-segment st">timesweeper.app</div>
-              </div>
-
-              {/* Function bar */}
-              <div class="grid-view__function-bar">
-                <div class="grid-view__function-item" onClick={doUndo}>
-                  <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
-                </div>
-                <div class="grid-view__function-item" onClick={openShareDialog}>
-                  <span class="grid-view__function-key">F3</span> <span class="hk">S</span>hare
-                </div>
-                <div class="grid-view__function-item" onClick={() => openConfirm(null, null)}>
-                  <span class="grid-view__function-key">F5</span> <span class="hk">C</span>onfirm
-                </div>
-              </div>
-              <Show when={isConfirmed()}>
-                <div class="grid-view__confirmed-overlay">
-                  <div class="grid-view__confirmed-box r">
-                    <div class="grid-view__confirmed-title">Time confirmed</div>
-                    <div class="grid-view__confirmed-details">
-                      <div>
-                        <b>Event:</b> {event()!.name}
-                      </div>
-                      <div>
-                        <b>Created by:</b> {createdByName()}
-                      </div>
-                      <div>
-                        <b>When:</b> {confirmedPickedLine()}
-                      </div>
-                      <div>
-                        <b>Participants:</b> {participantsLine()}
-                      </div>
-                    </div>
-                    <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
-                      <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
-                      <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
-                    </div>
-                    <div class="grid-view__confirmed-separator" />
-                    <div class="grid-view__confirmed-secondary">
-                      <div class="grid-view__confirmed-undo-row">
-                        <div class="grid-view__confirmed-undo-help">
-                          Availability is locked because a time was picked.
-                          <br />
-                          Need changes? Undo confirmation first.
-                        </div>
-                        <Win95Button
-                          class="grid-view__confirmed-undo-btn"
-                          onClick={undoConfirmedTime}
-                        >
-                          Undo confirmation
-                        </Win95Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Show>
-            </div>
-            {/* /grid-view__window-body */}
-          </div>
-          {/* /grid-view__window */}
-
-          {/* === DIALOGS === */}
-
-          <Show when={showNamePicker()}>
-            <div class="dialog-overlay">
-              <div class="dialog dialog--name-picker r">
-                <div class="win95-window__title-bar">
-                  <span>Choose participant</span>
-                  <div class="win95-window__title-buttons">
-                    <div
-                      class="win95-window__title-button r"
-                      onClick={() => setShowNamePicker(false)}
-                    >
-                      ×
-                    </div>
-                  </div>
-                </div>
-                <div class="dialog-body">
-                  <p class="participant-picker__lead">
-                    Choose your participant name to start editing availability.
-                  </p>
-                  <div class="participant-picker__list">
-                    <For each={event()!.participants}>
-                      {(p) => (
-                        <div
-                          class="dialog-btn r participant-picker__item"
-                          classList={{
-                            'participant-picker__item--selected': currentName() === p.name,
-                          }}
-                          onClick={() => selectParticipant(p.name)}
-                        >
-                          {p.name}
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                  <Show when={event()!.participants.length < event()!.maxParticipants}>
-                    <label class="participant-picker__label">I'm not in the list</label>
-                    <Win95Field
-                      kind="input"
-                      value={newParticipantName()}
-                      placeholder="Participant name"
-                      wrapperClass="dialog__field"
-                      controlClass="dialog__control"
-                      onInput={setNewParticipantName}
-                    />
-                    <div class="dialog-buttons">
-                      <div class="dialog-btn r" onClick={addParticipantFromPicker}>
-                        Add participant
-                      </div>
-                    </div>
-                  </Show>
-                </div>
-              </div>
-            </div>
-          </Show>
-
-          <Show when={dialog() === 'share'}>
-            <div class="dialog-overlay">
-              <div class="dialog r">
-                <div class="win95-window__title-bar">
-                  <span>Share Link</span>
-                  <div class="win95-window__title-buttons">
-                    <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
-                      ×
-                    </div>
-                  </div>
-                </div>
-                <div class="dialog-body">
-                  <label>Send this link to participants:</label>
+                    <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
+                      <label class="participant-picker__label">I'm not in the list</label>
                   <Win95Field
                     kind="input"
-                    type="url"
-                    value={eventUrl()}
-                    readOnly
+                    value={newParticipantName()}
+                    placeholder="Participant name"
                     wrapperClass="dialog__field"
                     controlClass="dialog__control"
-                    inputRef={(el) => {
-                      shareInputRef = el
-                    }}
-                    onClick={() => shareInputRef.select()}
+                    onInput={setNewParticipantName}
                   />
                   <div class="dialog-buttons">
-                    <div class="dialog-btn r" onClick={() => copyLink(eventUrl())}>
-                      <span class="hk">C</span>opy
-                    </div>
-                    <div class="dialog-btn r" onClick={() => setDialog(null)}>
-                      Close
+                    <div class="dialog-btn r" onClick={addParticipantFromPicker}>
+                      Add participant
                     </div>
                   </div>
-                  <div class="copy-status">{copyStatus()}</div>
-                </div>
-              </div>
+                </Show>
+              </Show>
             </div>
-          </Show>
+          </div>
+        </div>
+      </Show>
 
-          <Show when={dialog() === 'help'}>
-            <div class="dialog-overlay">
-              <div class="dialog dialog--help r">
-                <div class="win95-window__title-bar">
-                  <span>Help — TimeSweeper</span>
-                  <div class="win95-window__title-buttons">
-                    <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
-                      ×
-                    </div>
-                  </div>
-                </div>
-                <div class="dialog-body dialog-body--help">
-                  <p class="help__lead">
-                    <b>How to use TimeSweeper:</b>
-                  </p>
-                  <p class="help__step">
-                    <b>1.</b> Click <b>Switch...</b> and pick your participant name
-                  </p>
-                  <p class="help__step">
-                    <b>2.</b> Click a cell to mark availability:
-                    <br />
-                    <AvailabilityLegend mini class="help__cycle" />
-                  </p>
-                  <p class="help__step">
-                    <b>3.</b> Click and drag to fill multiple cells at once
-                  </p>
-                  <p class="help__step">
-                    <b>4.</b> Check "Group availability" to see when everyone is free
-                  </p>
-                  <p class="help__step">
-                    <b>5.</b> Click <b>Share</b> to send the link to others
-                  </p>
-                  <p class="help__step help__step--last">
-                    <b>6.</b> When the group agrees, click <b>Confirm</b>
-                  </p>
-                  <p class="help__keys">
-                    <b>Keyboard shortcuts:</b>
-                    <br />
-                    <span class="help__key-line">F1 / U — Undo</span>
-                    <br />
-                    <span class="help__key-line">S — Share link</span>
-                    <br />
-                    <span class="help__key-line">Ctrl+Z — Undo</span>
-                  </p>
-                  <div class="dialog-buttons">
-                    <div class="dialog-btn r" onClick={() => setDialog(null)}>
-                      OK
-                    </div>
-                  </div>
+      <Show when={dialog() === 'share'}>
+        <div class="dialog-overlay">
+          <div class="dialog r">
+            <div class="win95-window__title-bar">
+              <span>Share Link</span>
+              <div class="win95-window__title-buttons">
+                <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                  ×
                 </div>
               </div>
             </div>
-          </Show>
+            <div class="dialog-body">
+              <label>Send this link to participants:</label>
+              <Win95Field
+                kind="input"
+                type="url"
+                value={eventUrl()}
+                readOnly
+                wrapperClass="dialog__field"
+                controlClass="dialog__control"
+                inputRef={(el) => {
+                  shareInputRef = el
+                }}
+                onClick={() => shareInputRef.select()}
+              />
+              <div class="dialog-buttons">
+                <div class="dialog-btn r" onClick={() => copyLink(eventUrl())}>
+                  <span class="hk">C</span>opy
+                </div>
+                <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                  Close
+                </div>
+              </div>
+              <div class="copy-status">{copyStatus()}</div>
+            </div>
+          </div>
+        </div>
+      </Show>
 
-          <Show when={dialog() === 'confirm'}>
-            <div class="dialog-overlay">
-              <div class="dialog dialog--confirm r">
-                <div class="win95-window__title-bar">
-                  <span>Confirm Time</span>
-                  <div class="win95-window__title-buttons">
-                    <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
-                      ×
-                    </div>
-                  </div>
-                </div>
-                <div class="dialog-body dialog-body--confirm">
-                  <p class="confirm__lead">Confirm this time for everyone?</p>
-                  <label class="confirm__label">Day:</label>
-                  <Win95Field
-                    kind="select"
-                    value={confirmDay()}
-                    options={confirmDayOptions()}
-                    wrapperClass="confirm__field confirm__field--day"
-                    controlClass="confirm__control"
-                    onChange={setConfirmDay}
-                  />
-                  <label class="confirm__label">Time:</label>
-                  <Win95Field
-                    kind="select"
-                    value={confirmTime()}
-                    options={confirmTimeOptions()}
-                    wrapperClass="confirm__field confirm__field--time"
-                    controlClass="confirm__control"
-                    onChange={setConfirmTime}
-                  />
-                  <p class="confirm__note">
-                    Everyone will see the confirmed time.
-                    <br />
-                    This can be undone later.
-                  </p>
-                  <div class="dialog-buttons">
-                    <div class="dialog-btn r" onClick={doConfirm}>
-                      <span class="hk">C</span>onfirm
-                    </div>
-                    <div class="dialog-btn r" onClick={() => setDialog(null)}>
-                      Cancel
-                    </div>
-                  </div>
+      <Show when={dialog() === 'help'}>
+        <div class="dialog-overlay">
+          <div class="dialog dialog--help r">
+            <div class="win95-window__title-bar">
+              <span>Help — TimeSweeper</span>
+              <div class="win95-window__title-buttons">
+                <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                  ×
                 </div>
               </div>
             </div>
-          </Show>
-        </Show>
+            <div class="dialog-body dialog-body--help">
+              <p class="help__lead">
+                <b>How to use TimeSweeper:</b>
+              </p>
+              <p class="help__step">
+                <b>1.</b> Click <b>Switch...</b> and pick your participant name
+              </p>
+              <p class="help__step">
+                <b>2.</b> Click a cell to mark availability:
+                <br />
+                <AvailabilityLegend mini class="help__cycle" />
+              </p>
+              <p class="help__step">
+                <b>3.</b> Click and drag to fill multiple cells at once
+              </p>
+              <p class="help__step">
+                <b>4.</b> Check "Group availability" to see when everyone is free
+              </p>
+              <p class="help__step">
+                <b>5.</b> Click <b>Share</b> to send the link to others
+              </p>
+              <p class="help__step help__step--last">
+                <b>6.</b> When the group agrees, click <b>Confirm</b>
+              </p>
+              <p class="help__keys">
+                <b>Keyboard shortcuts:</b>
+                <br />
+                <span class="help__key-line">F1 / U — Undo</span>
+                <br />
+                <span class="help__key-line">S — Share link</span>
+                <br />
+                <span class="help__key-line">Ctrl+Z — Undo</span>
+              </p>
+              <div class="dialog-buttons">
+                <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                  OK
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={dialog() === 'confirm'}>
+        <div class="dialog-overlay">
+          <div class="dialog dialog--confirm r">
+            <div class="win95-window__title-bar">
+              <span>Confirm Time</span>
+              <div class="win95-window__title-buttons">
+                <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                  ×
+                </div>
+              </div>
+            </div>
+            <div class="dialog-body dialog-body--confirm">
+              <p class="confirm__lead">Confirm this time for everyone?</p>
+              <label class="confirm__label">Day:</label>
+              <Win95Field
+                kind="select"
+                value={confirmDay()}
+                options={confirmDayOptions()}
+                wrapperClass="confirm__field confirm__field--day"
+                controlClass="confirm__control"
+                onChange={setConfirmDay}
+              />
+              <label class="confirm__label">Time:</label>
+              <Win95Field
+                kind="select"
+                value={confirmTime()}
+                options={confirmTimeOptions()}
+                wrapperClass="confirm__field confirm__field--time"
+                controlClass="confirm__control"
+                onChange={setConfirmTime}
+              />
+              <p class="confirm__note">
+                Everyone will see the confirmed time.
+                <br />
+                This can be undone later.
+              </p>
+              <div class="dialog-buttons">
+                <div class="dialog-btn r" onClick={doConfirm}>
+                  <span class="hk">C</span>onfirm
+                </div>
+                <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                  Cancel
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   )

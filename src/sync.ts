@@ -1,12 +1,5 @@
 import type { AppEvent, SlotValue } from './types'
-import {
-  type SyncOp,
-  enqueueSyncOp,
-  getEvent,
-  listPendingSyncOps,
-  removePendingSyncOp,
-  saveEvent,
-} from './db'
+import { type SyncOp, enqueueSyncOp, getEvent, listPendingSyncOps, removePendingSyncOp } from './db'
 
 const API_ORIGIN = import.meta.env.DEV
   ? window.location.origin
@@ -116,12 +109,19 @@ export async function flushPendingSync(): Promise<void> {
 }
 
 export async function pullRemoteEvent(eventId: string): Promise<AppEvent | null> {
-  const resp = await fetch(`${apiBase()}/events/${encodeURIComponent(eventId)}`)
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 7000)
+  let resp: Response
+  try {
+    resp = await fetch(`${apiBase()}/events/${encodeURIComponent(eventId)}`, {
+      signal: controller.signal,
+    })
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
   if (resp.status === 404) return null
   if (!resp.ok) throw new Error(`pull event failed: ${resp.status}`)
-  const remote = (await resp.json()) as AppEvent
-  await saveEvent(remote)
-  return remote
+  return (await resp.json()) as AppEvent
 }
 
 type WsEventMessage =

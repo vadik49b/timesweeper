@@ -32,10 +32,7 @@ interface Env {
   ALLOW_LOCALHOST_ORIGIN?: string
 }
 
-const ALLOWED_ORIGINS = new Set([
-  'https://timesweeper.pages.dev',
-  'https://timesweeper.app',
-])
+const ALLOWED_ORIGINS = new Set(['https://timesweeper.pages.dev', 'https://timesweeper.app'])
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return true
