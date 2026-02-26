@@ -109,7 +109,7 @@ When2Meet also offers a "Days of Week" mode for recurring scheduling, but it exp
 
 ### Grid Defaults
 
-- **Slot interval: 30 minutes** (creator can change to 15 or 60)
+- **Slot interval: 30 minutes** (fixed in current implementation)
 - **Time range: soft cap at 8 hours** with a nudge ("Shorter ranges get better responses"). Not hard-blocked — creator can set longer if needed.
 - 8 hours at 30-min intervals = 16 rows × 44px = 704px. Fits one phone screen.
 - **Past dates are grayed out and non-editable.** Grid auto-scrolls to the first still-valid date. If all dates have passed → "This event has passed. Schedule again with same group?" flow.
@@ -221,7 +221,7 @@ Event {
 
   dates: ["2026-03-02", "2026-03-03", ...]
   timeRange: { start: "14:00", end: "22:00" }  // UTC
-  slotDuration: 30  // minutes (default), creator can set 15 or 60
+  slotDuration: 30  // minutes (fixed)
 
   participants: [
     {
@@ -496,7 +496,7 @@ The homepage IS the create form. No marketing page, no "Get started" — you lan
 
 ### Screen 2: Availability Grid (the core screen)
 
-This is the minesweeper board. A full Win95 window with menu bar, control bar, editing grid, results panels, and status bar.
+This is the minesweeper board. A full Win95 window with title bar, control deck, editing grid, results panels, and status bar.
 
 #### Window Structure
 
@@ -582,7 +582,7 @@ Sits **above** the Group availability heatmap (inside the same collapsible conta
 
 Opened from the `Help` button in the control deck. A Win95 modal dialog. Title bar: "Help — TimeSweeper". Content: 6 numbered steps:
 
-1. Pick your name from the dropdown
+1. Click `Switch...` and pick your name
 2. Click cells to mark availability (shows the visual cycle: □→✔→?→□)
 3. Click and drag to fill multiple cells at once
 4. Check group availability below to see overlap
@@ -630,32 +630,13 @@ F1 Undo  |  F3 Share  |  F5 Confirm
 
 Each is clickable. Hotkey letter underlined.
 
-### Screen 3: Participant Landing (from shared link)
+### Confirmed State
 
-When someone opens a TimeSweeper link, they see:
-- Event name + date summary
-- Name picker: list of participant names. Tap yours. Names already visited show ✓.
-- `"+ I'm someone else"` button to add a new name
-- Selecting a name immediately loads the grid (Screen 2)
-
-### Screen 4: Confirmed State
-
-Currently: the confirmed slot label is stored in state and shown in the status bar as `Confirmed | [label]`. The grid and results panels remain unchanged.
-
-**Planned confirmed UI — two-surface approach:**
-
-**Surface 1 — Notification bar:** A full-width bar appears between the control deck and the content panels. Yellow background (`#ffff80`), Win95 bevel border (sunken), containing `✔ Confirmed: [day] [time]` on the left and a dismissible `×` button on the right. Appears immediately on confirm, persists until dismissed or unconfirmed. This gives the attention-grabbing signal without blocking the rest of the UI.
-
-**Surface 2 — Suggestions panel transforms:** The "Results" sub-panel header changes to `✔ Confirmed` and its body swaps from the ranked suggestion list to a focused confirmed-time display: the day and time in large `VT323` text, plus an "Unconfirm" button at the bottom. The panel reverts to the normal suggestions list if unconfirmed.
-
-Both surfaces reinforce the same state. The notification bar is the immediate alert; the panel transformation is the persistent record. The grid and group heatmap remain fully functional below for reference or re-deciding.
-
-Planned additional actions in the transformed panel:
-- Add to calendar (.ics download) button
-- Copy summary button → formatted confirmed-time text for pasting in group chat
-- Undo/Unconfirm button (anyone can unconfirm — same permissive philosophy)
-
-**The "Who Decides" Philosophy:** Anyone can confirm. No admin role. In friend groups, whoever gets tired of waiting picks the green slot. In professional settings, it's usually the creator. Confirmation is reversible — anyone can undo and pick a different time. Starting permissive matches the trust model.
+Confirmed mode uses a blocking overlay over the grid window:
+- Shows event details (`Event`, `Created by`, `When`, `Participants`)
+- Shows action row (`Download .ics`, `Copy summary`)
+- Shows separate undo area (`Undo confirmation`)
+- Locks availability editing until confirmation is undone
 
 ### Screen 5: Upgrade Prompt
 
@@ -674,7 +655,7 @@ These decisions were made through iterative HTML prototyping and are final:
 
 1. **Cell cycle is tap-based, not mode-based.** One click cycles through all three states. No separate "flag mode" button — tested and rejected as confusing. The infinite loop (no→yes→maybe→no) is the interaction.
 
-2. **No smiley face.** Tested in v1–v4, removed in v5. The minesweeper smiley doesn't map to anything functional in a scheduling context. Control bar is: name dropdown + share button. Clean.
+2. **No smiley face.** Tested in v1–v4, removed in v5. The minesweeper smiley doesn't map to anything functional in a scheduling context. Control deck is: `Hi [name]!`, `Switch...`, `Share`, `Help`.
 
 3. **No LED counters.** The red LED number displays (flag count, mine count) were tested and removed. Random numbers next to the smiley confused users. The status bar serves the same purpose.
 

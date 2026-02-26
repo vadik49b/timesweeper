@@ -1,0 +1,17 @@
+{
+  "name": "TimeSweeper",
+  "short_name": "TimeSweeper",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#008080",
+  "theme_color": "#008080",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

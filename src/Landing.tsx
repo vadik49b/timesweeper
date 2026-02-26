@@ -4,7 +4,7 @@ import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents, setSelectedParticipant } from './db'
 import { queueEventSync, flushPendingSync } from './sync'
 import Win95Field from './components/Win95Field'
-import MineIcon from './icons/MineIcon'
+import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
 
 const MONTHS = [
@@ -187,7 +187,7 @@ export default function Landing(props: Props) {
       <div class="hero">
         <h1>
           <span class="mine-ico">
-            <MineIcon size={34} />
+            <AppIcon size={34} />
           </span>
           TimeSweeper
         </h1>

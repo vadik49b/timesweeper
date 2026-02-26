@@ -2,6 +2,7 @@ import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show }
 import { createStore, reconcile } from 'solid-js/store'
 import {
   getEvent,
+  hasPendingSyncForEvent,
   getSelectedParticipant,
   saveEvent,
   setSelectedParticipant,
@@ -188,7 +189,7 @@ export default function Grid(props: Props) {
     }
   }
 
-  function mergeRemoteIntoLocal(local: AppEvent, remote: AppEvent): AppEvent {
+  function mergeRemoteIntoLocal(local: AppEvent, remote: AppEvent, preferLocalMeta: boolean): AppEvent {
     const localByName = new Map(local.participants.map((p) => [p.name, p]))
     const mergedParticipants = remote.participants.map((rp) => {
       const lp = localByName.get(rp.name)
@@ -197,12 +198,23 @@ export default function Grid(props: Props) {
       const ru = rp.updatedAt ?? 0
       return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt } : rp
     })
-    return { ...remote, participants: mergedParticipants }
+    const mergedRemote: AppEvent = { ...remote, participants: mergedParticipants }
+    if (!preferLocalMeta) return mergedRemote
+    return {
+      ...mergedRemote,
+      name: local.name,
+      status: local.status,
+      confirmedSlot: local.confirmedSlot,
+      dates: local.dates,
+      timeRange: local.timeRange,
+      maxParticipants: local.maxParticipants,
+    }
   }
 
   async function applyRemoteEvent(remote: AppEvent) {
     const local = event()
-    const next = local ? mergeRemoteIntoLocal(local, remote) : remote
+    const pendingLocal = await hasPendingSyncForEvent(remote.id)
+    const next = local ? mergeRemoteIntoLocal(local, remote, pendingLocal) : remote
     await saveEvent(next)
     setEvent(next)
     const selected = currentName()
@@ -568,28 +580,7 @@ export default function Grid(props: Props) {
   })
 
   // Global event listeners + initial load
-  onMount(async () => {
-    const localEvent = await getEvent(props.eventId)
-    if (localEvent) {
-      setEvent(localEvent)
-      await initializeSelectedParticipant(localEvent)
-    }
-
-    try {
-      const remote = await pullRemoteEvent(props.eventId)
-      if (remote) {
-        await applyRemoteEvent(remote)
-        await initializeSelectedParticipant(remote)
-      } else if (localEvent) {
-        // Event exists locally but not on server yet: seed remote once.
-        await queueEventSync(localEvent)
-        await flushPendingSync()
-      }
-    } catch {
-      // Keep local-only mode when backend is unavailable.
-    }
-    await flushPendingSync()
-
+  onMount(() => {
     const disconnectSocket = connectEventSocket(props.eventId, {
       onEventUpdated: (remote) => {
         void applyRemoteEvent(remote)
@@ -605,22 +596,24 @@ export default function Grid(props: Props) {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         void flushPendingSync()
-        void pullRemoteEvent(props.eventId).then((remote) => {
-          if (remote) void applyRemoteEvent(remote)
-        })
+        void pullRemoteEvent(props.eventId)
+          .then((remote) => {
+            if (remote) void applyRemoteEvent(remote)
+          })
+          .catch(() => {})
       }
     }
     const pollId = window.setInterval(() => {
       if (!navigator.onLine) return
-      void pullRemoteEvent(props.eventId).then((remote) => {
-        if (remote) void applyRemoteEvent(remote)
-      })
+      void pullRemoteEvent(props.eventId)
+        .then((remote) => {
+          if (remote) void applyRemoteEvent(remote)
+        })
+        .catch(() => {})
       void flushPendingSync()
     }, 15000)
     window.addEventListener('online', onOnline)
     document.addEventListener('visibilitychange', onVisibilityChange)
-
-    setIsLoading(false)
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -686,6 +679,38 @@ export default function Grid(props: Props) {
       document.removeEventListener('touchend', dragEnd)
       document.removeEventListener('touchcancel', dragEnd)
     })
+
+    let localEvent: AppEvent | undefined
+    // Sync is background-only. Local event should render immediately if available.
+    void (async () => {
+      try {
+        localEvent = await getEvent(props.eventId)
+        if (localEvent) {
+          setEvent(localEvent)
+          await initializeSelectedParticipant(localEvent)
+          setIsLoading(false)
+        }
+      } catch {
+        // Never block local rendering when sync/indexeddb init fails.
+      }
+
+      try {
+        const remote = await pullRemoteEvent(props.eventId)
+        if (remote) {
+          await applyRemoteEvent(remote)
+          await initializeSelectedParticipant(remote)
+        } else if (localEvent) {
+          // Event exists locally but not on server yet: seed remote once.
+          await queueEventSync(localEvent)
+          await flushPendingSync()
+        }
+      } catch {
+        // Keep local-only mode when backend is unavailable.
+      } finally {
+        if (!localEvent) setIsLoading(false)
+      }
+      await flushPendingSync().catch(() => {})
+    })()
   })
 
   const RANKS = ['1.', '2.', '3.']

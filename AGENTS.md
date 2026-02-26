@@ -65,7 +65,7 @@ Event {
 
   dates: ["2026-03-02", "2026-03-03", ...]
   timeRange: { start: "14:00", end: "22:00" }  // UTC
-  slotDuration: 30  // minutes (default), creator can set 15 or 60
+  slotDuration: 30  // minutes (fixed in current spec)
 
   participants: [
     {
@@ -93,7 +93,6 @@ Sync blob per participant:
 - **Grid:** mobile-first, tap-to-cycle (empty→yes→maybe→empty), long-press-drag for bulk, undo button, 44px+ touch targets, haptic feedback, past dates grayed out
 - **Timezone:** auto-detect, displayed only in the "Your availability (Timezone)" header
 - **Live heatmap:** real-time updates, always on
-- **Focus mode:** checkbox hides group heatmap while editing; your edits still flow live
 - **Three-state availability:** yes=1pt / maybe=0.5pt / no=0pt
 - **Offline-first:** Service Worker + IndexedDB, sync when online
 - **PWA installable**
@@ -169,9 +168,8 @@ The entire app is themed as Windows 95 Minesweeper. Not a skin — the metaphor 
 
 Primary actions highlight their keyboard shortcut letter with an underline. Letters are real, functional hotkeys.
 
-- Grid menu bar: `Game · View · Help`
-- Grid function bar: `F1 Undo · F2 Focus · F3 Share · F5 Confirm`
-- Keyboard: `U`=undo, `F`=focus, `S`=share, `Ctrl+Z`=undo
+- Grid function bar: `F1 Undo · F3 Share · F5 Confirm`
+- Keyboard: `U`=undo, `S`=share, `Ctrl+Z`=undo
 
 ---
 
@@ -202,17 +200,15 @@ The homepage IS the create form. Win95 window chrome wraps the entire page.
 
 ### Screen 2: Availability Grid (core screen)
 
-Full Win95 window with menu bar, control bar, editing grid, results panels, status bar.
+Full Win95 window with title bar, control deck, editing grid, results panels, status bar.
 
 #### Window Structure
 
 ```
 ┌─ Title Bar ────────────────────────────┐
 │ [mine] TimeSweeper — "Event Name"      │
-├─ Menu Bar ─────────────────────────────┤
-│ Game   View   Help                     │
-├─ Control Bar (sunken) ─────────────────┤
-│ [Name dropdown ▼]        [Share btn]   │
+├─ Control Deck (sunken) ────────────────┤
+│ Hi [Name]! [Switch...] [Share] [Help]  │
 ├─ Layout Container ─────────────────────┤
 │                                        │
 │  ┌─ ▾ Your availability ────────────┐  │
@@ -234,13 +230,13 @@ Full Win95 window with menu bar, control bar, editing grid, results panels, stat
 ├─ Status Bar ───────────────────────────┤
 │ Editing: Jamie (EST)  │  timesweeper.. │
 ├─ Function Bar ─────────────────────────┤
-│ F1 Undo  F2 Focus  F3 Share  F5 Conf  │
+│ F1 Undo   F3 Share   F5 Confirm        │
 └────────────────────────────────────────┘
 ```
 
 #### Name Selector
 
-Native Win95 `<select>` dropdown — not chips, not custom. Beveled sunken frame with raised `▼` arrow button. Options: `"Jamie (EST)"`, `"Alex (CET)"`, `"Sam (JST)"`, `"+ Add yourself..."`. Selecting a name loads that person's grid instantly.
+`Hi [name]!` in the control deck with a `Switch...` button. Clicking `Switch...` opens a Win95 dialog with participant name buttons and an inline add-participant field.
 
 #### Grid Interaction
 
@@ -299,20 +295,6 @@ Sits above the Group availability heatmap. Top 3 time slots ranked by score.
 - **Mobile (<700px):** Stack vertically
 - All panels independently collapsible
 
-#### Focus Mode
-
-Toggle via F2 or function bar. When active:
-- Results and Group availability panels auto-collapse
-- Status bar shows `🔒 Focus ON`
-- Only editing grid visible
-- Your edits still flow live to the heatmap for everyone else
-
-#### Menu Bar
-
-- **Game** — event management (new event, recent events)
-- **View** — toggle focus mode, toggle panels
-- **Help** — opens help dialog
-
 #### Help Dialog
 
 Win95 modal. Title: "How to use TimeSweeper". 6 numbered steps + keyboard shortcuts at bottom. OK button closes.
@@ -336,6 +318,7 @@ Serves both "confirm a suggestion" and "pick a different time":
 
 Two sunken-thin segments:
 - Left: `Editing: Jamie (EST)` | `🔒 Focus ON` | `✅ Confirmed | Tue 3:00`
+- Left: `Editing: Jamie` | `Confirmed | Tue 3:00`
 - Right: `timesweeper.app`
 
 Temporary messages (e.g., `Link copied to clipboard`) display for 2s then revert.
@@ -343,30 +326,19 @@ Temporary messages (e.g., `Link copied to clipboard`) display for 2s then revert
 #### Function Bar
 
 ```
-F1 Undo  |  F2 Focus  |  F3 Share  |  F5 Confirm
+F1 Undo  |  F3 Share  |  F5 Confirm
 ```
 
 Each clickable. Hotkey letter underlined. Hover: navy background + white text.
 
 ---
 
-### Screen 3: Participant Landing (from shared link)
+### Confirmed State
 
-- Event name + date summary
-- Name picker list. Tap yours. Visited names show ✓.
-- `"+ I'm someone else"` button to add a new name
-- Timezone shown only in the "Your availability (Timezone)" header
-- Selecting a name immediately loads Screen 2
-
----
-
-### Screen 4: Confirmed State
-
-- `✅ Confirmed: Tuesday 3:00 PM EST / 9:00 PM CET / Wed 4:00 AM JST`
-- Add to calendar (.ics download) button
-- Copy summary button → confirmed-time text
-- Undo confirmation button (anyone can undo — permissive model)
-- Grid and results remain visible below
+- Confirmed mode shows a blocking overlay over the grid window.
+- Overlay includes Event, Created by, When, Participants.
+- Overlay actions: Download `.ics`, Copy summary, Undo confirmation.
+- Availability editing is locked until confirmation is undone.
 
 ---
 
@@ -385,18 +357,17 @@ Win95 dialog. Appears when the 6th person tries to join a free (5-slot) event:
 Final decisions from prototyping v1–v8:
 
 1. **Cell cycle is tap-based, not mode-based.** One click cycles all three states. No separate flag mode.
-2. **No smiley face.** Doesn't map to anything functional. Control bar is: name dropdown + share button.
+2. **No smiley face.** Doesn't map to anything functional. Control deck is: `Hi [name]!`, `Switch...`, `Share`, `Help`.
 3. **No LED counters.** Removed. Status bar serves the same purpose.
 4. **Flagged cells have NO yellow background.** Default gray + `?` symbol only. Minesweeper-authentic.
 5. **Cells must be square.** 44×44px. Both dimensions explicit.
 6. **Heatmap cells are also square.** 28×28px.
 7. **Drag paints a single target state.** First cell determines state; all dragged cells get that state.
-8. **Name selector is a native Win95 `<select>`.** Not chips, not custom. Last option always `"+ Add yourself..."`.
+8. **Name selector is a `Hi [name]!` + `Switch...` control deck pattern** with a Win95 name-picker dialog.
 9. **Share feedback goes in the status bar.** No toasts, no modals for clipboard confirmation.
 10. **Share action opens a dialog with the link.** Clipboard API unreliable in sandboxed environments.
 11. **Both panels are collapsible accordions.** Triangle indicator flips (▾→▸).
 12. **Desktop: side-by-side. Mobile: stacked.** At ≥700px flex row; below that, vertical stack.
-13. **Focus mode collapses both Results and Group panels.** Actively hides them, not just visual toggle.
 14. **Legend closes the loop visually.** `□ no → ✔ yes → ? maybe → □ no` — repeated "no" makes infinite cycle obvious.
 15. **"Your availability" label exists.** Without it users didn't know which grid they were editing.
 16. **Help dialog has step-by-step instructions.** Win95 modal, not tooltip or inline text.

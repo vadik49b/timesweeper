@@ -114,3 +114,11 @@ export async function removePendingSyncOp(id: number): Promise<void> {
   const db = await getDB()
   await db.delete('pendingSync', id)
 }
+
+export async function hasPendingSyncForEvent(eventId: string): Promise<boolean> {
+  const pending = await listPendingSyncOps()
+  return pending.some((op) => {
+    if (op.kind === 'event') return op.payload.event.id === eventId
+    return op.payload.eventId === eventId
+  })
+}
