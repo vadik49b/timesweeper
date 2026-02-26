@@ -24,7 +24,8 @@
   --num-4: #000080;
   --num-5: #800000;
   --cell: 44px;
-  --hm-cell: 28px;
+  --hm-cell: 44px;
+  --hm-col: 44px;
 }
 
 body {
@@ -476,25 +477,25 @@ body {
   height: 16px;
 }
 .heatmap-grid--days-1 {
-  grid-template-columns: 30px repeat(1, var(--hm-cell));
+  grid-template-columns: 30px repeat(1, var(--hm-col));
 }
 .heatmap-grid--days-2 {
-  grid-template-columns: 30px repeat(2, var(--hm-cell));
+  grid-template-columns: 30px repeat(2, var(--hm-col));
 }
 .heatmap-grid--days-3 {
-  grid-template-columns: 30px repeat(3, var(--hm-cell));
+  grid-template-columns: 30px repeat(3, var(--hm-col));
 }
 .heatmap-grid--days-4 {
-  grid-template-columns: 30px repeat(4, var(--hm-cell));
+  grid-template-columns: 30px repeat(4, var(--hm-col));
 }
 .heatmap-grid--days-5 {
-  grid-template-columns: 30px repeat(5, var(--hm-cell));
+  grid-template-columns: 30px repeat(5, var(--hm-col));
 }
 .heatmap-grid--days-6 {
-  grid-template-columns: 30px repeat(6, var(--hm-cell));
+  grid-template-columns: 30px repeat(6, var(--hm-col));
 }
 .heatmap-grid--days-7 {
-  grid-template-columns: 30px repeat(7, var(--hm-cell));
+  grid-template-columns: 30px repeat(7, var(--hm-col));
 }
 .heatmap-grid__day {
   text-align: center;
@@ -535,60 +536,13 @@ body {
 .heatmap-grid__cell.heatmap-grid__cell--3 {
   background: #50a050;
 }
-.heatmap-grid__cell .heatmap-grid__value--0 {
-  color: transparent;
+.heatmap-grid__value {
+  color: #202020;
 }
-.heatmap-grid__cell .heatmap-grid__value--1 {
-  color: var(--num-1);
-}
-.heatmap-grid__cell .heatmap-grid__value--2 {
-  color: var(--num-2);
-}
-.heatmap-grid__cell .heatmap-grid__value--3 {
-  color: var(--num-3);
-}
-.heatmap-grid__cell .heatmap-grid__value--4 {
-  color: var(--num-4);
-}
-.heatmap-grid__cell .heatmap-grid__value--5 {
-  color: var(--num-5);
-}
-.heatmap-legend {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  padding: 3px 0 2px;
-  font-size: 11px;
-  color: #404040;
-}
-.heatmap-legend__swatch {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--blo);
-  vertical-align: middle;
-  margin-right: 2px;
-}
-.heatmap-legend__swatch--0 {
-  background: #c0c0c0;
-}
-.heatmap-legend__swatch--1 {
-  background: #b0d0b0;
-}
-.heatmap-legend__swatch--2 {
-  background: #80b880;
-}
-.heatmap-legend__swatch--3 {
-  background: #50a050;
-}
-.heatmap-legend__value--1 {
-  color: var(--num-1);
-}
-.heatmap-legend__value--2 {
-  color: var(--num-2);
-}
-.heatmap-legend__value--3 {
-  color: var(--num-3);
+.heatmap-empty {
+  font-size: 14px;
+  color: #808080;
+  padding: 4px 2px;
 }
 
 .results {

@@ -1,4 +1,4 @@
-import { createSignal, createMemo, onMount, For, Index } from 'solid-js'
+import { createSignal, createMemo, createEffect, onMount, For, Index } from 'solid-js'
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from './db'
@@ -52,6 +52,8 @@ export default function Landing(props: Props) {
   const [timeStart, setTimeStart] = createSignal('10:00')
   const [timeEnd, setTimeEnd] = createSignal('18:00')
   const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
+  const [pendingParticipantFocus, setPendingParticipantFocus] = createSignal<number | null>(null)
+  const participantInputRefs: HTMLInputElement[] = []
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   onMount(async () => {
@@ -131,7 +133,9 @@ export default function Landing(props: Props) {
     if (participants().length >= 5) {
       return
     }
+    const nextIndex = participants().length
     setParticipants([...participants(), ''])
+    setPendingParticipantFocus(nextIndex)
   }
 
   function removeParticipant(i: number) {
@@ -144,6 +148,19 @@ export default function Landing(props: Props) {
     next[i] = val
     setParticipants(next)
   }
+
+  createEffect(() => {
+    const idx = pendingParticipantFocus()
+    if (idx === null) return
+    participants()
+    queueMicrotask(() => {
+      const input = participantInputRefs[idx]
+      if (!input) return
+      input.focus()
+      input.select()
+      setPendingParticipantFocus(null)
+    })
+  })
 
   async function create() {
     if (!eventName().trim()) {
@@ -302,6 +319,9 @@ export default function Landing(props: Props) {
                   placeholder={i === 0 ? 'You' : `Person ${i + 1}`}
                   wrapperClass="landing__participant-field"
                   controlClass="landing__control landing__control--input"
+                  inputRef={(el) => {
+                    participantInputRefs[i] = el
+                  }}
                   onInput={(value) => updateParticipant(i, value)}
                 />
                 {i > 0 && (

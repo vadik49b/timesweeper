@@ -88,11 +88,6 @@ export default function Grid(props: Props) {
   const [statusFlash, setStatusFlash] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
 
-  // Non-reactive drag state
-  let dragging = false
-  let dragTargetState = 0
-  let draggedCells = new Set<string>()
-  let dragUndoBatch: UndoEntry[] = []
   let undoStack: UndoEntry[][] = []
   let statusTimer: ReturnType<typeof setTimeout> | null = null
   let shareInputRef!: HTMLInputElement
@@ -285,36 +280,14 @@ export default function Grid(props: Props) {
     await flushPendingSync()
   }
 
-  function dragStart(dk: string, ti: number) {
+  function cycleCell(dk: string, ti: number) {
     if (isConfirmed()) return
-    dragging = true
-    draggedCells = new Set()
-    dragUndoBatch = []
     const prev = myState[dk]?.[ti] ?? 0
-    dragTargetState = (prev + 1) % 3
-    dragUndoBatch.push({ dk, ti, prev })
-    setMyState(dk, ti, dragTargetState)
-    draggedCells.add(`${dk}-${ti}`)
+    const next = (prev + 1) % 3
+    if (prev === next) return
+    undoStack.push([{ dk, ti, prev }])
+    setMyState(dk, ti, next)
     if (navigator.vibrate) navigator.vibrate(10)
-  }
-
-  function dragOver(dk: string, ti: number) {
-    if (isConfirmed()) return
-    const key = `${dk}-${ti}`
-    if (draggedCells.has(key)) return
-    const prev = myState[dk]?.[ti] ?? 0
-    dragUndoBatch.push({ dk, ti, prev })
-    setMyState(dk, ti, dragTargetState)
-    draggedCells.add(key)
-    if (navigator.vibrate) navigator.vibrate(5)
-  }
-
-  function dragEnd() {
-    if (!dragging) return
-    dragging = false
-    if (dragUndoBatch.length > 0) undoStack.push([...dragUndoBatch])
-    dragUndoBatch = []
-    draggedCells = new Set()
     persistCurrentSlots()
   }
 
@@ -588,8 +561,38 @@ export default function Grid(props: Props) {
   const dayCountClass = createMemo(
     () => `grid-table--days-${Math.min(Math.max(days().length, 1), 7)}`,
   )
+  const heatmapView = createMemo(() => {
+    const d = days()
+    const t = times()
+    const values = t.map((_, ti) => d.map((day) => heat(day.key, ti)))
+    if (d.length === 0 || t.length === 0) return { days: d, times: t, values }
+
+    let minRow = t.length
+    let maxRow = -1
+    let minCol = d.length
+    let maxCol = -1
+
+    values.forEach((row, ri) => {
+      row.forEach((value, ci) => {
+        if (value <= 0) return
+        if (ri < minRow) minRow = ri
+        if (ri > maxRow) maxRow = ri
+        if (ci < minCol) minCol = ci
+        if (ci > maxCol) maxCol = ci
+      })
+    })
+
+    // Hide the heatmap entirely when everyone is completely unavailable.
+    if (maxRow === -1 || maxCol === -1) return { days: [], times: [], values: [] as number[][] }
+
+    return {
+      days: d.slice(minCol, maxCol + 1),
+      times: t.slice(minRow, maxRow + 1),
+      values: values.slice(minRow, maxRow + 1).map((row) => row.slice(minCol, maxCol + 1)),
+    }
+  })
   const heatmapDayCountClass = createMemo(
-    () => `heatmap-grid--days-${Math.min(Math.max(days().length, 1), 7)}`,
+    () => `heatmap-grid--days-${Math.min(Math.max(heatmapView().days.length, 1), 7)}`,
   )
   const confirmDayOptions = createMemo(() =>
     days().map((d) => ({ value: d.label, label: d.label })),
@@ -696,20 +699,7 @@ export default function Grid(props: Props) {
       }
     }
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (!dragging) return
-      e.preventDefault()
-      const touch = e.touches[0]
-      const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null
-      if (el?.dataset.day) dragOver(el.dataset.day, parseInt(el.dataset.ti!))
-    }
-
     document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('mouseup', dragEnd)
-    document.addEventListener('mouseleave', dragEnd)
-    document.addEventListener('touchmove', onTouchMove, { passive: false })
-    document.addEventListener('touchend', dragEnd)
-    document.addEventListener('touchcancel', dragEnd)
 
     onCleanup(() => {
       disconnectSocket()
@@ -717,11 +707,6 @@ export default function Grid(props: Props) {
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('mouseup', dragEnd)
-      document.removeEventListener('mouseleave', dragEnd)
-      document.removeEventListener('touchmove', onTouchMove)
-      document.removeEventListener('touchend', dragEnd)
-      document.removeEventListener('touchcancel', dragEnd)
     })
 
     let localEvent: AppEvent | undefined
@@ -823,7 +808,9 @@ export default function Grid(props: Props) {
                     <div class={`availability-grid ${dayCountClass()}`}>
                       <div class="availability-grid__corner" />
                       <For each={days()}>
-                        {(d) => <div class="availability-grid__day">{d.label}</div>}
+                        {(d) => (
+                          <div class="availability-grid__day">{d.label}</div>
+                        )}
                       </For>
                       <For each={times()}>
                         {(t, ti) => (
@@ -837,19 +824,7 @@ export default function Grid(props: Props) {
                                     'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
                                     'availability-grid__cell--maybe': myState[d.key]?.[ti()] === 2,
                                   }}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault()
-                                    dragStart(d.key, ti())
-                                  }}
-                                  onMouseEnter={() => {
-                                    if (dragging) dragOver(d.key, ti())
-                                  }}
-                                  onTouchStart={(e) => {
-                                    e.preventDefault()
-                                    dragStart(d.key, ti())
-                                  }}
-                                  data-day={d.key}
-                                  data-ti={String(ti())}
+                                  onClick={() => cycleCell(d.key, ti())}
                                 >
                                   <Show when={myState[d.key]?.[ti()] === 1}>
                                     <span class="availability-grid__icon">✔</span>
@@ -981,58 +956,50 @@ export default function Grid(props: Props) {
                 </div>
                 <Show when={!groupCollapsed()}>
                   <div class="grid-view__panel-body">
-                    <div class="heatmap-legend">
-                      <span>
-                        <span class="heatmap-legend__swatch heatmap-legend__swatch--0" />0
-                      </span>
-                      <span>
-                        <span class="heatmap-legend__swatch heatmap-legend__swatch--1" />
-                        <b class="heatmap-legend__value heatmap-legend__value--1">1</b>
-                      </span>
-                      <span>
-                        <span class="heatmap-legend__swatch heatmap-legend__swatch--2" />
-                        <b class="heatmap-legend__value heatmap-legend__value--2">2</b>
-                      </span>
-                      <span>
-                        <span class="heatmap-legend__swatch heatmap-legend__swatch--3" />
-                        <b class="heatmap-legend__value heatmap-legend__value--3">3</b>
-                      </span>
-                    </div>
-                    <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
-                      <div class="heatmap-grid__corner" />
-                      <For each={days()}>
-                        {(d) => <div class="heatmap-grid__day">{d.label}</div>}
-                      </For>
-                      <For each={times()}>
-                        {(t, ti) => (
-                          <>
-                            <div class="heatmap-grid__time">{t.label}</div>
-                            <For each={days()}>
-                              {(d) => {
-                                const h = () => heat(d.key, ti())
-                                return (
-                                  <div
-                                    classList={{
-                                      'heatmap-grid__cell': true,
-                                      'heatmap-grid__cell--0': h() === 0,
-                                      'heatmap-grid__cell--1': h() === 1,
-                                      'heatmap-grid__cell--2': h() === 2,
-                                      'heatmap-grid__cell--3': h() >= 3,
-                                    }}
-                                  >
-                                    <span
-                                      class={`heatmap-grid__value heatmap-grid__value--${Math.min(h(), 5)}`}
+                    <Show
+                      when={heatmapView().days.length > 0 && heatmapView().times.length > 0}
+                      fallback={
+                        <div class="heatmap-empty">
+                          Group availability will appear after someone marks a slot.
+                        </div>
+                      }
+                    >
+                      <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
+                        <div class="heatmap-grid__corner" />
+                        <For each={heatmapView().days}>
+                          {(d) => (
+                            <div class="heatmap-grid__day">{d.label}</div>
+                          )}
+                        </For>
+                        <For each={heatmapView().times}>
+                          {(t, ti) => (
+                            <>
+                              <div class="heatmap-grid__time">{t.label}</div>
+                              <For each={heatmapView().days}>
+                                {(_, di) => {
+                                  const h = () => heatmapView().values[ti()]?.[di()] ?? 0
+                                  return (
+                                    <div
+                                      classList={{
+                                        'heatmap-grid__cell': true,
+                                        'heatmap-grid__cell--0': h() === 0,
+                                        'heatmap-grid__cell--1': h() === 1,
+                                        'heatmap-grid__cell--2': h() === 2,
+                                        'heatmap-grid__cell--3': h() >= 3,
+                                      }}
                                     >
-                                      {h() > 0 ? h() : ''}
-                                    </span>
-                                  </div>
-                                )
-                              }}
-                            </For>
-                          </>
-                        )}
-                      </For>
-                    </div>
+                                      <span class="heatmap-grid__value">
+                                        {h() > 0 ? h() : ''}
+                                      </span>
+                                    </div>
+                                  )
+                                }}
+                              </For>
+                            </>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                   </div>
                 </Show>
               </div>
