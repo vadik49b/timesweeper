@@ -21,7 +21,7 @@ interface TimeSweeper extends DBSchema {
 export interface ParticipantSyncPayload {
   eventId: string
   participantName: string
-  changes: Array<{ i: number; v: SlotValue }>
+  slots: SlotValue[]
   baseVersion: number
   updatedAt: number
 }

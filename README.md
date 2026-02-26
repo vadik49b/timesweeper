@@ -31,7 +31,7 @@ The Worker + Durable Object API lives in:
 Implemented endpoints:
 - `GET /api/events/:eventId`
 - `PUT /api/events/:eventId`
-- `PUT /api/events/:eventId/participants/:participantName` with `{ changes, baseVersion, updatedAt }`
+- `PUT /api/events/:eventId/participants/:participantName` with `{ slots, baseVersion, updatedAt }`
 - `GET /api/events/:eventId/ws` (WebSocket)
 
 WebSocket messages:

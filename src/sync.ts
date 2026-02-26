@@ -24,14 +24,14 @@ function wsBase() {
 
 async function sendSyncOp(op: SyncOp): Promise<void> {
   if (op.kind === 'participant') {
-    const { eventId, participantName, changes, baseVersion, updatedAt } = op.payload
+    const { eventId, participantName, slots, baseVersion, updatedAt } = op.payload
     const sendParticipant = (version: number) =>
       fetch(
         `${apiBase()}/events/${encodeURIComponent(eventId)}/participants/${encodeURIComponent(participantName)}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ changes, baseVersion: version, updatedAt }),
+          body: JSON.stringify({ slots, baseVersion: version, updatedAt }),
         },
       )
     let resp = await sendParticipant(baseVersion)
@@ -68,13 +68,13 @@ async function sendSyncOp(op: SyncOp): Promise<void> {
 export async function queueParticipantSync(
   eventId: string,
   participantName: string,
-  changes: Array<{ i: number; v: SlotValue }>,
+  slots: SlotValue[],
   baseVersion: number,
   updatedAt: number,
 ): Promise<void> {
   await enqueueSyncOp({
     kind: 'participant',
-    payload: { eventId, participantName, changes, baseVersion, updatedAt },
+    payload: { eventId, participantName, slots, baseVersion, updatedAt },
     createdAt: Date.now(),
   })
 }

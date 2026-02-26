@@ -172,10 +172,10 @@ var EventRoom = class {
     if (request.method !== "PUT")
       return json({ error: "method_not_allowed" }, request, this.env, 405);
     const body = await readJson(request);
-    const changes = body?.changes;
+    const slots = body?.slots;
     const baseVersion = body?.baseVersion;
     const updatedAt = body?.updatedAt;
-    if (!Array.isArray(changes) || typeof updatedAt !== "number" || typeof baseVersion !== "number") {
+    if (!Array.isArray(slots) || typeof updatedAt !== "number" || typeof baseVersion !== "number") {
       return json({ error: "invalid_participant_payload" }, request, this.env, 400);
     }
     const event = await this.getEvent();
@@ -195,13 +195,13 @@ var EventRoom = class {
     if ((participant.updatedAt ?? 0) >= updatedAt) {
       return json({ ok: true, stale: true }, request, this.env);
     }
-    const nextSlots = [...participant.slots];
-    for (const change of changes) {
-      if (typeof change?.i !== "number") continue;
-      if (change.i < 0 || change.i >= nextSlots.length) continue;
-      if (change.v !== 0 && change.v !== 1 && change.v !== 2) continue;
-      nextSlots[change.i] = change.v;
+    if (slots.length !== participant.slots.length) {
+      return json({ error: "invalid_slots_length" }, request, this.env, 400);
     }
+    const nextSlots = slots.map((value) => {
+      if (value === 1 || value === 2) return value;
+      return 0;
+    });
     const nextVersion = currentVersion + 1;
     const nextEvent = {
       ...event,

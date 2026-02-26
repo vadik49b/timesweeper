@@ -267,13 +267,11 @@ export default function Grid(props: Props) {
     const spd = slotsPerDay(ev)
     const flat = recordToFlat(myState, ev.dates, spd)
     const prevFlat = ev.participants.find((p) => p.name === currentName())?.slots ?? []
-    const changes: Array<{ i: number; v: SlotValue }> = []
-    for (let i = 0; i < flat.length; i++) {
-      const prev = prevFlat[i] ?? 0
-      const next = flat[i] ?? 0
-      if (prev !== next) changes.push({ i, v: next as SlotValue })
-    }
-    if (changes.length === 0) return
+    if (
+      prevFlat.length === flat.length &&
+      prevFlat.every((value, index) => value === (flat[index] ?? 0))
+    )
+      return
     const updatedAt = Date.now()
     const prevVersion = ev.participants.find((p) => p.name === currentName())?.version ?? 0
     const nextVersion = prevVersion + 1
@@ -284,7 +282,7 @@ export default function Grid(props: Props) {
         p.name === currentName() ? { ...p, slots: flat, updatedAt, version: nextVersion } : p,
       ),
     })
-    await queueParticipantSync(ev.id, currentName(), changes, prevVersion, updatedAt)
+    await queueParticipantSync(ev.id, currentName(), flat, prevVersion, updatedAt)
     await flushPendingSync()
   }
 
