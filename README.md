@@ -52,11 +52,13 @@ WebSocket messages:
 npm run deploy:api
 ```
 
+`deploy:api` targets the top-level Wrangler environment explicitly (`--env=""`).
+
 ## Deploy from Laptop (No GitHub Required)
 
 Then use:
 
 ```bash
 npm run deploy:fe    # build + deploy frontend (dist/) to Pages
-npm run deploy:all   # deploy API Worker + frontend
+npm run deploy       # deploy API Worker + frontend
 ```

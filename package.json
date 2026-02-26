@@ -9,9 +9,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "format": "prettier --write src/ && prettier --write worker/src",
-    "deploy:api": "wrangler deploy -c worker/wrangler.toml",
+    "deploy:api": "wrangler deploy -c worker/wrangler.toml --env=\"\"",
     "deploy:fe": "npm run build && wrangler pages deploy dist --project-name timesweeper",
-    "deploy:all": "npm run deploy:api && npm run deploy:fe"
+    "deploy": "npm run deploy:api && npm run deploy:fe"
   },
   "dependencies": {
     "idb": "^8.0.3",
