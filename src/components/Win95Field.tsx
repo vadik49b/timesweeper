@@ -34,8 +34,20 @@ interface SelectProps extends BaseProps {
 type Props = InputProps | SelectProps
 
 export default function Win95Field(props: Props) {
-  const wrapperClass = () =>
-    ['win95-field', props.wrapperClass].filter(Boolean).join(' ')
+  let selectEl: HTMLSelectElement | undefined
+
+  function openSelectMenu() {
+    if (!selectEl) return
+    selectEl.focus()
+    const picker = selectEl as HTMLSelectElement & { showPicker?: () => void }
+    if (picker.showPicker) {
+      picker.showPicker()
+    } else {
+      selectEl.click()
+    }
+  }
+
+  const wrapperClass = () => ['win95-field', props.wrapperClass].filter(Boolean).join(' ')
   const frameClass = () =>
     [
       'win95-field__frame',
@@ -67,7 +79,11 @@ export default function Win95Field(props: Props) {
         <Show when={props.kind === 'select'}>
           <div class="win95-field__select-wrap">
             <select
-              ref={(el) => props.kind === 'select' && props.selectRef?.(el)}
+              ref={(el) => {
+                if (props.kind !== 'select') return
+                selectEl = el
+                props.selectRef?.(el)
+              }}
               class={['win95-field__control', props.controlClass].filter(Boolean).join(' ')}
               value={props.kind === 'select' ? props.value : ''}
               onChange={(e) => props.kind === 'select' && props.onChange(e.currentTarget.value)}
@@ -76,7 +92,19 @@ export default function Win95Field(props: Props) {
                 {(option) => <option value={option.value}>{option.label}</option>}
               </For>
             </select>
-            <div class="win95-field__arrow r">▼</div>
+            <div
+              class="win95-field__arrow r"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                openSelectMenu()
+              }}
+              onClick={(e) => {
+                e.preventDefault()
+                openSelectMenu()
+              }}
+            >
+              ▼
+            </div>
           </div>
         </Show>
       </div>

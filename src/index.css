@@ -394,7 +394,9 @@ body {
   border: 2px solid;
   border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
 }
-.availability-grid__cell:active:not(.availability-grid__cell--yes):not(.availability-grid__cell--maybe) {
+.availability-grid__cell:active:not(.availability-grid__cell--yes):not(
+    .availability-grid__cell--maybe
+  ) {
   border-width: 1px;
   border-color: var(--blo);
   padding: 1px;

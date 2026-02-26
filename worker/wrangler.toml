@@ -1,5 +1,5 @@
 name = "timesweeper-api"
-main = "worker/src/worker.ts"
+main = "src/worker.ts"
 compatibility_date = "2026-02-25"
 
 [durable_objects]

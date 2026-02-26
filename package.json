@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "wrangler dev",
+    "dev:api": "wrangler dev -c worker/wrangler.toml",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "format": "prettier --write src/",
-    "deploy:api": "wrangler deploy"
+    "format": "prettier --write src/ && prettier --write worker/src",
+    "deploy:api": "wrangler deploy -c worker/wrangler.toml",
+    "deploy:fe": "npm run build && wrangler pages deploy dist --project-name timesweeper",
+    "deploy:all": "npm run deploy:api && npm run deploy:fe"
   },
   "dependencies": {
     "idb": "^8.0.3",

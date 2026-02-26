@@ -51,3 +51,12 @@ WebSocket messages:
 ```bash
 npm run deploy:api
 ```
+
+## Deploy from Laptop (No GitHub Required)
+
+Then use:
+
+```bash
+npm run deploy:fe    # build + deploy frontend (dist/) to Pages
+npm run deploy:all   # deploy API Worker + frontend
+```

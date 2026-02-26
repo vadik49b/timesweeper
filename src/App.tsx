@@ -8,7 +8,9 @@ function parseEventIdFromPath(pathname: string): string | null {
 }
 
 export default function App() {
-  const [eventId, setEventId] = createSignal<string | null>(parseEventIdFromPath(window.location.pathname))
+  const [eventId, setEventId] = createSignal<string | null>(
+    parseEventIdFromPath(window.location.pathname),
+  )
 
   function navigateToEvent(id: string) {
     const nextPath = `/e/${encodeURIComponent(id)}`

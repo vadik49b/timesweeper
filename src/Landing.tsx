@@ -153,7 +153,9 @@ export default function Landing(props: Props) {
     if (dates.length === 0) {
       return
     }
-    const participantNames = participants().map((p) => p.trim()).filter(Boolean)
+    const participantNames = participants()
+      .map((p) => p.trim())
+      .filter(Boolean)
     if (participantNames.length === 0) {
       return
     }
@@ -168,18 +170,21 @@ export default function Landing(props: Props) {
       dates,
       timeRange,
       participants: participantNames.map((name) => ({
-          name: name.trim(),
-          timezone: '',
-          slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
-          visitedAt: null,
-          updatedAt: null,
-        })),
+        name: name.trim(),
+        timezone: '',
+        slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
+        visitedAt: null,
+        updatedAt: null,
+      })),
     }
     await saveEvent(event)
-    await queueEventSync(event)
-    await flushPendingSync()
     await setSelectedParticipant(event.id, participantNames[0])
     props.onOpenEvent(event.id)
+    void queueEventSync(event)
+      .then(() => flushPendingSync())
+      .catch(() => {
+        // Keep create flow local-first; sync retries in background.
+      })
   }
 
   return (

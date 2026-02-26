@@ -30,25 +30,53 @@ interface Env {
   EVENT_ROOMS: DurableObjectNamespace<EventRoom>
 }
 
-function json(data: unknown, status = 200): Response {
+const ALLOWED_ORIGINS = new Set([
+  'https://timesweeper.pages.dev',
+  'https://timesweeper.app',
+])
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return true
+  return ALLOWED_ORIGINS.has(origin)
+}
+
+function corsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get('Origin')
+  if (!origin || !isAllowedOrigin(origin)) return {}
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    Vary: 'Origin',
+  }
+}
+
+function json(data: unknown, request: Request, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
+      ...corsHeaders(request),
     },
   })
 }
 
-function noContent(status = 204): Response {
-  return new Response(null, { status })
+function noContent(request: Request, status = 204): Response {
+  return new Response(null, { status, headers: corsHeaders(request) })
 }
 
-function readJson<T>(req: Request): Promise<T> {
-  return req.json() as Promise<T>
+async function readJson<T>(req: Request): Promise<T | null> {
+  try {
+    return (await req.json()) as T
+  } catch {
+    return null
+  }
 }
 
-function matchEventPath(pathname: string):
+function matchEventPath(
+  pathname: string,
+):
   | { kind: 'event'; eventId: string }
   | { kind: 'participant'; eventId: string; participantName: string }
   | { kind: 'ws'; eventId: string }
@@ -70,10 +98,13 @@ function matchEventPath(pathname: string):
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method === 'OPTIONS') return noContent()
+    if (!isAllowedOrigin(request.headers.get('Origin'))) {
+      return json({ error: 'origin_not_allowed' }, request, 403)
+    }
+    if (request.method === 'OPTIONS') return noContent(request)
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
-    if (!route) return json({ error: 'not_found' }, 404)
+    if (!route) return json({ error: 'not_found' }, request, 404)
     const id = env.EVENT_ROOMS.idFromName(route.eventId)
     const stub = env.EVENT_ROOMS.get(id)
     return stub.fetch(request)
@@ -119,13 +150,19 @@ export class EventRoom {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!isAllowedOrigin(request.headers.get('Origin'))) {
+      return json({ error: 'origin_not_allowed' }, request, 403)
+    }
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
-    if (!route) return json({ error: 'not_found' }, 404)
+    if (!route) return json({ error: 'not_found' }, request, 404)
 
     if (route.kind === 'ws') {
       if (request.headers.get('Upgrade') !== 'websocket') {
-        return json({ error: 'expected_websocket_upgrade' }, 426)
+        return json({ error: 'expected_websocket_upgrade' }, request, 426)
+      }
+      if (!isAllowedOrigin(request.headers.get('Origin'))) {
+        return json({ error: 'origin_not_allowed' }, request, 403)
       }
       const pair = new WebSocketPair()
       const [client, server] = Object.values(pair)
@@ -137,34 +174,41 @@ export class EventRoom {
     if (route.kind === 'event') {
       if (request.method === 'GET') {
         const event = await this.getEvent()
-        if (!event) return json({ error: 'event_not_found' }, 404)
-        return json(event)
+        if (!event) return json({ error: 'event_not_found' }, request, 404)
+        return json(event, request)
       }
       if (request.method === 'PUT') {
         const event = await readJson<AppEvent>(request)
-        if (!event || typeof event.id !== 'string') return json({ error: 'invalid_event_payload' }, 400)
+        if (!event || typeof event.id !== 'string')
+          return json({ error: 'invalid_event_payload' }, request, 400)
+        if (event.id !== route.eventId) {
+          return json({ error: 'event_id_mismatch' }, request, 400)
+        }
         await this.setEvent(event)
         this.broadcast({ type: 'event.updated', event })
-        return json({ ok: true })
+        return json({ ok: true }, request)
       }
-      return json({ error: 'method_not_allowed' }, 405)
+      return json({ error: 'method_not_allowed' }, request, 405)
     }
 
-    if (request.method !== 'PUT') return json({ error: 'method_not_allowed' }, 405)
-    const body = await readJson<{ changes?: Array<{ i: number; v: SlotValue }>; updatedAt?: number }>(request)
+    if (request.method !== 'PUT') return json({ error: 'method_not_allowed' }, request, 405)
+    const body = await readJson<{
+      changes?: Array<{ i: number; v: SlotValue }>
+      updatedAt?: number
+    }>(request)
     const changes = body?.changes
     const updatedAt = body?.updatedAt
     if (!Array.isArray(changes) || typeof updatedAt !== 'number') {
-      return json({ error: 'invalid_participant_payload' }, 400)
+      return json({ error: 'invalid_participant_payload' }, request, 400)
     }
     const event = await this.getEvent()
-    if (!event) return json({ error: 'event_not_found' }, 404)
+    if (!event) return json({ error: 'event_not_found' }, request, 404)
     const idx = event.participants.findIndex((p) => p.name === route.participantName)
-    if (idx === -1) return json({ error: 'participant_not_found' }, 404)
+    if (idx === -1) return json({ error: 'participant_not_found' }, request, 404)
 
     const participant = event.participants[idx]
-    if ((participant.updatedAt ?? 0) > updatedAt) {
-      return json({ ok: true, stale: true })
+    if ((participant.updatedAt ?? 0) >= updatedAt) {
+      return json({ ok: true, stale: true }, request)
     }
 
     const nextSlots = [...participant.slots]
@@ -190,6 +234,6 @@ export class EventRoom {
       slots: nextSlots,
       updatedAt,
     })
-    return json({ ok: true })
+    return json({ ok: true }, request)
   }
 }

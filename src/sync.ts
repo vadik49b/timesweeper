@@ -8,13 +8,18 @@ import {
   saveEvent,
 } from './db'
 
+const API_ORIGIN = import.meta.env.DEV
+  ? window.location.origin
+  : 'https://timesweeper-api.boltach.workers.dev'
+
 function apiBase() {
-  return `${window.location.origin}/api`
+  return `${API_ORIGIN}/api`
 }
 
 function wsBase() {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${window.location.host}/api`
+  const proto = API_ORIGIN.startsWith('https') ? 'wss:' : 'ws:'
+  const host = new URL(API_ORIGIN).host
+  return `${proto}//${host}/api`
 }
 
 async function sendSyncOp(op: SyncOp): Promise<void> {
@@ -100,7 +105,13 @@ export async function pullRemoteEvent(eventId: string): Promise<AppEvent | null>
 
 type WsEventMessage =
   | { type: 'event.updated'; event: AppEvent }
-  | { type: 'participant.updated'; eventId: string; participantName: string; slots: SlotValue[]; updatedAt: number }
+  | {
+      type: 'participant.updated'
+      eventId: string
+      participantName: string
+      slots: SlotValue[]
+      updatedAt: number
+    }
 
 export interface SyncSocketHandlers {
   onEventUpdated: (event: AppEvent) => void

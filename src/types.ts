@@ -31,12 +31,13 @@ export interface AppEvent {
 export function slotsPerDay(event: AppEvent): number {
   const [sh, sm] = event.timeRange.start.split(':').map(Number)
   const [eh, em] = event.timeRange.end.split(':').map(Number)
-  return ((eh * 60 + em) - (sh * 60 + sm)) / SLOT_DURATION
+  return (eh * 60 + em - (sh * 60 + sm)) / SLOT_DURATION
 }
 
-export function computeTimeSlots(
-  timeRange: { start: string; end: string },
-): { label: string; value: string }[] {
+export function computeTimeSlots(timeRange: {
+  start: string
+  end: string
+}): { label: string; value: string }[] {
   const [sh, sm] = timeRange.start.split(':').map(Number)
   const [eh, em] = timeRange.end.split(':').map(Number)
   const startMins = sh * 60 + sm

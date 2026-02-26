@@ -47,7 +47,10 @@ function getDB() {
           db.createObjectStore('localState', { keyPath: 'eventId' })
         }
         if (!db.objectStoreNames.contains('pendingSync')) {
-          const pending = db.createObjectStore('pendingSync', { keyPath: 'id', autoIncrement: true })
+          const pending = db.createObjectStore('pendingSync', {
+            keyPath: 'id',
+            autoIncrement: true,
+          })
           pending.createIndex('by-created', 'createdAt')
         }
       },
@@ -94,7 +97,10 @@ export async function getSelectedParticipant(eventId: string): Promise<string | 
   return row?.participantName ?? null
 }
 
-export async function setSelectedParticipant(eventId: string, participantName: string): Promise<void> {
+export async function setSelectedParticipant(
+  eventId: string,
+  participantName: string,
+): Promise<void> {
   const db = await getDB()
   await db.put('localState', { eventId, participantName })
 }
