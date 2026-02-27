@@ -65,6 +65,7 @@ body {
   text-align: center;
   white-space: nowrap;
   user-select: none;
+  pointer-events: auto;
 }
 .win95-button--normal {
   font-size: 12px;
@@ -196,7 +197,6 @@ body {
   font-family: var(--ui);
   font-size: 14px;
   padding: 4px 20px;
-  cursor: pointer;
   background: var(--bg);
   min-width: 75px;
 }
@@ -259,7 +259,6 @@ body {
   align-items: center;
   justify-content: center;
   font-family: sans-serif;
-  cursor: pointer;
 }
 
 .grid-view__window-body {
@@ -722,7 +721,6 @@ body {
   padding: 2px 8px;
   min-width: 0;
   flex-shrink: 0;
-  cursor: pointer;
 }
 .results__custom {
   margin-top: 6px;
@@ -732,7 +730,6 @@ body {
   font-size: 13px;
   padding: 3px 10px;
   min-width: 0;
-  cursor: pointer;
   display: inline-block;
 }
 
@@ -886,6 +883,7 @@ body {
   text-align: center;
   padding: 3px 2px;
   cursor: pointer;
+  pointer-events: auto;
 }
 .grid-view__function-item:hover {
   background: var(--navy);
@@ -1004,7 +1002,6 @@ body {
 .cal-nav {
   font-size: 11px;
   padding: 1px 8px;
-  cursor: pointer;
   background: var(--bg);
 }
 .cal-nav:active {
@@ -1067,7 +1064,6 @@ body {
 .p-rm {
   font-size: 11px;
   padding: 1px 6px;
-  cursor: pointer;
   background: var(--bg);
 }
 .p-rm:active {
@@ -1077,7 +1073,6 @@ body {
   font-family: var(--ui);
   font-size: 11px;
   padding: 2px 8px;
-  cursor: pointer;
   background: var(--bg);
   margin-top: 4px;
 }
@@ -1089,7 +1084,6 @@ body {
   font-family: var(--ui);
   font-size: 13px;
   padding: 6px 20px;
-  cursor: pointer;
   background: var(--bg);
   max-width: 420px;
   text-align: center;

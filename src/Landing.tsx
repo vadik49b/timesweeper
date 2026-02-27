@@ -337,11 +337,10 @@ export default function Landing(props: Props) {
             + <span class="hk">A</span>dd person
           </Win95Button>
         </div>
+        <Win95Button fullWidth class="create-btn" onClick={create}>
+          <span class="hk">C</span>reate Event
+        </Win95Button>
       </div>
-
-      <Win95Button fullWidth class="create-btn" onClick={create}>
-        <span class="hk">C</span>reate Event
-      </Win95Button>
 
       <div class="how-section">
         <div class="how-title">How it works</div>

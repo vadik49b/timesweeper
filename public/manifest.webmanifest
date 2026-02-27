@@ -8,9 +8,9 @@
   "theme_color": "#008080",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/anti-tank-mine-logo.png",
+      "sizes": "604x508",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

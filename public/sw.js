@@ -1,5 +1,5 @@
-const CACHE_NAME = 'timesweeper-v1'
-const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/vite.svg']
+const CACHE_NAME = 'timesweeper-v2'
+const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/anti-tank-mine-logo.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
