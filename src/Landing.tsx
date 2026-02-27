@@ -235,9 +235,11 @@ export default function Landing(props: Props) {
 
       <div class="form-card r">
         <div class="field">
-          <label>Event name:</label>
+          <label for="event-name">Event name:</label>
           <Win95Field
             kind="input"
+            id="event-name"
+            name="eventName"
             value={eventName()}
             placeholder="e.g. Game Night, Intro Call"
             autoFocus
@@ -247,17 +249,27 @@ export default function Landing(props: Props) {
           />
         </div>
 
-        <div class="field">
-          <label>Pick dates:</label>
+        <fieldset class="field landing__group">
+          <legend>Pick dates:</legend>
           <div class="landing__calendar s">
             <div class="cal-header">
-              <Win95Button size="small" class="cal-nav" onClick={() => calNav(-1)}>
+              <Win95Button
+                size="small"
+                class="cal-nav"
+                ariaLabel="Previous month"
+                onClick={() => calNav(-1)}
+              >
                 &lt;
               </Win95Button>
               <span>
                 {MONTHS[calMonth()]} {calYear()}
               </span>
-              <Win95Button size="small" class="cal-nav" onClick={() => calNav(1)}>
+              <Win95Button
+                size="small"
+                class="cal-nav"
+                ariaLabel="Next month"
+                onClick={() => calNav(1)}
+              >
                 &gt;
               </Win95Button>
             </div>
@@ -275,6 +287,17 @@ export default function Landing(props: Props) {
                       selected: day.isSelected,
                     }}
                     disabled={day.day === null || day.isPast}
+                    aria-label={
+                      day.ds
+                        ? new Date(`${day.ds}T00:00:00`).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })
+                        : 'Empty day'
+                    }
+                    aria-pressed={day.isSelected}
                     onClick={() => day.ds && toggleDate(day.ds)}
                   >
                     {day.day ?? ''}
@@ -284,13 +307,15 @@ export default function Landing(props: Props) {
             </div>
             <div class="landing__date-summary">{selectedDateLabels()}</div>
           </div>
-        </div>
+        </fieldset>
 
         <div class="field">
-          <label>What times might work? ({localTimezone})</label>
+          <label for="time-start">What times might work? ({localTimezone})</label>
           <div class="time-range">
             <Win95Field
               kind="select"
+              id="time-start"
+              name="timeStart"
               value={timeStart()}
               options={TIMES}
               wrapperClass="landing__time-select"
@@ -300,6 +325,8 @@ export default function Landing(props: Props) {
             <span>to</span>
             <Win95Field
               kind="select"
+              id="time-end"
+              name="timeEnd"
               value={timeEnd()}
               options={TIMES}
               wrapperClass="landing__time-select"
@@ -309,13 +336,18 @@ export default function Landing(props: Props) {
           </div>
         </div>
 
-        <div class="field">
-          <label>Who's in?</label>
+        <fieldset class="field landing__group">
+          <legend>Who's in?</legend>
           <Index each={participants()}>
             {(p, i) => (
               <div class="participant-row">
+                <label class="sr-only" for={`participant-${i}`}>
+                  Participant {i + 1} name
+                </label>
                 <Win95Field
                   kind="input"
+                  id={`participant-${i}`}
+                  name={`participant-${i}`}
                   value={p()}
                   placeholder={i === 0 ? 'You' : `Person ${i + 1}`}
                   wrapperClass="landing__participant-field"
@@ -327,7 +359,7 @@ export default function Landing(props: Props) {
                 />
                 {i > 0 && (
                   <Win95Button size="small" class="p-rm" onClick={() => removeParticipant(i)}>
-                    x
+                    x <span class="sr-only">Remove participant {i + 1}</span>
                   </Win95Button>
                 )}
               </div>
@@ -336,7 +368,7 @@ export default function Landing(props: Props) {
           <Win95Button class="add-btn" onClick={addParticipant}>
             + <span class="hk">A</span>dd person
           </Win95Button>
-        </div>
+        </fieldset>
         <Win95Button fullWidth class="create-btn" onClick={create}>
           <span class="hk">C</span>reate Event
         </Win95Button>
@@ -376,7 +408,14 @@ export default function Landing(props: Props) {
             <div class="recent-empty">No recent events</div>
           ) : (
             recentEvents().map((e) => (
-              <div class="recent-item" onClick={() => props.onOpenEvent(e.id)}>
+              <a
+                class="recent-item"
+                href={`/e/${e.id}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  props.onOpenEvent(e.id)
+                }}
+              >
                 <span class="flag-ico">
                   <FlagIcon />
                 </span>
@@ -388,7 +427,7 @@ export default function Landing(props: Props) {
                     day: 'numeric',
                   })}
                 </span>
-              </div>
+              </a>
             ))
           )}
         </div>
@@ -398,7 +437,7 @@ export default function Landing(props: Props) {
         No accounts | No tracking | Works offline
         <br />
         <span class="footer-links">
-          timesweeper.app | <a href="#">About</a>
+          timesweeper.app | <span>About</span>
         </span>
       </div>
     </div>

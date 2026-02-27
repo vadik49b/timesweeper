@@ -6,6 +6,8 @@ interface Option {
 }
 
 interface BaseProps {
+  id?: string
+  name?: string
   wrapperClass?: string
   frameClass?: string
   controlClass?: string
@@ -66,6 +68,8 @@ export default function Win95Field(props: Props) {
             <input
               ref={(el) => props.kind === 'input' && props.inputRef?.(el)}
               class={['win95-field__control', props.controlClass].filter(Boolean).join(' ')}
+              id={props.id}
+              name={props.name}
               type={props.kind === 'input' ? (props.type ?? 'text') : 'text'}
               value={props.kind === 'input' ? props.value : ''}
               placeholder={props.kind === 'input' ? props.placeholder : ''}
@@ -85,6 +89,8 @@ export default function Win95Field(props: Props) {
                 props.selectRef?.(el)
               }}
               class={['win95-field__control', props.controlClass].filter(Boolean).join(' ')}
+              id={props.id}
+              name={props.name}
               value={props.kind === 'select' ? props.value : ''}
               onChange={(e) => props.kind === 'select' && props.onChange(e.currentTarget.value)}
             >
@@ -92,7 +98,8 @@ export default function Win95Field(props: Props) {
                 {(option) => <option value={option.value}>{option.label}</option>}
               </For>
             </select>
-            <div
+            <button
+              type="button"
               class="win95-field__arrow r"
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -102,9 +109,11 @@ export default function Win95Field(props: Props) {
                 e.preventDefault()
                 openSelectMenu()
               }}
+              aria-hidden="true"
+              tabIndex={-1}
             >
               ▼
-            </div>
+            </button>
           </div>
         </Show>
       </div>

@@ -770,9 +770,13 @@ export default function Grid(props: Props) {
                 <MineIcon size={16} /> TimeSweeper — {event()?.name ?? 'Opening event'}
               </span>
           <div class="win95-window__title-buttons">
-            <Win95Button size="small" class="win95-window__title-button" onClick={goToLanding}>
+            <a
+              href="/"
+              class="win95-button r win95-button--small win95-window__title-button"
+              aria-label="Close event and return to home"
+            >
               ×
-            </Win95Button>
+            </a>
           </div>
         </div>
 
@@ -803,16 +807,20 @@ export default function Grid(props: Props) {
             {/* Panel: Your availability */}
             <div class="grid-view__panel">
               <div class="grid-view__panel-frame s">
-                <div
+                <button
+                  type="button"
                   class="grid-view__panel-header"
+                  id="panel-toggle-edit"
                   onClick={() => setEditCollapsed(!editCollapsed())}
+                  aria-controls="panel-body-edit"
+                  aria-expanded={!editCollapsed()}
                 >
                   <div class="grid-view__panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
                   <span>Your availability ({currentTimezone()})</span>
                   <hr />
-                </div>
+                </button>
                 <Show when={!editCollapsed()}>
-                  <div class="grid-view__panel-body">
+                  <div class="grid-view__panel-body" id="panel-body-edit" role="region" aria-labelledby="panel-toggle-edit">
                     <div class="grid-view__legend">
                       <AvailabilityLegend withLabels />
                     </div>
@@ -829,7 +837,8 @@ export default function Grid(props: Props) {
                             <div class="availability-grid__time">{t.label}</div>
                             <For each={days()}>
                               {(d, di) => (
-                                <div
+                                <button
+                                  type="button"
                                   classList={{
                                     'availability-grid__cell': true,
                                     'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
@@ -837,6 +846,14 @@ export default function Grid(props: Props) {
                                     'availability-grid__cell--first-row': ti() === 0,
                                     'availability-grid__cell--first-col': di() === 0,
                                   }}
+                                  aria-label={`${d.label} at ${t.label}. Current status: ${
+                                    myState[d.key]?.[ti()] === 1
+                                      ? 'yes'
+                                      : myState[d.key]?.[ti()] === 2
+                                        ? 'maybe'
+                                        : 'no'
+                                  }. Activate to cycle.`}
+                                  disabled={isConfirmed()}
                                   onClick={() => cycleCell(d.key, ti())}
                                 >
                                   <Show when={myState[d.key]?.[ti()] === 1}>
@@ -845,7 +862,7 @@ export default function Grid(props: Props) {
                                   <Show when={myState[d.key]?.[ti()] === 2}>
                                     <span class="availability-grid__icon">?</span>
                                   </Show>
-                                </div>
+                                </button>
                               )}
                             </For>
                           </>
@@ -861,9 +878,13 @@ export default function Grid(props: Props) {
             <div class="grid-view__panel">
               <div class="grid-view__panel-frame s">
                 {/* Results sub-panel */}
-                <div
+                <button
+                  type="button"
                   class="grid-view__panel-header"
+                  id="panel-toggle-best"
                   onClick={() => setBestCollapsed(!bestCollapsed())}
+                  aria-controls="panel-body-best"
+                  aria-expanded={!bestCollapsed()}
                 >
                   <div class="grid-view__panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
                   <span>
@@ -871,9 +892,9 @@ export default function Grid(props: Props) {
                     availability
                   </span>
                   <hr />
-                </div>
+                </button>
                 <Show when={!bestCollapsed()}>
-                  <div class="grid-view__panel-body">
+                  <div class="grid-view__panel-body" id="panel-body-best" role="region" aria-labelledby="panel-toggle-best">
                     <Show
                       when={canShowSuggestions()}
                       fallback={
@@ -957,17 +978,21 @@ export default function Grid(props: Props) {
                 </Show>
 
                 {/* Group heatmap sub-panel */}
-                <div
+                <button
+                  type="button"
                   class="grid-view__panel-header"
                   classList={{ 'grid-view__panel-header--spaced': true }}
+                  id="panel-toggle-group"
                   onClick={() => setGroupCollapsed(!groupCollapsed())}
+                  aria-controls="panel-body-group"
+                  aria-expanded={!groupCollapsed()}
                 >
                   <div class="grid-view__panel-toggle">{groupCollapsed() ? '▸' : '▾'}</div>
                   <span>Group availability</span>
                   <hr />
-                </div>
+                </button>
                 <Show when={!groupCollapsed()}>
-                  <div class="grid-view__panel-body">
+                  <div class="grid-view__panel-body" id="panel-body-group" role="region" aria-labelledby="panel-toggle-group">
                     <Show
                       when={heatmapView().days.length > 0 && heatmapView().times.length > 0}
                       fallback={
@@ -1029,15 +1054,19 @@ export default function Grid(props: Props) {
 
           {/* Function bar */}
           <div class="grid-view__function-bar">
-            <div class="grid-view__function-item" onClick={doUndo}>
+            <button type="button" class="grid-view__function-item" onClick={doUndo}>
               <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
-            </div>
-            <div class="grid-view__function-item" onClick={openShareDialog}>
+            </button>
+            <button type="button" class="grid-view__function-item" onClick={openShareDialog}>
               <span class="grid-view__function-key">F3</span> <span class="hk">S</span>hare
-            </div>
-            <div class="grid-view__function-item" onClick={() => openConfirm(null, null)}>
+            </button>
+            <button
+              type="button"
+              class="grid-view__function-item"
+              onClick={() => openConfirm(null, null)}
+            >
               <span class="grid-view__function-key">F5</span> <span class="hk">C</span>onfirm
-            </div>
+            </button>
           </div>
           <Show when={isConfirmed()}>
             <div class="grid-view__confirmed-overlay">
@@ -1117,9 +1146,11 @@ export default function Grid(props: Props) {
               </For>
             </div>
             <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
-              <label class="participant-picker__label">I'm not in the list</label>
+              <label class="participant-picker__label" for="new-participant-name">I'm not in the list</label>
               <Win95Field
                 kind="input"
+                id="new-participant-name"
+                name="newParticipantName"
                 value={newParticipantName()}
                 placeholder="Your name"
                 wrapperClass="dialog__field"
@@ -1138,9 +1169,11 @@ export default function Grid(props: Props) {
 
       <Show when={dialog() === 'share'}>
         <Win95Dialog title="Share Link" onClose={() => setDialog(null)}>
-          <label>Send this link to participants:</label>
+          <label for="share-link">Send this link to participants:</label>
           <Win95Field
             kind="input"
+            id="share-link"
+            name="shareLink"
             type="url"
             value={eventUrl()}
             readOnly
@@ -1159,7 +1192,7 @@ export default function Grid(props: Props) {
               Close
             </Win95Button>
           </div>
-          <div class="copy-status">{copyStatus()}</div>
+          <div class="copy-status" aria-live="polite">{copyStatus()}</div>
         </Win95Dialog>
       </Show>
 
@@ -1177,16 +1210,13 @@ export default function Grid(props: Props) {
             <AvailabilityLegend mini class="help__cycle" />
           </p>
           <p class="help__step">
-            <b>3.</b> Click and drag to fill multiple cells at once
+            <b>3.</b> Check "Group availability" to see when everyone is free
           </p>
           <p class="help__step">
-            <b>4.</b> Check "Group availability" to see when everyone is free
+            <b>4.</b> Click <b>Share</b> to send the link to others
           </p>
           <p class="help__step">
-            <b>5.</b> Click <b>Share</b> to send the link to others
-          </p>
-          <p class="help__step help__step--last">
-            <b>6.</b> When the group agrees, click <b>Confirm</b>
+            <b>5.</b> When the group agrees, click <b>Confirm</b>
           </p>
           <p class="help__keys">
             <b>Keyboard shortcuts:</b>
@@ -1213,18 +1243,22 @@ export default function Grid(props: Props) {
           onClose={() => setDialog(null)}
         >
           <p class="confirm__lead">Confirm this time for everyone?</p>
-          <label class="confirm__label">Day:</label>
+          <label class="confirm__label" for="confirm-day">Day:</label>
           <Win95Field
             kind="select"
+            id="confirm-day"
+            name="confirmDay"
             value={confirmDay()}
             options={confirmDayOptions()}
             wrapperClass="confirm__field confirm__field--day"
             controlClass="confirm__control"
             onChange={setConfirmDay}
           />
-          <label class="confirm__label">Time:</label>
+          <label class="confirm__label" for="confirm-time">Time:</label>
           <Win95Field
             kind="select"
+            id="confirm-time"
+            name="confirmTime"
             value={confirmTime()}
             options={confirmTimeOptions()}
             wrapperClass="confirm__field confirm__field--time"
