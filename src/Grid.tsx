@@ -93,7 +93,6 @@ export default function Grid(props: Props) {
   let statusTimer: ReturnType<typeof setTimeout> | null = null
   let persistTimer: ReturnType<typeof setTimeout> | undefined
   let shareInputRef!: HTMLInputElement
-  let lastGridTouchEndAt = 0
 
   function goToLanding() {
     if (window.location.pathname !== '/') {
@@ -299,12 +298,10 @@ export default function Grid(props: Props) {
     schedulePersist()
   }
 
-  function preventGridDoubleTapZoom(e: TouchEvent) {
-    const now = Date.now()
-    if (now - lastGridTouchEndAt <= 300) {
-      e.preventDefault()
-    }
-    lastGridTouchEndAt = now
+  function handleCellPointerDown(e: PointerEvent, dk: string, ti: number) {
+    // Prevent iOS gesture interpretation on rapid taps while keeping cell updates immediate.
+    if (e.pointerType === 'touch') e.preventDefault()
+    cycleCell(dk, ti)
   }
 
   function doUndo() {
@@ -824,10 +821,7 @@ export default function Grid(props: Props) {
                     <div class="grid-view__legend">
                       <AvailabilityLegend withLabels />
                     </div>
-                    <div
-                      class={`availability-grid ${dayCountClass()}`}
-                      onTouchEnd={preventGridDoubleTapZoom}
-                    >
+                    <div class={`availability-grid ${dayCountClass()}`}>
                       <div class="availability-grid__corner" />
                       <For each={days()}>
                         {(d) => (
@@ -848,7 +842,7 @@ export default function Grid(props: Props) {
                                     'availability-grid__cell--first-row': ti() === 0,
                                     'availability-grid__cell--first-col': di() === 0,
                                   }}
-                                  onClick={() => cycleCell(d.key, ti())}
+                                  onPointerDown={(e) => handleCellPointerDown(e, d.key, ti())}
                                 >
                                   <Show when={myState[d.key]?.[ti()] === 1}>
                                     <span class="availability-grid__icon">✔</span>
