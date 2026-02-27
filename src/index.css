@@ -106,10 +106,16 @@ body {
   padding: 2px 4px;
   border: none;
   background: white;
+  color: #000;
+  -webkit-text-fill-color: #000;
   appearance: none;
   -webkit-appearance: none;
   outline: none;
   cursor: pointer;
+}
+.win95-field__control option {
+  color: #000;
+  background: #fff;
 }
 .win95-field__frame--input .win95-field__control {
   cursor: text;
@@ -131,6 +137,15 @@ body {
 }
 .win95-field__arrow:active {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+}
+
+/* iOS Safari: prevent focus zoom and forced select text tinting. */
+@supports (-webkit-touch-callout: none) {
+  .win95-field__control {
+    font-size: 16px;
+    color: #000;
+    -webkit-text-fill-color: #000;
+  }
 }
 
 /* === SHARED: DIALOG === */
