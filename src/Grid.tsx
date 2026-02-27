@@ -298,12 +298,6 @@ export default function Grid(props: Props) {
     schedulePersist()
   }
 
-  function handleCellPointerDown(e: PointerEvent, dk: string, ti: number) {
-    // Prevent iOS gesture interpretation on rapid taps while keeping cell updates immediate.
-    if (e.pointerType === 'touch') e.preventDefault()
-    cycleCell(dk, ti)
-  }
-
   function doUndo() {
     if (isConfirmed()) return
     if (!undoStack.length) return
@@ -842,7 +836,7 @@ export default function Grid(props: Props) {
                                     'availability-grid__cell--first-row': ti() === 0,
                                     'availability-grid__cell--first-col': di() === 0,
                                   }}
-                                  onPointerDown={(e) => handleCellPointerDown(e, d.key, ti())}
+                                  onClick={() => cycleCell(d.key, ti())}
                                 >
                                   <Show when={myState[d.key]?.[ti()] === 1}>
                                     <span class="availability-grid__icon">✔</span>
