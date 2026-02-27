@@ -395,7 +395,6 @@ body {
   background: var(--bg);
   border: 2px solid;
   border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
-  touch-action: manipulation;
 }
 .availability-grid__cell:active:not(.availability-grid__cell--yes):not(
     .availability-grid__cell--maybe
