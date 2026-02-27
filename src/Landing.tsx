@@ -224,13 +224,8 @@ export default function Landing(props: Props) {
         <p>
           Find a time that works for everyone.
           <br />
-          No login. No app. Just a link.
+          No app to install. Just a link.
         </p>
-        <div class="hero-features">
-          <span class="hero-tag r">No accounts</span>
-          <span class="hero-tag r">Works offline</span>
-          <span class="hero-tag r">Timezone-aware</span>
-        </div>
       </div>
 
       <div class="form-card r">
@@ -393,7 +388,7 @@ export default function Landing(props: Props) {
           </div>
           <div class="how-step">
             <div class="how-num r">4</div>
-            <div class="how-text">Confirm a time and everyone gets a calendar invite</div>
+            <div class="how-text">Confirm a time — it's locked in and visible to everyone who opens the link</div>
           </div>
         </div>
       </div>
@@ -434,12 +429,13 @@ export default function Landing(props: Props) {
       </div>
 
       <div class="footer">
-        No accounts | No tracking | Works offline
+        No accounts | No tracking | Local-first
         <br />
         <span class="footer-links">
-          timesweeper.app | <span>About</span>
+          timesweeper.app
         </span>
       </div>
+
     </div>
   )
 }

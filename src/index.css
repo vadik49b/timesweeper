@@ -976,19 +976,6 @@ body {
   color: #e0e0e0;
   line-height: 1.5;
 }
-.hero-features {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-.hero-tag {
-  font-size: 11px;
-  color: #000;
-  background: var(--bg);
-  padding: 2px 8px;
-}
 
 .form-card {
   background: var(--bg);
