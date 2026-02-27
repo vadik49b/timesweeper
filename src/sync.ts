@@ -1,9 +1,7 @@
 import type { AppEvent, SlotValue } from './types'
 import { type SyncOp, enqueueSyncOp, getEvent, listPendingSyncOps, removePendingSyncOp } from './db'
 
-const API_ORIGIN = import.meta.env.DEV
-  ? window.location.origin
-  : 'https://timesweeper-api.boltach.workers.dev'
+const API_ORIGIN = window.location.origin
 
 function apiBase() {
   return `${API_ORIGIN}/api`

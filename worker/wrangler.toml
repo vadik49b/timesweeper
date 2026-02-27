@@ -9,11 +9,3 @@ bindings = [{ name = "EVENT_ROOMS", class_name = "EventRoom" }]
 tag = "v1"
 new_sqlite_classes = ["EventRoom"]
 
-[vars]
-ALLOW_LOCALHOST_ORIGIN = "false"
-
-[env.dev.vars]
-ALLOW_LOCALHOST_ORIGIN = "true"
-
-[env.dev.durable_objects]
-bindings = [{ name = "EVENT_ROOMS", class_name = "EventRoom" }]
