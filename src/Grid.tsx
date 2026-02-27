@@ -93,6 +93,7 @@ export default function Grid(props: Props) {
   let statusTimer: ReturnType<typeof setTimeout> | null = null
   let persistTimer: ReturnType<typeof setTimeout> | undefined
   let shareInputRef!: HTMLInputElement
+  let lastGridTouchEndAt = 0
 
   function goToLanding() {
     if (window.location.pathname !== '/') {
@@ -296,6 +297,14 @@ export default function Grid(props: Props) {
     setMyState(dk, ti, next)
     if (navigator.vibrate) navigator.vibrate(10)
     schedulePersist()
+  }
+
+  function preventGridDoubleTapZoom(e: TouchEvent) {
+    const now = Date.now()
+    if (now - lastGridTouchEndAt <= 300) {
+      e.preventDefault()
+    }
+    lastGridTouchEndAt = now
   }
 
   function doUndo() {
@@ -815,7 +824,10 @@ export default function Grid(props: Props) {
                     <div class="grid-view__legend">
                       <AvailabilityLegend withLabels />
                     </div>
-                    <div class={`availability-grid ${dayCountClass()}`}>
+                    <div
+                      class={`availability-grid ${dayCountClass()}`}
+                      onTouchEnd={preventGridDoubleTapZoom}
+                    >
                       <div class="availability-grid__corner" />
                       <For each={days()}>
                         {(d) => (
@@ -827,12 +839,14 @@ export default function Grid(props: Props) {
                           <>
                             <div class="availability-grid__time">{t.label}</div>
                             <For each={days()}>
-                              {(d) => (
+                              {(d, di) => (
                                 <div
                                   classList={{
                                     'availability-grid__cell': true,
                                     'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
                                     'availability-grid__cell--maybe': myState[d.key]?.[ti()] === 2,
+                                    'availability-grid__cell--first-row': ti() === 0,
+                                    'availability-grid__cell--first-col': di() === 0,
                                   }}
                                   onClick={() => cycleCell(d.key, ti())}
                                 >
@@ -996,6 +1010,8 @@ export default function Grid(props: Props) {
                                         'heatmap-grid__cell--1': h() === 1,
                                         'heatmap-grid__cell--2': h() === 2,
                                         'heatmap-grid__cell--3': h() >= 3,
+                                        'heatmap-grid__cell--first-row': ti() === 0,
+                                        'heatmap-grid__cell--first-col': di() === 0,
                                       }}
                                     >
                                       <span class="heatmap-grid__value">
@@ -1126,14 +1142,14 @@ export default function Grid(props: Props) {
                   <Win95Field
                     kind="input"
                     value={newParticipantName()}
-                    placeholder="Participant name"
+                    placeholder="Your name"
                     wrapperClass="dialog__field"
                     controlClass="dialog__control"
                     onInput={setNewParticipantName}
                   />
                   <div class="dialog-buttons">
                     <div class="dialog-btn r" onClick={addParticipantFromPicker}>
-                      Add participant
+                      Add
                     </div>
                   </div>
                 </Show>
