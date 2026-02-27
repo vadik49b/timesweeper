@@ -1142,6 +1142,48 @@ body {
 .p-rm:active {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
 }
+
+/* Touch targets: keep classic proportions, slightly enlarge visuals, add invisible slop. */
+@media (pointer: coarse) {
+  .win95-window__title-button,
+  .cal-nav,
+  .win95-field__arrow,
+  .p-rm {
+    position: relative;
+  }
+
+  .win95-window__title-button {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+  .cal-nav {
+    font-size: 12px;
+    padding: 2px 9px;
+  }
+  .win95-field__arrow {
+    width: 22px;
+    font-size: 10px;
+  }
+  .p-rm {
+    font-size: 12px;
+    padding: 2px 7px;
+  }
+
+  .win95-window__title-button::before,
+  .cal-nav::before,
+  .win95-field__arrow::before,
+  .p-rm::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+
+  /* Keep select-arrow slop slightly tighter to avoid stealing adjacent select taps. */
+  .win95-field__arrow::before {
+    inset: -9px -6px;
+  }
+}
 .add-btn {
   font-family: var(--ui);
   font-size: 11px;
