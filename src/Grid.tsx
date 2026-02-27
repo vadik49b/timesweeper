@@ -39,9 +39,7 @@ type UndoEntry = { dk: string; ti: number; prev: number }
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
   const [localReady, setLocalReady] = createSignal(false)
-  const [isFetchingRemote, setIsFetchingRemote] = createSignal(false)
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
-  const [showNamePicker, setShowNamePicker] = createSignal(false)
   const [newParticipantName, setNewParticipantName] = createSignal('')
 
   const days = createMemo(() => {
@@ -83,8 +81,8 @@ export default function Grid(props: Props) {
   const [bestCollapsed, setBestCollapsed] = createSignal(false)
   const [groupCollapsed, setGroupCollapsed] = createSignal(false)
 
-  type Dialog = null | 'share' | 'help' | 'confirm'
-  const [dialog, setDialog] = createSignal<Dialog>(null)
+  type ActiveModal = null | 'name-picker' | 'share' | 'help' | 'confirm'
+  const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
   const [statusFlash, setStatusFlash] = createSignal('')
@@ -310,7 +308,7 @@ export default function Grid(props: Props) {
   function openConfirm(day: string | null, time: string | null) {
     setConfirmDay(day ?? days()[0]?.label ?? '')
     setConfirmTime(time ?? times()[0]?.label ?? '')
-    setDialog('confirm')
+    setActiveModal('confirm')
   }
 
   function doConfirm() {
@@ -333,7 +331,7 @@ export default function Grid(props: Props) {
     void flushPendingSync()
     setEvent(updated)
     flashStatus('Confirmed time updated')
-    setDialog(null)
+    setActiveModal(null)
   }
 
   function undoConfirmedTime() {
@@ -348,11 +346,11 @@ export default function Grid(props: Props) {
   }
 
   function closeOpenDialog() {
-    if (showNamePicker()) {
-      setShowNamePicker(false)
+    if (activeModal() === 'name-picker' && !event()) {
+      goToLanding()
       return
     }
-    if (dialog()) setDialog(null)
+    if (activeModal()) setActiveModal(null)
   }
 
   function flashStatus(message: string) {
@@ -363,7 +361,7 @@ export default function Grid(props: Props) {
 
   function openShareDialog() {
     setCopyStatus('')
-    setDialog('share')
+    setActiveModal('share')
   }
 
   async function copyLink(url: string) {
@@ -490,7 +488,7 @@ export default function Grid(props: Props) {
     setEvent(updated)
     loadParticipantSlots(updated, name)
     setCurrentName(name)
-    setShowNamePicker(false)
+    setActiveModal(null)
   }
 
   async function addParticipantFromPicker() {
@@ -523,7 +521,7 @@ export default function Grid(props: Props) {
     loadParticipantSlots(updated, trimmed)
     setCurrentName(trimmed)
     setNewParticipantName('')
-    setShowNamePicker(false)
+    setActiveModal(null)
   }
 
   async function initializeSelectedParticipant(ev: AppEvent) {
@@ -532,14 +530,13 @@ export default function Grid(props: Props) {
     if (savedName && exists) {
       loadParticipantSlots(ev, savedName)
       setCurrentName(savedName)
-      setShowNamePicker(false)
+      setActiveModal(null)
     } else {
-      setShowNamePicker(true)
+      setActiveModal('name-picker')
     }
   }
 
   async function loadFromWorkerInBackground() {
-    setIsFetchingRemote(true)
     try {
       const remote = await pullRemoteEvent(props.eventId)
       if (remote) {
@@ -551,8 +548,6 @@ export default function Grid(props: Props) {
       setLoadError('not-found')
     } catch {
       setLoadError('network')
-    } finally {
-      setIsFetchingRemote(false)
     }
   }
 
@@ -617,7 +612,7 @@ export default function Grid(props: Props) {
   })
 
   createEffect(() => {
-    if (dialog() !== 'share') return
+    if (activeModal() !== 'share') return
     queueMicrotask(() => {
       shareInputRef.focus()
       shareInputRef.select()
@@ -753,13 +748,6 @@ export default function Grid(props: Props) {
     return 'Loading participant list...'
   })
 
-  const shouldShowNamePickerDialog = createMemo(
-    () =>
-      showNamePicker() ||
-      (!event() &&
-        (isFetchingRemote() || loadError() === 'network' || loadError() === 'not-found')),
-  )
-
   return (
     <div class="grid-view">
       <Show when={localReady()} fallback={null}>
@@ -788,7 +776,7 @@ export default function Grid(props: Props) {
                 Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
               </div>
               <Show when={!isConfirmed()}>
-                <Win95Button class="grid-view__deck-modify" onClick={() => setShowNamePicker(true)}>
+                <Win95Button class="grid-view__deck-modify" onClick={() => setActiveModal('name-picker')}>
                   Switch...
                 </Win95Button>
               </Show>
@@ -797,7 +785,7 @@ export default function Grid(props: Props) {
               <Win95Button class="grid-view__deck-share" onClick={openShareDialog}>
                 <span class="hk">S</span>hare
               </Win95Button>
-              <Win95Button class="grid-view__deck-help" onClick={() => setDialog('help')}>
+              <Win95Button class="grid-view__deck-help" onClick={() => setActiveModal('help')}>
                 <span class="hk">H</span>elp
               </Win95Button>
             </div>
@@ -1113,11 +1101,11 @@ export default function Grid(props: Props) {
 
       {/* === DIALOGS === */}
 
-      <Show when={shouldShowNamePickerDialog()}>
+      <Show when={activeModal() === 'name-picker'}>
         <Win95Dialog
           title="Choose participant"
           class="dialog--name-picker"
-          onClose={() => (event() ? setShowNamePicker(false) : goToLanding())}
+          onClose={() => (event() ? setActiveModal(null) : goToLanding())}
         >
           <Show
             when={event()}
@@ -1167,8 +1155,8 @@ export default function Grid(props: Props) {
         </Win95Dialog>
       </Show>
 
-      <Show when={dialog() === 'share'}>
-        <Win95Dialog title="Share Link" onClose={() => setDialog(null)}>
+      <Show when={activeModal() === 'share'}>
+        <Win95Dialog title="Share Link" onClose={() => setActiveModal(null)}>
           <label for="share-link">Send this link to participants:</label>
           <Win95Field
             kind="input"
@@ -1188,7 +1176,7 @@ export default function Grid(props: Props) {
             <Win95Button class="dialog-btn" onClick={() => copyLink(eventUrl())}>
               <span class="hk">C</span>opy
             </Win95Button>
-            <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
+            <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
               Close
             </Win95Button>
           </div>
@@ -1196,8 +1184,8 @@ export default function Grid(props: Props) {
         </Win95Dialog>
       </Show>
 
-      <Show when={dialog() === 'help'}>
-        <Win95Dialog title="Help — TimeSweeper" class="dialog--help" bodyClass="dialog-body--help" onClose={() => setDialog(null)}>
+      <Show when={activeModal() === 'help'}>
+        <Win95Dialog title="Help — TimeSweeper" class="dialog--help" bodyClass="dialog-body--help" onClose={() => setActiveModal(null)}>
           <p class="help__lead">
             <b>How to use TimeSweeper:</b>
           </p>
@@ -1228,19 +1216,19 @@ export default function Grid(props: Props) {
             <span class="help__key-line">Ctrl+Z — Undo</span>
           </p>
           <div class="dialog-buttons">
-            <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
+            <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
               OK
             </Win95Button>
           </div>
         </Win95Dialog>
       </Show>
 
-      <Show when={dialog() === 'confirm'}>
+      <Show when={activeModal() === 'confirm'}>
         <Win95Dialog
           title="Confirm Time"
           class="dialog--confirm"
           bodyClass="dialog-body--confirm"
-          onClose={() => setDialog(null)}
+          onClose={() => setActiveModal(null)}
         >
           <p class="confirm__lead">Confirm this time for everyone?</p>
           <label class="confirm__label" for="confirm-day">Day:</label>
@@ -1274,7 +1262,7 @@ export default function Grid(props: Props) {
             <Win95Button class="dialog-btn" onClick={doConfirm}>
               <span class="hk">C</span>onfirm
             </Win95Button>
-            <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
+            <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
               Cancel
             </Win95Button>
           </div>

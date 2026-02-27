@@ -156,6 +156,16 @@ body {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
 }
 
+@media (pointer: coarse) {
+  /* Small touch-only comfort bump without changing Win95 frame proportions. */
+  .win95-field__control {
+    font-size: 16px;
+    line-height: 1.35;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+}
+
 /* iOS Safari: prevent focus zoom and forced select text tinting. */
 @supports (-webkit-touch-callout: none) {
   .win95-field__control {
