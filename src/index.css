@@ -964,6 +964,7 @@ body {
 }
 .landing__calendar {
   padding: 4px;
+  touch-action: manipulation;
 }
 .landing__date-summary {
   font-size: 10px;
@@ -1018,14 +1019,26 @@ body {
   font-weight: bold;
 }
 .cal-day {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
   text-align: center;
+  font-family: var(--ui);
+  color: #000;
+  -webkit-text-fill-color: currentColor;
   font-size: 11px;
   padding: 3px 0;
   cursor: pointer;
   height: 30px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent;
+  touch-action: manipulation;
+}
+.cal-day:disabled {
+  cursor: default;
 }
 .cal-day.selected {
   background: var(--navy);

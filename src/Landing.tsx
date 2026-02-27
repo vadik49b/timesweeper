@@ -265,7 +265,8 @@ export default function Landing(props: Props) {
               <For each={DOWS}>{(d) => <div class="cal-dow">{d}</div>}</For>
               <For each={calDays()}>
                 {(day) => (
-                  <div
+                  <button
+                    type="button"
                     classList={{
                       'cal-day': true,
                       empty: day.day === null,
@@ -273,12 +274,11 @@ export default function Landing(props: Props) {
                       today: day.isToday,
                       selected: day.isSelected,
                     }}
-                    onClick={() => {
-                      if (day.ds && !day.isPast) toggleDate(day.ds)
-                    }}
+                    disabled={day.day === null || day.isPast}
+                    onClick={() => day.ds && toggleDate(day.ds)}
                   >
                     {day.day ?? ''}
-                  </div>
+                  </button>
                 )}
               </For>
             </div>
