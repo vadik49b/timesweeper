@@ -182,7 +182,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: transparent;
+  background: rgba(192, 192, 192, 0.35);
   z-index: 100;
   display: flex;
   justify-content: center;
@@ -838,6 +838,11 @@ body {
 }
 
 @media (max-width: 700px) {
+  .dialog--name-picker,
+  .dialog--help {
+    width: calc(100vw - 28px);
+    max-width: 340px;
+  }
   .dialog--confirm {
     width: calc(100vw - 12px);
     max-width: none;

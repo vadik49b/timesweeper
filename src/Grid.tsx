@@ -143,6 +143,15 @@ export default function Grid(props: Props) {
     return Math.round(c)
   }
 
+  function slotContributorCount(dk: string, ti: number) {
+    let count = 0
+    if ((myState[dk]?.[ti] ?? 0) > 0) count += 1
+    Object.values(others()).forEach((p) => {
+      if ((p[dk]?.[ti] ?? 0) > 0) count += 1
+    })
+    return count
+  }
+
   const bestTimes = createMemo(() => {
     const d = days()
     const t = times()
@@ -150,7 +159,9 @@ export default function Grid(props: Props) {
     d.forEach((day) =>
       t.forEach((slot, ti) => {
         const h = heat(day.key, ti)
-        if (h > 0) slots.push({ day: day.label, time: slot.label, score: h, dk: day.key, ti })
+        const contributors = slotContributorCount(day.key, ti)
+        if (h > 0 && contributors >= 2)
+          slots.push({ day: day.label, time: slot.label, score: h, dk: day.key, ti })
       }),
     )
     slots.sort((a, b) => b.score - a.score)
@@ -620,7 +631,7 @@ export default function Grid(props: Props) {
   })
 
   createEffect(() => {
-    if (!isConfirmed()) return
+    if (!isConfirmed() && !activeModal()) return
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     onCleanup(() => {
