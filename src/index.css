@@ -54,13 +54,29 @@ body {
   text-decoration: underline;
 }
 .win95-button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 2px solid;
+  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
   font-family: var(--ui);
-  font-size: 12px;
-  padding: 3px 8px;
   cursor: pointer;
   background: var(--bg);
+  color: #000;
+  text-align: center;
   white-space: nowrap;
   user-select: none;
+}
+.win95-button--normal {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.win95-button--small {
+  font-size: 11px;
+  padding: 1px 6px;
+}
+.win95-button--full-width {
+  width: 100%;
+  display: block;
 }
 .win95-button:active {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
@@ -221,6 +237,7 @@ body {
 .win95-window__title-button {
   width: 18px;
   height: 18px;
+  padding: 0;
   background: var(--bg);
   font-size: 11px;
   display: flex;
@@ -1059,11 +1076,8 @@ body {
   padding: 6px 20px;
   cursor: pointer;
   background: var(--bg);
-  display: block;
-  width: 100%;
   max-width: 420px;
   text-align: center;
-  font-weight: bold;
 }
 .create-btn:active {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);

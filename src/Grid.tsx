@@ -778,9 +778,9 @@ export default function Grid(props: Props) {
                 <MineIcon size={16} /> TimeSweeper — {event()?.name ?? 'Opening event'}
               </span>
           <div class="win95-window__title-buttons">
-            <div class="win95-window__title-button r" onClick={goToLanding}>
+            <Win95Button size="small" class="win95-window__title-button" onClick={goToLanding}>
               ×
-            </div>
+            </Win95Button>
           </div>
         </div>
 
@@ -942,25 +942,24 @@ export default function Grid(props: Props) {
                                     </div>
                                     <div class="results__breakdown" innerHTML={breakdown()} />
                                   </div>
-                                  <div
-                                    class="dialog-btn r"
-                                    classList={{ 'results__confirm-btn': true }}
+                                  <Win95Button
+                                    size="small"
+                                    class="dialog-btn results__confirm-btn"
                                     onClick={() => openConfirm(slot.day, slot.time)}
                                   >
                                     <span class="hk">C</span>onfirm
-                                  </div>
+                                  </Win95Button>
                                 </div>
                               )
                             }}
                           </For>
                           <div class="results__custom">
-                            <div
-                              class="dialog-btn r"
-                              classList={{ 'results__custom-btn': true }}
+                            <Win95Button
+                              class="dialog-btn results__custom-btn"
                               onClick={() => openConfirm(null, null)}
                             >
                               Pick a different time...
-                            </div>
+                            </Win95Button>
                           </div>
                         </div>
                       </Show>
@@ -1102,12 +1101,13 @@ export default function Grid(props: Props) {
             <div class="win95-window__title-bar">
               <span>Choose participant</span>
               <div class="win95-window__title-buttons">
-                <div
-                  class="win95-window__title-button r"
+                <Win95Button
+                  size="small"
+                  class="win95-window__title-button"
                   onClick={() => (event() ? setShowNamePicker(false) : goToLanding())}
                 >
                   ×
-                </div>
+                </Win95Button>
               </div>
             </div>
             <div class="dialog-body">
@@ -1125,15 +1125,15 @@ export default function Grid(props: Props) {
                     <div class="participant-picker__list">
                       <For each={event()?.participants ?? []}>
                         {(p) => (
-                          <div
-                            class="dialog-btn r participant-picker__item"
-                        classList={{
-                          'participant-picker__item--selected': currentName() === p.name,
-                        }}
-                        onClick={() => selectParticipant(p.name)}
-                      >
-                        {p.name}
-                      </div>
+                          <Win95Button
+                            size="small"
+                            class={`dialog-btn participant-picker__item${
+                              currentName() === p.name ? ' participant-picker__item--selected' : ''
+                            }`}
+                            onClick={() => selectParticipant(p.name)}
+                          >
+                            {p.name}
+                          </Win95Button>
                     )}
                   </For>
                 </div>
@@ -1148,9 +1148,9 @@ export default function Grid(props: Props) {
                     onInput={setNewParticipantName}
                   />
                   <div class="dialog-buttons">
-                    <div class="dialog-btn r" onClick={addParticipantFromPicker}>
+                    <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
                       Add
-                    </div>
+                    </Win95Button>
                   </div>
                 </Show>
               </Show>
@@ -1165,9 +1165,13 @@ export default function Grid(props: Props) {
             <div class="win95-window__title-bar">
               <span>Share Link</span>
               <div class="win95-window__title-buttons">
-                <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                <Win95Button
+                  size="small"
+                  class="win95-window__title-button"
+                  onClick={() => setDialog(null)}
+                >
                   ×
-                </div>
+                </Win95Button>
               </div>
             </div>
             <div class="dialog-body">
@@ -1185,12 +1189,12 @@ export default function Grid(props: Props) {
                 onClick={() => shareInputRef.select()}
               />
               <div class="dialog-buttons">
-                <div class="dialog-btn r" onClick={() => copyLink(eventUrl())}>
+                <Win95Button class="dialog-btn" onClick={() => copyLink(eventUrl())}>
                   <span class="hk">C</span>opy
-                </div>
-                <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                </Win95Button>
+                <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
                   Close
-                </div>
+                </Win95Button>
               </div>
               <div class="copy-status">{copyStatus()}</div>
             </div>
@@ -1204,9 +1208,13 @@ export default function Grid(props: Props) {
             <div class="win95-window__title-bar">
               <span>Help — TimeSweeper</span>
               <div class="win95-window__title-buttons">
-                <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                <Win95Button
+                  size="small"
+                  class="win95-window__title-button"
+                  onClick={() => setDialog(null)}
+                >
                   ×
-                </div>
+                </Win95Button>
               </div>
             </div>
             <div class="dialog-body dialog-body--help">
@@ -1243,9 +1251,9 @@ export default function Grid(props: Props) {
                 <span class="help__key-line">Ctrl+Z — Undo</span>
               </p>
               <div class="dialog-buttons">
-                <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
                   OK
-                </div>
+                </Win95Button>
               </div>
             </div>
           </div>
@@ -1258,9 +1266,13 @@ export default function Grid(props: Props) {
             <div class="win95-window__title-bar">
               <span>Confirm Time</span>
               <div class="win95-window__title-buttons">
-                <div class="win95-window__title-button r" onClick={() => setDialog(null)}>
+                <Win95Button
+                  size="small"
+                  class="win95-window__title-button"
+                  onClick={() => setDialog(null)}
+                >
                   ×
-                </div>
+                </Win95Button>
               </div>
             </div>
             <div class="dialog-body dialog-body--confirm">
@@ -1289,12 +1301,12 @@ export default function Grid(props: Props) {
                 This can be undone later.
               </p>
               <div class="dialog-buttons">
-                <div class="dialog-btn r" onClick={doConfirm}>
+                <Win95Button class="dialog-btn" onClick={doConfirm}>
                   <span class="hk">C</span>onfirm
-                </div>
-                <div class="dialog-btn r" onClick={() => setDialog(null)}>
+                </Win95Button>
+                <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
                   Cancel
-                </div>
+                </Win95Button>
               </div>
             </div>
           </div>

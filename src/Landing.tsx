@@ -4,6 +4,7 @@ import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from './db'
 import { publishEventNow, queueEventSync, flushPendingSync } from './sync'
 import Win95Field from './components/Win95Field'
+import Win95Button from './components/Win95Button'
 import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
 
@@ -250,15 +251,15 @@ export default function Landing(props: Props) {
           <label>Pick dates:</label>
           <div class="landing__calendar s">
             <div class="cal-header">
-              <div class="cal-nav r" onClick={() => calNav(-1)}>
+              <Win95Button size="small" class="cal-nav" onClick={() => calNav(-1)}>
                 &lt;
-              </div>
+              </Win95Button>
               <span>
                 {MONTHS[calMonth()]} {calYear()}
               </span>
-              <div class="cal-nav r" onClick={() => calNav(1)}>
+              <Win95Button size="small" class="cal-nav" onClick={() => calNav(1)}>
                 &gt;
-              </div>
+              </Win95Button>
             </div>
             <div class="cal-grid">
               <For each={DOWS}>{(d) => <div class="cal-dow">{d}</div>}</For>
@@ -325,22 +326,22 @@ export default function Landing(props: Props) {
                   onInput={(value) => updateParticipant(i, value)}
                 />
                 {i > 0 && (
-                  <div class="p-rm r" onClick={() => removeParticipant(i)}>
+                  <Win95Button size="small" class="p-rm" onClick={() => removeParticipant(i)}>
                     x
-                  </div>
+                  </Win95Button>
                 )}
               </div>
             )}
           </Index>
-          <div class="add-btn r" onClick={addParticipant}>
+          <Win95Button class="add-btn" onClick={addParticipant}>
             + <span class="hk">A</span>dd person
-          </div>
+          </Win95Button>
         </div>
       </div>
 
-      <div class="create-btn r" onClick={create}>
+      <Win95Button fullWidth class="create-btn" onClick={create}>
         <span class="hk">C</span>reate Event
-      </div>
+      </Win95Button>
 
       <div class="how-section">
         <div class="how-title">How it works</div>
