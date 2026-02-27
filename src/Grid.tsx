@@ -16,6 +16,7 @@ import {
 } from './sync'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
+import Win95Dialog from './components/Win95Dialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import MineIcon from './icons/MineIcon'
 import {
@@ -1084,221 +1085,166 @@ export default function Grid(props: Props) {
       {/* === DIALOGS === */}
 
       <Show when={shouldShowNamePickerDialog()}>
-        <div class="dialog-overlay">
-          <div class="dialog dialog--name-picker r">
-            <div class="win95-window__title-bar">
-              <span>Choose participant</span>
-              <div class="win95-window__title-buttons">
-                <Win95Button
-                  size="small"
-                  class="win95-window__title-button"
-                  onClick={() => (event() ? setShowNamePicker(false) : goToLanding())}
-                >
-                  ×
+        <Win95Dialog
+          title="Choose participant"
+          class="dialog--name-picker"
+          onClose={() => (event() ? setShowNamePicker(false) : goToLanding())}
+        >
+          <Show
+            when={event()}
+            fallback={
+              <div class="participant-picker__loading">
+                <p class="participant-picker__lead">{loadingOverlayText()}</p>
+              </div>
+            }
+          >
+            <p class="participant-picker__lead">
+              Choose your participant name to start editing availability.
+            </p>
+            <div class="participant-picker__list">
+              <For each={event()?.participants ?? []}>
+                {(p) => (
+                  <Win95Button
+                    size="small"
+                    class={`dialog-btn participant-picker__item${
+                      currentName() === p.name ? ' participant-picker__item--selected' : ''
+                    }`}
+                    onClick={() => selectParticipant(p.name)}
+                  >
+                    {p.name}
+                  </Win95Button>
+                )}
+              </For>
+            </div>
+            <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
+              <label class="participant-picker__label">I'm not in the list</label>
+              <Win95Field
+                kind="input"
+                value={newParticipantName()}
+                placeholder="Your name"
+                wrapperClass="dialog__field"
+                controlClass="dialog__control"
+                onInput={setNewParticipantName}
+              />
+              <div class="dialog-buttons">
+                <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
+                  Add
                 </Win95Button>
               </div>
-            </div>
-            <div class="dialog-body">
-                  <Show
-                    when={event()}
-                    fallback={
-                      <div class="participant-picker__loading">
-                        <p class="participant-picker__lead">{loadingOverlayText()}</p>
-                      </div>
-                    }
-                  >
-                <p class="participant-picker__lead">
-                  Choose your participant name to start editing availability.
-                </p>
-                    <div class="participant-picker__list">
-                      <For each={event()?.participants ?? []}>
-                        {(p) => (
-                          <Win95Button
-                            size="small"
-                            class={`dialog-btn participant-picker__item${
-                              currentName() === p.name ? ' participant-picker__item--selected' : ''
-                            }`}
-                            onClick={() => selectParticipant(p.name)}
-                          >
-                            {p.name}
-                          </Win95Button>
-                    )}
-                  </For>
-                </div>
-                    <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
-                      <label class="participant-picker__label">I'm not in the list</label>
-                  <Win95Field
-                    kind="input"
-                    value={newParticipantName()}
-                    placeholder="Your name"
-                    wrapperClass="dialog__field"
-                    controlClass="dialog__control"
-                    onInput={setNewParticipantName}
-                  />
-                  <div class="dialog-buttons">
-                    <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
-                      Add
-                    </Win95Button>
-                  </div>
-                </Show>
-              </Show>
-            </div>
-          </div>
-        </div>
+            </Show>
+          </Show>
+        </Win95Dialog>
       </Show>
 
       <Show when={dialog() === 'share'}>
-        <div class="dialog-overlay">
-          <div class="dialog r">
-            <div class="win95-window__title-bar">
-              <span>Share Link</span>
-              <div class="win95-window__title-buttons">
-                <Win95Button
-                  size="small"
-                  class="win95-window__title-button"
-                  onClick={() => setDialog(null)}
-                >
-                  ×
-                </Win95Button>
-              </div>
-            </div>
-            <div class="dialog-body">
-              <label>Send this link to participants:</label>
-              <Win95Field
-                kind="input"
-                type="url"
-                value={eventUrl()}
-                readOnly
-                wrapperClass="dialog__field"
-                controlClass="dialog__control"
-                inputRef={(el) => {
-                  shareInputRef = el
-                }}
-                onClick={() => shareInputRef.select()}
-              />
-              <div class="dialog-buttons">
-                <Win95Button class="dialog-btn" onClick={() => copyLink(eventUrl())}>
-                  <span class="hk">C</span>opy
-                </Win95Button>
-                <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
-                  Close
-                </Win95Button>
-              </div>
-              <div class="copy-status">{copyStatus()}</div>
-            </div>
+        <Win95Dialog title="Share Link" onClose={() => setDialog(null)}>
+          <label>Send this link to participants:</label>
+          <Win95Field
+            kind="input"
+            type="url"
+            value={eventUrl()}
+            readOnly
+            wrapperClass="dialog__field"
+            controlClass="dialog__control"
+            inputRef={(el) => {
+              shareInputRef = el
+            }}
+            onClick={() => shareInputRef.select()}
+          />
+          <div class="dialog-buttons">
+            <Win95Button class="dialog-btn" onClick={() => copyLink(eventUrl())}>
+              <span class="hk">C</span>opy
+            </Win95Button>
+            <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
+              Close
+            </Win95Button>
           </div>
-        </div>
+          <div class="copy-status">{copyStatus()}</div>
+        </Win95Dialog>
       </Show>
 
       <Show when={dialog() === 'help'}>
-        <div class="dialog-overlay">
-          <div class="dialog dialog--help r">
-            <div class="win95-window__title-bar">
-              <span>Help — TimeSweeper</span>
-              <div class="win95-window__title-buttons">
-                <Win95Button
-                  size="small"
-                  class="win95-window__title-button"
-                  onClick={() => setDialog(null)}
-                >
-                  ×
-                </Win95Button>
-              </div>
-            </div>
-            <div class="dialog-body dialog-body--help">
-              <p class="help__lead">
-                <b>How to use TimeSweeper:</b>
-              </p>
-              <p class="help__step">
-                <b>1.</b> Click <b>Switch...</b> and pick your participant name
-              </p>
-              <p class="help__step">
-                <b>2.</b> Click a cell to mark availability:
-                <br />
-                <AvailabilityLegend mini class="help__cycle" />
-              </p>
-              <p class="help__step">
-                <b>3.</b> Click and drag to fill multiple cells at once
-              </p>
-              <p class="help__step">
-                <b>4.</b> Check "Group availability" to see when everyone is free
-              </p>
-              <p class="help__step">
-                <b>5.</b> Click <b>Share</b> to send the link to others
-              </p>
-              <p class="help__step help__step--last">
-                <b>6.</b> When the group agrees, click <b>Confirm</b>
-              </p>
-              <p class="help__keys">
-                <b>Keyboard shortcuts:</b>
-                <br />
-                <span class="help__key-line">F1 / U — Undo</span>
-                <br />
-                <span class="help__key-line">S — Share link</span>
-                <br />
-                <span class="help__key-line">Ctrl+Z — Undo</span>
-              </p>
-              <div class="dialog-buttons">
-                <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
-                  OK
-                </Win95Button>
-              </div>
-            </div>
+        <Win95Dialog title="Help — TimeSweeper" class="dialog--help" bodyClass="dialog-body--help" onClose={() => setDialog(null)}>
+          <p class="help__lead">
+            <b>How to use TimeSweeper:</b>
+          </p>
+          <p class="help__step">
+            <b>1.</b> Click <b>Switch...</b> and pick your participant name
+          </p>
+          <p class="help__step">
+            <b>2.</b> Click a cell to mark availability:
+            <br />
+            <AvailabilityLegend mini class="help__cycle" />
+          </p>
+          <p class="help__step">
+            <b>3.</b> Click and drag to fill multiple cells at once
+          </p>
+          <p class="help__step">
+            <b>4.</b> Check "Group availability" to see when everyone is free
+          </p>
+          <p class="help__step">
+            <b>5.</b> Click <b>Share</b> to send the link to others
+          </p>
+          <p class="help__step help__step--last">
+            <b>6.</b> When the group agrees, click <b>Confirm</b>
+          </p>
+          <p class="help__keys">
+            <b>Keyboard shortcuts:</b>
+            <br />
+            <span class="help__key-line">F1 / U — Undo</span>
+            <br />
+            <span class="help__key-line">S — Share link</span>
+            <br />
+            <span class="help__key-line">Ctrl+Z — Undo</span>
+          </p>
+          <div class="dialog-buttons">
+            <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
+              OK
+            </Win95Button>
           </div>
-        </div>
+        </Win95Dialog>
       </Show>
 
       <Show when={dialog() === 'confirm'}>
-        <div class="dialog-overlay">
-          <div class="dialog dialog--confirm r">
-            <div class="win95-window__title-bar">
-              <span>Confirm Time</span>
-              <div class="win95-window__title-buttons">
-                <Win95Button
-                  size="small"
-                  class="win95-window__title-button"
-                  onClick={() => setDialog(null)}
-                >
-                  ×
-                </Win95Button>
-              </div>
-            </div>
-            <div class="dialog-body dialog-body--confirm">
-              <p class="confirm__lead">Confirm this time for everyone?</p>
-              <label class="confirm__label">Day:</label>
-              <Win95Field
-                kind="select"
-                value={confirmDay()}
-                options={confirmDayOptions()}
-                wrapperClass="confirm__field confirm__field--day"
-                controlClass="confirm__control"
-                onChange={setConfirmDay}
-              />
-              <label class="confirm__label">Time:</label>
-              <Win95Field
-                kind="select"
-                value={confirmTime()}
-                options={confirmTimeOptions()}
-                wrapperClass="confirm__field confirm__field--time"
-                controlClass="confirm__control"
-                onChange={setConfirmTime}
-              />
-              <p class="confirm__note">
-                Everyone will see the confirmed time.
-                <br />
-                This can be undone later.
-              </p>
-              <div class="dialog-buttons">
-                <Win95Button class="dialog-btn" onClick={doConfirm}>
-                  <span class="hk">C</span>onfirm
-                </Win95Button>
-                <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
-                  Cancel
-                </Win95Button>
-              </div>
-            </div>
+        <Win95Dialog
+          title="Confirm Time"
+          class="dialog--confirm"
+          bodyClass="dialog-body--confirm"
+          onClose={() => setDialog(null)}
+        >
+          <p class="confirm__lead">Confirm this time for everyone?</p>
+          <label class="confirm__label">Day:</label>
+          <Win95Field
+            kind="select"
+            value={confirmDay()}
+            options={confirmDayOptions()}
+            wrapperClass="confirm__field confirm__field--day"
+            controlClass="confirm__control"
+            onChange={setConfirmDay}
+          />
+          <label class="confirm__label">Time:</label>
+          <Win95Field
+            kind="select"
+            value={confirmTime()}
+            options={confirmTimeOptions()}
+            wrapperClass="confirm__field confirm__field--time"
+            controlClass="confirm__control"
+            onChange={setConfirmTime}
+          />
+          <p class="confirm__note">
+            Everyone will see the confirmed time.
+            <br />
+            This can be undone later.
+          </p>
+          <div class="dialog-buttons">
+            <Win95Button class="dialog-btn" onClick={doConfirm}>
+              <span class="hk">C</span>onfirm
+            </Win95Button>
+            <Win95Button class="dialog-btn" onClick={() => setDialog(null)}>
+              Cancel
+            </Win95Button>
           </div>
-        </div>
+        </Win95Dialog>
       </Show>
       </Show>
     </div>
