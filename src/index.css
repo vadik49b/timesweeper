@@ -970,6 +970,7 @@ body {
   color: #808080;
   margin-top: 4px;
   text-align: center;
+  padding: 2px 4px;
 }
 .landing__control {
   font-family: var(--ui);
@@ -1021,13 +1022,10 @@ body {
   font-size: 11px;
   padding: 3px 0;
   cursor: pointer;
-  height: 26px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.cal-day:hover:not(.empty):not(.past) {
-  background: #e0e0e0;
 }
 .cal-day.selected {
   background: var(--navy);
@@ -1042,6 +1040,27 @@ body {
 }
 .cal-day.today {
   font-weight: bold;
+}
+
+/* Apply hover feedback only on pointer/hover-capable devices. */
+@media (hover: hover) and (pointer: fine) {
+  .cal-day:hover:not(.empty):not(.past) {
+    outline: 1px dotted #000;
+    outline-offset: -3px;
+  }
+}
+
+/* Mobile: make day cells easier to tap (touch target best practice). */
+@media (max-width: 700px) {
+  .cal-day {
+    height: 44px;
+    font-size: 13px;
+    padding: 0;
+  }
+  .cal-dow {
+    font-size: 11px;
+    padding: 4px 0;
+  }
 }
 
 .time-range {
