@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+:root {
+  --bg: #c0c0c0;
+  --bhi: #ffffff;
+  --blo: #808080;
+  --bdk: #404040;
+  --ui: 'Segoe UI', Tahoma, 'MS Sans Serif', Geneva, sans-serif;
+  --mono: 'VT323', 'Courier New', monospace;
+  --teal: #008080;
+  --navy: #000080;
+  --title-bar: linear-gradient(90deg, #000080, #1084d0);
+  --cell-open: #a8d4a8;
+  --num-1: #0000ff;
+  --num-2: #008000;
+  --num-3: #ff0000;
+  --num-4: #000080;
+  --num-5: #800000;
+  --cell: 44px;
+  --hm-cell: 44px;
+  --hm-col: 44px;
+  --control-small-height: 22px;
+  --landing-max: 420px;
+  --text-muted: #404040;
+  --text-subtle: #808080;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 10px;
+}
+
+body {
+  background: var(--teal);
+  font-family: var(--ui);
+  min-height: 100vh;
+  user-select: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* === BEVELS === */
+.r {
+  border: 2px solid;
+  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
+}
+.s {
+  border: 2px solid;
+  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+}
+.st {
+  border: 1px solid;
+  border-color: var(--blo) var(--bhi) var(--bhi) var(--blo);
+}
+
+.hk {
+  text-decoration: underline;
+}
+.win95-button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 2px solid;
+  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
+  font-family: var(--ui);
+  cursor: pointer;
+  background: var(--bg);
+  color: #000;
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: auto;
+  text-decoration: none;
+}
+.win95-button--normal {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.win95-button--small {
+  font-size: 11px;
+  padding: 0 6px;
+  height: var(--control-small-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.win95-button--variant-toolbar {
+  padding: 2px 8px;
+}
+.win95-button--variant-icon {
+  min-width: var(--control-small-height);
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.win95-button--variant-cta {
+  font-size: 13px;
+  padding: 6px 20px;
+}
+.win95-button--full-width {
+  width: 100%;
+  display: block;
+}
+.win95-button:active {
+  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+}
+.win95-field__arrow:active {
+  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+}
+
+/* === SHARED: WIN95 FIELD === */
+.win95-field__frame {
+  width: 100%;
+  background: white;
+  overflow: hidden;
+}
+.win95-field__select-wrap {
+  display: flex;
+  height: 100%;
+  background: white;
+  overflow: hidden;
+}
+.win95-field__input-wrap {
+  width: 100%;
+  background: white;
+}
+.win95-field__control {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  font-family: var(--ui);
+  font-size: 15px;
+  padding: 2px 4px;
+  border: none;
+  background: white;
+  color: #000;
+  -webkit-text-fill-color: #000;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  cursor: pointer;
+}
+.win95-field__control option {
+  color: #000;
+  background: #fff;
+}
+.win95-field__frame--input .win95-field__control {
+  cursor: text;
+}
+.win95-field__frame--select .win95-field__control {
+  flex: 1;
+}
+.win95-field__arrow {
+  appearance: none;
+  -webkit-appearance: none;
+  width: var(--control-small-height);
+  padding: 0;
+  line-height: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: #000;
+  font-size: 9px;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 2px solid;
+  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
+}
+.win95-field--small .win95-field__control {
+  font-size: 12px;
+  height: 100%;
+  line-height: 1.2;
+  padding: 1px 3px 0;
+}
+
+/* === SHARED: LAYOUT UTILS === */
+.row {
+  display: flex;
+}
+.row--center {
+  align-items: center;
+}
+.row--between {
+  justify-content: space-between;
+}
+.row--start {
+  align-items: flex-start;
+}
+.row--gap-xs {
+  gap: var(--space-1);
+}
+.row--gap-sm {
+  gap: var(--space-2);
+}
+.row--gap-md {
+  gap: 10px;
+}
+
+/* === SHARED: EMPTY STATES === */
+.empty-text {
+  font-size: 14px;
+  color: var(--text-subtle);
+  padding: var(--space-1) 2px;
+}
+.win95-field--small .win95-field__arrow {
+  font-size: 9px;
+}
+.win95-field--small .win95-field__frame {
+  height: var(--control-small-height);
+}
+
+@media (pointer: coarse) {
+  /* Small touch-only comfort bump without changing Win95 frame proportions. */
+  .win95-field__control {
+    font-size: 16px;
+    line-height: 1.35;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+}
+
+/* iOS Safari: prevent focus zoom and forced select text tinting. */
+@supports (-webkit-touch-callout: none) {
+  .win95-field__control {
+    font-size: 16px;
+    color: #000;
+    -webkit-text-fill-color: #000;
+  }
+}
+
+/* === SHARED: DIALOG === */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(192, 192, 192, 0.35);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.dialog {
+  background: var(--bg);
+  min-width: 300px;
+  max-width: 90vw;
+  box-shadow: 2px 2px 0 #000;
+}
+.dialog .win95-window__title-bar {
+  font-size: 13px;
+  padding: 2px 4px;
+  cursor: default;
+}
+.dialog-body {
+  padding: 12px;
+}
+.dialog-body label {
+  font-size: 14px;
+  display: block;
+  margin-bottom: 4px;
+}
+.dialog__field {
+  margin-bottom: 10px;
+}
+.dialog-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.dialog-btn {
+  font-family: var(--ui);
+  font-size: 14px;
+  padding: 4px 20px;
+  background: var(--bg);
+  min-width: 75px;
+}
+.copy-status {
+  font-size: 12px;
+  color: #404040;
+  margin-top: 6px;
+  min-height: 14px;
+}

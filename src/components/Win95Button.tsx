@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js'
 interface Props {
   class?: string
   size?: 'normal' | 'small'
+  variant?: 'default' | 'toolbar' | 'icon' | 'cta'
   fullWidth?: boolean
   disabled?: boolean
   title?: string
@@ -17,6 +18,9 @@ export default function Win95Button(props: Props) {
       'win95-button',
       'r',
       `win95-button--${props.size ?? 'normal'}`,
+      props.variant && props.variant !== 'default'
+        ? `win95-button--variant-${props.variant}`
+        : '',
       props.fullWidth ? 'win95-button--full-width' : '',
       props.class,
     ]

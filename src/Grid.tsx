@@ -578,9 +578,6 @@ export default function Grid(props: Props) {
   )
 
   const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
-  const dayCountClass = createMemo(
-    () => `grid-table--days-${Math.min(Math.max(days().length, 1), 7)}`,
-  )
   const heatmapView = createMemo(() => {
     const d = days()
     const t = times()
@@ -611,9 +608,6 @@ export default function Grid(props: Props) {
       values: values.slice(minRow, maxRow + 1).map((row) => row.slice(minCol, maxCol + 1)),
     }
   })
-  const heatmapDayCountClass = createMemo(
-    () => `heatmap-grid--days-${Math.min(Math.max(heatmapView().days.length, 1), 7)}`,
-  )
   const confirmDayOptions = createMemo(() =>
     days().map((d) => ({ value: d.label, label: d.label })),
   )
@@ -779,19 +773,19 @@ export default function Grid(props: Props) {
 
         <div class="grid-view__window-body">
           {/* Minesweeper-style control deck */}
-          <div class="grid-view__deck s">
-            <div class="grid-view__deck-left">
+          <div class="grid-view__deck s row row--center row--gap-sm">
+            <div class="grid-view__deck-left row row--center row--gap-sm">
               <div class="grid-view__deck-display">
                 Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
               </div>
               <Show when={!isConfirmed()}>
-                <Win95Button class="grid-view__deck-modify" onClick={() => setActiveModal('name-picker')}>
+                <Win95Button variant="toolbar" onClick={() => setActiveModal('name-picker')}>
                   Switch...
                 </Win95Button>
               </Show>
             </div>
-            <div class="grid-view__deck-actions">
-              <Win95Button class="grid-view__deck-help" onClick={() => setActiveModal('help')}>
+            <div class="grid-view__deck-actions row row--center row--gap-xs">
+              <Win95Button variant="toolbar" onClick={() => setActiveModal('help')}>
                 <span class="hk">H</span>elp
               </Win95Button>
             </div>
@@ -813,7 +807,7 @@ export default function Grid(props: Props) {
                     and suggests the best times.
                   </p>
                   <label for="share-link" class="share-panel__label">Event link:</label>
-                  <div class="share-panel__link-row">
+                  <div class="share-panel__link-row row">
                     <Win95Field
                       kind="input"
                       id="share-link"
@@ -823,7 +817,6 @@ export default function Grid(props: Props) {
                       value={eventUrl()}
                       readOnly
                       wrapperClass="dialog__field share-panel__field"
-                      controlClass="dialog__control"
                       inputRef={(el) => {
                         shareInputRef = el
                       }}
@@ -831,6 +824,7 @@ export default function Grid(props: Props) {
                     />
                     <Win95Button
                       size="small"
+                      variant="toolbar"
                       class="share-panel__copy-btn"
                       onClick={() => copyLink(eventUrl())}
                     >
@@ -850,7 +844,10 @@ export default function Grid(props: Props) {
                   <div class="grid-view__legend">
                     <AvailabilityLegend withLabels />
                   </div>
-                  <div class={`availability-grid ${dayCountClass()}`}>
+                  <div
+                    class="availability-grid"
+                    style={{ '--days': String(Math.min(Math.max(days().length, 1), 7)) }}
+                  >
                     <div class="availability-grid__corner" />
                     <For each={days()}>
                       {(d) => (
@@ -917,7 +914,7 @@ export default function Grid(props: Props) {
                   <Show
                     when={canShowSuggestions()}
                     fallback={
-                      <div class="results__empty grid-view__panel-content--title-aligned">
+                      <div class="empty-text grid-view__panel-content--title-aligned">
                         Not enough participants yet to suggest times.
                       </div>
                     }
@@ -925,7 +922,7 @@ export default function Grid(props: Props) {
                     <Show
                       when={bestTimes().length > 0}
                       fallback={
-                        <div class="results__empty grid-view__panel-content--title-aligned">
+                        <div class="empty-text grid-view__panel-content--title-aligned">
                           No suggested times yet
                         </div>
                       }
@@ -1010,12 +1007,19 @@ export default function Grid(props: Props) {
                   <Show
                     when={heatmapView().days.length > 0 && heatmapView().times.length > 0}
                     fallback={
-                      <div class="heatmap-empty grid-view__panel-content--title-aligned">
+                      <div class="empty-text grid-view__panel-content--title-aligned">
                         Group availability will appear after someone marks a slot.
                       </div>
                     }
                   >
-                    <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
+                    <div
+                      class="heatmap-grid"
+                      style={{
+                        '--days': String(
+                          Math.min(Math.max(heatmapView().days.length, 1), 7),
+                        ),
+                      }}
+                    >
                       <div class="heatmap-grid__corner" />
                       <For each={heatmapView().days}>
                         {(d) => (
@@ -1060,7 +1064,7 @@ export default function Grid(props: Props) {
           {/* /panels */}
 
           {/* Status bar */}
-          <div class="grid-view__status-bar">
+          <div class="grid-view__status-bar row">
             <div class="grid-view__status-segment st">{statusLeft()}</div>
             <div class="grid-view__status-segment st">timesweeper.app</div>
           </div>
@@ -1164,7 +1168,6 @@ export default function Grid(props: Props) {
                 value={newParticipantName()}
                 placeholder="Your name"
                 wrapperClass="dialog__field"
-                controlClass="dialog__control"
                 onInput={setNewParticipantName}
               />
               <div class="dialog-buttons">
@@ -1229,10 +1232,10 @@ export default function Grid(props: Props) {
             kind="select"
             id="confirm-day"
             name="confirmDay"
+            size="small"
             value={confirmDay()}
             options={confirmDayOptions()}
             wrapperClass="confirm__field confirm__field--day"
-            controlClass="confirm__control"
             onChange={setConfirmDay}
           />
           <label class="confirm__label" for="confirm-time">Time:</label>
@@ -1240,10 +1243,10 @@ export default function Grid(props: Props) {
             kind="select"
             id="confirm-time"
             name="confirmTime"
+            size="small"
             value={confirmTime()}
             options={confirmTimeOptions()}
             wrapperClass="confirm__field confirm__field--time"
-            controlClass="confirm__control"
             onChange={setConfirmTime}
           />
           <p class="confirm__note">

@@ -1,0 +1,360 @@
+/* ======================== */
+/* === LANDING PAGE ======= */
+/* ======================== */
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 12px;
+  min-height: 100vh;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 20px;
+  max-width: var(--landing-max);
+}
+.hero h1 {
+  font-family: var(--mono);
+  font-size: 38px;
+  color: white;
+  text-shadow: 2px 2px 0 var(--navy);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.mine-ico {
+  filter: drop-shadow(2px 2px 0 var(--navy));
+  flex-shrink: 0;
+}
+.hero p {
+  font-size: 14px;
+  color: #e0e0e0;
+  line-height: 1.5;
+}
+
+.form-card {
+  background: var(--bg);
+  width: 100%;
+  max-width: var(--landing-max);
+  padding: 10px;
+  margin-bottom: 16px;
+}
+.landing label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+  font-weight: bold;
+}
+.field {
+  margin-bottom: 10px;
+}
+.landing__group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 10px;
+  min-width: 0;
+}
+.landing__group > legend {
+  font-size: 12px;
+  margin-bottom: 2px;
+  font-weight: bold;
+}
+.landing__event-name {
+  width: 100%;
+}
+.landing__text-input-control {
+  font-family: var(--ui);
+  font-size: 12px;
+  padding: 3px 4px;
+}
+.landing__calendar {
+  padding: 4px;
+  touch-action: manipulation;
+}
+.landing__date-summary {
+  font-size: 10px;
+  color: var(--text-subtle);
+  margin-top: 4px;
+  text-align: center;
+  padding: 2px 4px;
+}
+.landing__time-select {
+  flex: 1;
+}
+.landing__participant-field {
+  flex: 1;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.cal-header span {
+  font-size: 12px;
+  font-weight: bold;
+}
+.cal-nav {
+  background: var(--bg);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.cal-dow {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 0;
+  font-weight: bold;
+}
+.cal-day {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  text-align: center;
+  font-family: var(--ui);
+  color: #000;
+  -webkit-text-fill-color: currentColor;
+  font-size: 11px;
+  padding: 3px 0;
+  cursor: pointer;
+  height: 30px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  touch-action: manipulation;
+}
+.cal-day:disabled {
+  cursor: default;
+}
+.cal-day.selected {
+  background: var(--navy);
+  color: white;
+}
+.cal-day.past {
+  color: #a0a0a0;
+  cursor: default;
+}
+.cal-day.empty {
+  cursor: default;
+}
+.cal-day.today {
+  font-weight: bold;
+}
+
+/* Apply hover feedback only on pointer/hover-capable devices. */
+@media (hover: hover) and (pointer: fine) {
+  .cal-day:hover:not(.empty):not(.past) {
+    outline: 1px dotted #000;
+    outline-offset: -3px;
+  }
+}
+
+/* Mobile: make day cells easier to tap (touch target best practice). */
+@media (max-width: 700px) {
+  .cal-day {
+    height: 44px;
+    font-size: 13px;
+    padding: 0;
+  }
+  .cal-dow {
+    font-size: 11px;
+    padding: 4px 0;
+  }
+}
+
+.time-range {
+  gap: var(--space-2);
+}
+.time-range span {
+  font-size: 12px;
+}
+
+.participant-row {
+  gap: var(--space-1);
+  margin-bottom: 4px;
+}
+.p-rm {
+  background: var(--bg);
+}
+
+/* Touch targets: keep classic proportions, slightly enlarge visuals, add invisible slop. */
+@media (pointer: coarse) {
+  .win95-window__title-button,
+  .cal-nav,
+  .win95-field__arrow,
+  .p-rm {
+    position: relative;
+  }
+
+  .win95-window__title-button {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+  .cal-nav {
+    font-size: 12px;
+    padding: 2px 9px;
+  }
+  .win95-field__arrow {
+    width: 22px;
+    font-size: 10px;
+  }
+  .p-rm {
+    font-size: 12px;
+    padding: 2px 7px;
+  }
+
+  .win95-window__title-button::before,
+  .cal-nav::before,
+  .win95-field__arrow::before,
+  .p-rm::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+
+  /* Keep select-arrow slop slightly tighter to avoid stealing adjacent select taps. */
+  .win95-field__arrow::before {
+    inset: -9px -6px;
+  }
+}
+.add-btn {
+  background: var(--bg);
+  margin-top: 4px;
+}
+
+.create-btn {
+  background: var(--bg);
+  max-width: var(--landing-max);
+  text-align: center;
+}
+
+.how-section {
+  width: 100%;
+  max-width: var(--landing-max);
+  margin-top: 28px;
+  margin-bottom: 16px;
+}
+.how-title {
+  font-family: var(--mono);
+  font-size: 22px;
+  color: white;
+  text-shadow: 1px 1px 0 var(--navy);
+  margin-bottom: 10px;
+  text-align: center;
+}
+.how-steps {
+  background: var(--bg);
+  padding: 10px;
+}
+.how-step {
+  gap: var(--space-3);
+  padding: 6px 4px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--blo);
+}
+.how-step:last-child {
+  border-bottom: none;
+}
+.how-num {
+  background: var(--navy);
+  color: white;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+}
+.how-text {
+  line-height: 1.5;
+}
+
+.recent-section {
+  width: 100%;
+  max-width: var(--landing-max);
+  margin-top: 32px;
+}
+.recent-panel {
+  background: var(--bg);
+  padding: 8px 10px;
+}
+.recent-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.recent-title hr {
+  flex: 1;
+  border: none;
+  border-top: 1px solid var(--blo);
+}
+.recent-empty {
+  font-size: 12px;
+}
+.recent-item {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: var(--ui);
+  color: inherit;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.recent-item:hover {
+  background: var(--navy);
+  color: white;
+}
+.recent-date {
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+.recent-item:hover .recent-date {
+  color: #a0a0ff;
+}
+.flag-ico {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.footer {
+  margin-top: 40px;
+  font-size: 10px;
+  color: #a0c0c0;
+  text-align: center;
+  line-height: 1.6;
+}
+.footer a {
+  color: #e0e0e0;
+}
+.footer-links {
+  margin-top: 4px;
+  display: inline-block;
+}

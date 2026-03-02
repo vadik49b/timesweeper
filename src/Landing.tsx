@@ -239,7 +239,7 @@ export default function Landing(props: Props) {
             placeholder="e.g. Game Night, Intro Call"
             autoFocus
             wrapperClass="landing__event-name"
-            controlClass="landing__control landing__control--input"
+            controlClass="landing__text-input-control"
             onInput={setEventName}
           />
         </div>
@@ -250,6 +250,7 @@ export default function Landing(props: Props) {
             <div class="cal-header">
               <Win95Button
                 size="small"
+                variant="icon"
                 class="cal-nav"
                 ariaLabel="Previous month"
                 onClick={() => calNav(-1)}
@@ -261,6 +262,7 @@ export default function Landing(props: Props) {
               </span>
               <Win95Button
                 size="small"
+                variant="icon"
                 class="cal-nav"
                 ariaLabel="Next month"
                 onClick={() => calNav(1)}
@@ -306,15 +308,15 @@ export default function Landing(props: Props) {
 
         <div class="field">
           <label for="time-start">What times might work? ({localTimezone})</label>
-          <div class="time-range">
+          <div class="time-range row row--center row--gap-sm">
             <Win95Field
               kind="select"
               id="time-start"
               name="timeStart"
+              size="small"
               value={timeStart()}
               options={TIMES}
               wrapperClass="landing__time-select"
-              controlClass="landing__control"
               onChange={setTimeStart}
             />
             <span>to</span>
@@ -322,10 +324,10 @@ export default function Landing(props: Props) {
               kind="select"
               id="time-end"
               name="timeEnd"
+              size="small"
               value={timeEnd()}
               options={TIMES}
               wrapperClass="landing__time-select"
-              controlClass="landing__control"
               onChange={setTimeEnd}
             />
           </div>
@@ -335,7 +337,7 @@ export default function Landing(props: Props) {
           <legend>Who's in?</legend>
           <Index each={participants()}>
             {(p, i) => (
-              <div class="participant-row">
+              <div class="participant-row row row--center row--gap-xs">
                 <label class="sr-only" for={`participant-${i}`}>
                   Participant {i + 1} name
                 </label>
@@ -343,29 +345,28 @@ export default function Landing(props: Props) {
                   kind="input"
                   id={`participant-${i}`}
                   name={`participant-${i}`}
-                  size="small"
                   value={p()}
                   placeholder={i === 0 ? 'You' : `Person ${i + 1}`}
                   wrapperClass="landing__participant-field"
-                  controlClass="landing__control landing__control--input"
+                  controlClass="landing__text-input-control"
                   inputRef={(el) => {
                     participantInputRefs[i] = el
                   }}
                   onInput={(value) => updateParticipant(i, value)}
                 />
                 {i > 0 && (
-                  <Win95Button size="small" class="p-rm" onClick={() => removeParticipant(i)}>
+                  <Win95Button size="small" variant="icon" class="p-rm" onClick={() => removeParticipant(i)}>
                     x <span class="sr-only">Remove participant {i + 1}</span>
                   </Win95Button>
                 )}
               </div>
             )}
           </Index>
-          <Win95Button class="add-btn" onClick={addParticipant}>
+          <Win95Button size="small" variant="toolbar" class="add-btn" onClick={addParticipant}>
             + <span class="hk">A</span>dd person
           </Win95Button>
         </fieldset>
-        <Win95Button fullWidth class="create-btn" onClick={create}>
+        <Win95Button fullWidth variant="cta" class="create-btn" onClick={create}>
           <span class="hk">C</span>reate Event
         </Win95Button>
       </div>
@@ -373,21 +374,21 @@ export default function Landing(props: Props) {
       <div class="how-section">
         <div class="how-title">How it works</div>
         <div class="how-steps r">
-          <div class="how-step">
+          <div class="how-step row row--start row--gap-md">
             <div class="how-num r">1</div>
             <div class="how-text">Create an event and share the link with your group</div>
           </div>
-          <div class="how-step">
+          <div class="how-step row row--start row--gap-md">
             <div class="how-num r">2</div>
             <div class="how-text">
               Everyone opens the link, picks their name, and marks when they're free
             </div>
           </div>
-          <div class="how-step">
+          <div class="how-step row row--start row--gap-md">
             <div class="how-num r">3</div>
             <div class="how-text">See the group heatmap — the best times light up instantly</div>
           </div>
-          <div class="how-step">
+          <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>
             <div class="how-text">Confirm a time — it's locked in and visible to everyone who opens the link</div>
           </div>
@@ -401,7 +402,7 @@ export default function Landing(props: Props) {
             <hr />
           </div>
           {recentEvents().length === 0 ? (
-            <div class="recent-empty">No recent events</div>
+            <div class="empty-text recent-empty">No recent events</div>
           ) : (
             recentEvents().map((e) => (
               <a
