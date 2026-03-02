@@ -162,19 +162,18 @@ type WsEventMessage =
       version: number
     }
 
-export interface SyncSocketHandlers {
-  onEventUpdated: (event: AppEvent) => void
+export function connectEventSocket(
+  eventId: string,
+  onEventUpdated: (event: AppEvent) => void,
   onParticipantUpdated: (
     eventId: string,
     participantName: string,
     slots: SlotValue[],
     updatedAt: number,
     version: number,
-  ) => void
-  onConnectionChange?: (connected: boolean) => void
-}
-
-export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers): () => void {
+  ) => void,
+  onConnectionChange: (connected: boolean) => void,
+): () => void {
   const ws = new ReconnectingWebSocket(`${wsBase()}/events/${encodeURIComponent(eventId)}/ws`, [], {
     minReconnectionDelay: 1000,
     maxReconnectionDelay: 30000,
@@ -187,10 +186,7 @@ export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers
   const onOpen = () => {
     if (!connected) {
       connected = true
-
-      if (handlers.onConnectionChange) {
-        handlers.onConnectionChange(true)
-      }
+      onConnectionChange(true)
     }
   }
 
@@ -199,9 +195,9 @@ export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers
       const msg = JSON.parse(String(ev.data)) as WsEventMessage
 
       if (msg.type === 'event.updated') {
-        handlers.onEventUpdated(msg.event)
+        onEventUpdated(msg.event)
       } else if (msg.type === 'participant.updated') {
-        handlers.onParticipantUpdated(
+        onParticipantUpdated(
           msg.eventId,
           msg.participantName,
           msg.slots,
@@ -217,10 +213,7 @@ export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers
   const onClose = () => {
     if (connected) {
       connected = false
-
-      if (handlers.onConnectionChange) {
-        handlers.onConnectionChange(false)
-      }
+      onConnectionChange(false)
     }
   }
 
@@ -235,10 +228,7 @@ export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers
 
     if (connected) {
       connected = false
-
-      if (handlers.onConnectionChange) {
-        handlers.onConnectionChange(false)
-      }
+      onConnectionChange(false)
     }
     ws.close(1000, 'cleanup')
   }

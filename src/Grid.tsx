@@ -1,5 +1,6 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
+import { makeEventListener } from '@solid-primitives/event-listener'
 import {
   getEvent,
   getSelectedParticipant,
@@ -857,14 +858,15 @@ export default function Grid(props: Props) {
       }, fallbackPollDelay)
     }
 
-    const disconnectSocket = connectEventSocket(props.eventId, {
-      onEventUpdated: (remote) => {
+    const disconnectSocket = connectEventSocket(
+      props.eventId,
+      (remote) => {
         void applyRemoteEvent(remote)
       },
-      onParticipantUpdated: (eventId, participantName, slots, updatedAt, version) => {
+      (eventId, participantName, slots, updatedAt, version) => {
         void applyRemoteParticipantUpdate(eventId, participantName, slots, updatedAt, version)
       },
-      onConnectionChange: (connected) => {
+      (connected) => {
         wsConnected = connected
 
         if (connected) {
@@ -876,7 +878,7 @@ export default function Grid(props: Props) {
 
         scheduleFallbackPoll()
       },
-    })
+    )
 
     const onOnline = () => {
       void flushPendingSync()
@@ -903,8 +905,8 @@ export default function Grid(props: Props) {
         }
       }
     }
-    window.addEventListener('online', onOnline)
-    document.addEventListener('visibilitychange', onVisibilityChange)
+    makeEventListener(window, 'online', onOnline)
+    makeEventListener(document, 'visibilitychange', onVisibilityChange)
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -952,14 +954,11 @@ export default function Grid(props: Props) {
       }
     }
 
-    document.addEventListener('keydown', onKeyDown)
+    makeEventListener(document, 'keydown', onKeyDown)
 
     onCleanup(() => {
       disconnectSocket()
       clearFallbackPoll()
-      window.removeEventListener('online', onOnline)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      document.removeEventListener('keydown', onKeyDown)
     })
 
     let localEvent: AppEvent | undefined

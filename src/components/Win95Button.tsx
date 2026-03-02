@@ -8,7 +8,7 @@ interface Props {
   disabled?: boolean
   title?: string
   ariaLabel?: string
-  onClick?: JSX.EventHandlerUnion<HTMLButtonElement, MouseEvent>
+  onClick: JSX.EventHandlerUnion<HTMLButtonElement, MouseEvent>
   children: JSX.Element
 }
 

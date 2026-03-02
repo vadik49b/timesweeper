@@ -1,4 +1,5 @@
-import { createSignal, Show, Suspense, lazy, onMount, onCleanup } from 'solid-js'
+import { createSignal, Show, Suspense, lazy, onMount } from 'solid-js'
+import { makeEventListener } from '@solid-primitives/event-listener'
 import { touchEventRecent } from './db'
 
 const Landing = lazy(() => import('./Landing'))
@@ -45,8 +46,7 @@ export default function App() {
 
     const initialId = parseEventIdFromPath(window.location.pathname)
     touchRecentSilently(initialId)
-    window.addEventListener('popstate', onPopState)
-    onCleanup(() => window.removeEventListener('popstate', onPopState))
+    makeEventListener(window, 'popstate', onPopState)
   })
 
   return (

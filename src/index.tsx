@@ -1,5 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
+import { makeEventListener } from '@solid-primitives/event-listener'
 import './styles/base.css'
 import './styles/grid.css'
 import './styles/landing.css'
@@ -11,7 +12,7 @@ render(() => <App />, root!)
 
 if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
+    makeEventListener(window, 'load', () => {
       navigator.serviceWorker.register('/sw.js').catch(() => {
         // Keep app working without SW in unsupported/restricted environments.
       })

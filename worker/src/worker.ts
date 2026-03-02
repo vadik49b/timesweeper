@@ -47,7 +47,9 @@ function isAllowedOrigin(origin: string | null): boolean {
 
 function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get('Origin')
+
   if (!origin || !ALLOWED_ORIGINS.has(origin)) return {}
+
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
@@ -87,8 +89,10 @@ function matchEventPath(
   | { kind: 'ws'; eventId: string }
   | null {
   const ws = pathname.match(/^\/api\/events\/([^/]+)\/ws$/)
+
   if (ws) return { kind: 'ws', eventId: decodeURIComponent(ws[1]) }
   const participant = pathname.match(/^\/api\/events\/([^/]+)\/participants\/([^/]+)$/)
+
   if (participant) {
     return {
       kind: 'participant',
@@ -97,7 +101,9 @@ function matchEventPath(
     }
   }
   const event = pathname.match(/^\/api\/events\/([^/]+)$/)
+
   if (event) return { kind: 'event', eventId: decodeURIComponent(event[1]) }
+
   return null
 }
 
@@ -106,12 +112,15 @@ export default {
     if (!isAllowedOrigin(request.headers.get('Origin'))) {
       return json({ error: 'origin_not_allowed' }, request, 403)
     }
+
     if (request.method === 'OPTIONS') return noContent(request)
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
+
     if (!route) return json({ error: 'not_found' }, request, 404)
     const id = env.EVENT_ROOMS.idFromName(route.eventId)
     const stub = env.EVENT_ROOMS.get(id)
+
     return stub.fetch(request)
   },
 }
@@ -127,6 +136,7 @@ export class EventRoom {
 
   private async getEvent(): Promise<AppEvent | null> {
     const event = await this.state.storage.get<AppEvent>('event')
+
     return event ?? null
   }
 
@@ -160,12 +170,14 @@ export class EventRoom {
     }
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
+
     if (!route) return json({ error: 'not_found' }, request, 404)
 
     if (route.kind === 'ws') {
       if (request.headers.get('Upgrade') !== 'websocket') {
         return json({ error: 'expected_websocket_upgrade' }, request, 426)
       }
+
       if (!isAllowedOrigin(request.headers.get('Origin'))) {
         return json({ error: 'origin_not_allowed' }, request, 403)
       }
@@ -173,19 +185,26 @@ export class EventRoom {
       const [client, server] = Object.values(pair)
       server.accept()
       this.attachSocket(server)
+
       return new Response(null, { status: 101, webSocket: client })
     }
 
     if (route.kind === 'event') {
       if (request.method === 'GET') {
         const event = await this.getEvent()
+
         if (!event) return json({ error: 'event_not_found' }, request, 404)
+
         return json(event, request)
       }
+
       if (request.method === 'PUT') {
         const event = await readJson<AppEvent>(request)
-        if (!event || typeof event.id !== 'string')
+
+        if (!event || typeof event.id !== 'string') {
           return json({ error: 'invalid_event_payload' }, request, 400)
+        }
+
         if (event.id !== route.eventId) {
           return json({ error: 'event_id_mismatch' }, request, 400)
         }
@@ -195,8 +214,10 @@ export class EventRoom {
         }
         await this.setEvent(normalized)
         this.broadcast({ type: 'event.updated', event: normalized })
+
         return json({ ok: true }, request)
       }
+
       return json({ error: 'method_not_allowed' }, request, 405)
     }
 
@@ -209,16 +230,21 @@ export class EventRoom {
     const slots = body?.slots
     const baseVersion = body?.baseVersion
     const updatedAt = body?.updatedAt
+
     if (!Array.isArray(slots) || typeof updatedAt !== 'number' || typeof baseVersion !== 'number') {
       return json({ error: 'invalid_participant_payload' }, request, 400)
     }
+
     const event = await this.getEvent()
+
     if (!event) return json({ error: 'event_not_found' }, request, 404)
     const idx = event.participants.findIndex((p) => p.name === route.participantName)
+
     if (idx === -1) return json({ error: 'participant_not_found' }, request, 404)
 
     const participant = event.participants[idx]
     const currentVersion = participant.version ?? 0
+
     if (currentVersion !== baseVersion) {
       return json(
         { error: 'version_conflict', currentVersion, updatedAt: participant.updatedAt ?? null },
@@ -226,6 +252,7 @@ export class EventRoom {
         409,
       )
     }
+
     if ((participant.updatedAt ?? 0) >= updatedAt) {
       return json({ ok: true, stale: true }, request)
     }
@@ -258,6 +285,7 @@ export class EventRoom {
       updatedAt,
       version: nextVersion,
     })
+
     return json({ ok: true, version: nextVersion }, request)
   }
 }

@@ -14,7 +14,10 @@
     "deploy": "npm run deploy:api && npm run deploy:fe"
   },
   "dependencies": {
+    "@solid-primitives/event-listener": "^2.4.5",
+    "@solid-primitives/media": "^2.3.5",
     "idb": "^8.0.3",
+    "reconnecting-websocket": "^4.4.0",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {
