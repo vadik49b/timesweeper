@@ -384,6 +384,133 @@
   font-size: var(--fs-sm);
   padding: 4px 2px;
 }
+.summary-table-wrap {
+  padding: 4px 2px;
+}
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--blo);
+  font-size: var(--fs-xs);
+  min-width: 0;
+}
+.summary-table th,
+.summary-table td {
+  border: 1px solid var(--blo);
+  padding: 4px;
+  text-align: left;
+  vertical-align: top;
+}
+.summary-table th {
+  background: var(--bg);
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+}
+.summary-table__row--best {
+  background: var(--cell-open);
+}
+.summary-table__row--almost {
+  background: var(--bg);
+}
+.summary-table__time {
+  text-align: left;
+  min-width: 118px;
+}
+.summary-table th.summary-table__participants-col,
+.summary-table td.summary-table__participants {
+  min-width: 176px;
+}
+.summary-table__kind {
+  font-size: var(--fs-xxs);
+  color: var(--txt);
+  white-space: normal;
+  margin-bottom: 8px;
+}
+.summary-table__cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--blo);
+  background: var(--bg);
+  font-family: var(--ui);
+  font-size: var(--fs-xs);
+}
+.summary-table__cell--clickable {
+  appearance: none;
+  cursor: pointer;
+  box-shadow: inset -1px -1px var(--blo), inset 1px 1px var(--bhi);
+}
+.summary-table__cell--clickable:active {
+  box-shadow: inset 1px 1px var(--blo), inset -1px -1px var(--bhi);
+}
+.summary-table__cell--yes {
+  background: var(--cell-open);
+  color: var(--num-2);
+  border-style: solid;
+  border-color: var(--blo);
+  border-width: 1px;
+}
+.summary-table__cell--maybe {
+  color: var(--num-3);
+  border-style: solid;
+  border-color: var(--blo);
+  border-width: 1px;
+}
+.summary-table__cell--no {
+  color: var(--text-subtle);
+}
+.summary-table td.summary-table__participant {
+  text-align: center;
+  vertical-align: middle;
+}
+.summary-table th.summary-table__participant-col {
+  text-align: center;
+}
+.summary-table td.summary-table__action {
+  min-width: 120px;
+  text-align: center;
+  vertical-align: middle;
+}
+.summary-table th.summary-table__action-col {
+  text-align: center;
+}
+.summary-table td.summary-table__participants {
+  vertical-align: middle;
+}
+.summary-table__stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 4px;
+  font-size: var(--fs-xxs);
+  line-height: 1.2;
+}
+.summary-table__stack-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.summary-table__stack-names {
+  color: var(--text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.summary-table__cell--mini {
+  width: 14px;
+  height: 14px;
+  font-size: var(--fs-xxs);
+  flex: 0 0 14px;
+}
+.summary-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.summary-table__footer {
+  margin-top: 6px;
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
+}
 .grid-view__confirmed-overlay {
   position: fixed;
   inset: 0;

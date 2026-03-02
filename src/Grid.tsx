@@ -37,6 +37,20 @@ interface Props {
 }
 
 type UndoEntry = { dk: string; ti: number; prev: number }
+type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
+type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
+type SummaryRow = {
+  dk: string
+  ti: number
+  day: string
+  time: string
+  score: number
+  canAttend: number
+  kind: 'best' | 'almost' | 'partial'
+  missingNames: string[]
+  myCell: SummaryCell
+  allGroups: SummaryGroups
+}
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
@@ -86,19 +100,8 @@ export default function Grid(props: Props) {
     return result
   })
 
-  const participantList = createMemo(() => {
-    const ev = event()
-
-    if (!ev) {
-      return []
-    }
-
-    return ev.participants.map((p) => ({ key: p.name, label: p.name }))
-  })
-
   const [editCollapsed, setEditCollapsed] = createSignal(false)
   const [bestCollapsed, setBestCollapsed] = createSignal(false)
-  const [groupCollapsed, setGroupCollapsed] = createSignal(false)
 
   type ActiveModal = null | 'name-picker' | 'help' | 'confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
@@ -150,64 +153,103 @@ export default function Grid(props: Props) {
   }
 
   // --- Logic ---
-  function heat(dk: string, ti: number) {
-    let c = 0
-    const m = myState[dk]?.[ti] ?? 0
-
-    if (m === 1) {
-      c += 1
-    } else if (m === 2) {
-      c += 0.5
-    }
-
-    Object.values(others()).forEach((p) => {
-      const v = p[dk]?.[ti] ?? 0
-
-      if (v === 1) {
-        c += 1
-      } else if (v === 2) {
-        c += 0.5
-      }
-    })
-
-    return Math.round(c)
-  }
-
-  function slotContributorCount(dk: string, ti: number) {
-    let count = 0
-
-    if ((myState[dk]?.[ti] ?? 0) > 0) {
-      count += 1
-    }
-
-    Object.values(others()).forEach((p) => {
-      if ((p[dk]?.[ti] ?? 0) > 0) {
-        count += 1
-      }
-    })
-
-    return count
-  }
-
-  const bestTimes = createMemo(() => {
+  const summaryRows = createMemo<SummaryRow[]>(() => {
+    const ev = event()
     const d = days()
     const t = times()
-    const slots: { day: string; time: string; score: number; dk: string; ti: number }[] = []
-    d.forEach((day) =>
+    if (!ev || d.length === 0 || t.length === 0) {
+      return []
+    }
+
+    const participantNames = [...ev.participants.map((p) => p.name)].sort((a, b) => {
+      if (a === currentName()) {
+        return -1
+      }
+
+      if (b === currentName()) {
+        return 1
+      }
+
+      return 0
+    })
+    const rows: SummaryRow[] = []
+    d.forEach((day) => {
       t.forEach((slot, ti) => {
-        const h = heat(day.key, ti)
-        const contributors = slotContributorCount(day.key, ti)
+        const cells: SummaryCell[] = participantNames.map((name) => {
+          const value =
+            name === currentName()
+              ? ((myState[day.key]?.[ti] ?? 0) as SlotValue)
+              : ((others()[name]?.[day.key]?.[ti] ?? 0) as SlotValue)
 
-        if (h > 0 && contributors >= 2)
-          slots.push({ day: day.label, time: slot.label, score: h, dk: day.key, ti })
-      }),
-    )
-    slots.sort((a, b) => b.score - a.score)
+          return {
+            name,
+            value,
+            isCurrent: name === currentName(),
+          }
+        })
+        const yesCount = cells.filter((cell) => cell.value === 1).length
+        const maybeCount = cells.filter((cell) => cell.value === 2).length
+        const canAttend = yesCount + maybeCount
+        if (canAttend === 0) {
+          return
+        }
 
-    return slots.slice(0, 3)
+        const score = yesCount + maybeCount * 0.5
+        const noCount = cells.length - canAttend
+        const kind = noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial'
+        const missingNames = cells
+          .filter((cell) => cell.value === 0)
+          .map((cell) => (cell.isCurrent ? 'You' : cell.name))
+        const myCell = cells.find((cell) => cell.isCurrent) ?? { name: 'You', value: 0, isCurrent: true }
+        const allGroups: SummaryGroups = {
+          yes: cells
+            .filter((cell) => cell.value === 1)
+            .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
+          maybe: cells
+            .filter((cell) => cell.value === 2)
+            .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
+          no: cells
+            .filter((cell) => cell.value === 0)
+            .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
+        }
+        rows.push({
+          dk: day.key,
+          ti,
+          day: day.label,
+          time: slot.label,
+          score,
+          canAttend,
+          kind,
+          missingNames,
+          myCell,
+          allGroups,
+        })
+      })
+    })
+    const kindRank: Record<SummaryRow['kind'], number> = { best: 0, almost: 1, partial: 2 }
+    rows.sort((a, b) => {
+      if (kindRank[a.kind] !== kindRank[b.kind]) {
+        return kindRank[a.kind] - kindRank[b.kind]
+      }
+
+      if (a.score !== b.score) {
+        return b.score - a.score
+      }
+
+      if (a.canAttend !== b.canAttend) {
+        return b.canAttend - a.canAttend
+      }
+
+      if (a.day !== b.day) {
+        return a.day.localeCompare(b.day)
+      }
+
+      return a.time.localeCompare(b.time)
+    })
+
+    return rows
   })
 
-  const totalParticipants = createMemo(() => event()?.participants.length ?? 0)
   const participantsWithAvailability = createMemo(() => {
     const ev = event()
 
@@ -394,6 +436,58 @@ export default function Grid(props: Props) {
 
     if (navigator.vibrate) navigator.vibrate(10)
     schedulePersist()
+  }
+
+  function setCellValue(dk: string, ti: number, next: SlotValue) {
+    if (isConfirmed()) {
+      return
+    }
+
+    const prev = myState[dk]?.[ti] ?? 0
+
+    if (prev === next) {
+      return
+    }
+
+    undoStack.push([{ dk, ti, prev }])
+    setMyState(dk, ti, next)
+
+    if (navigator.vibrate) {
+      navigator.vibrate(10)
+    }
+
+    schedulePersist()
+  }
+
+  function summaryCellMark(value: SlotValue) {
+    if (value === 1) {
+      return '✓'
+    }
+
+    if (value === 2) {
+      return '?'
+    }
+
+    return ''
+  }
+
+  function summaryNeedText(missingNames: string[]) {
+    if (missingNames.length === 0) {
+      return 'Works for everyone'
+    }
+
+    const missingYou = missingNames.includes('You')
+    const others = missingNames.filter((name) => name !== 'You')
+
+    if (!missingYou) {
+      return `Ask ${others.join(', ')} if they can make it`
+    }
+
+    if (others.length === 0) {
+      return 'Can you make it?'
+    }
+
+    return `Can you and ${others.join(', ')} make it?`
   }
 
   function doUndo() {
@@ -717,52 +811,6 @@ export default function Grid(props: Props) {
   }
 
   const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
-  const heatmapView = createMemo(() => {
-    const d = days()
-    const t = times()
-    const values = t.map((_, ti) => d.map((day) => heat(day.key, ti)))
-
-    if (d.length === 0 || t.length === 0) return { days: d, times: t, values }
-
-    let minRow = t.length
-    let maxRow = -1
-    let minCol = d.length
-    let maxCol = -1
-
-    values.forEach((row, ri) => {
-      row.forEach((value, ci) => {
-        if (value <= 0) {
-          return
-        }
-
-        if (ri < minRow) {
-          minRow = ri
-        }
-
-        if (ri > maxRow) {
-          maxRow = ri
-        }
-
-        if (ci < minCol) {
-          minCol = ci
-        }
-
-        if (ci > maxCol) {
-          maxCol = ci
-        }
-      })
-    })
-
-    // Hide the heatmap entirely when everyone is completely unavailable.
-
-    if (maxRow === -1 || maxCol === -1) return { days: [], times: [], values: [] as number[][] }
-
-    return {
-      days: d.slice(minCol, maxCol + 1),
-      times: t.slice(minRow, maxRow + 1),
-      values: values.slice(minRow, maxRow + 1).map((row) => row.slice(minCol, maxCol + 1)),
-    }
-  })
   const confirmDayOptions = createMemo(() =>
     days().map((d) => ({ value: d.label, label: d.label })),
   )
@@ -964,7 +1012,6 @@ export default function Grid(props: Props) {
     })()
   })
 
-  const RANKS = ['1.', '2.', '3.']
   const loadingOverlayText = createMemo(() => {
     if (loadError() === 'network') {
       return 'Could not reach server to load this event.'
@@ -1130,12 +1177,7 @@ export default function Grid(props: Props) {
                   {/* Results sub-panel */}
                   <GridAccordion
                     id="best"
-                    title={
-                      <>
-                        Suggestions · {participantsWithAvailability()}/{totalParticipants()} shared
-                        availability
-                      </>
-                    }
+                    title={`Summary (${currentTimezone()})`}
                     collapsed={bestCollapsed()}
                     onToggle={() => setBestCollapsed(!bestCollapsed())}
                   >
@@ -1148,139 +1190,143 @@ export default function Grid(props: Props) {
                       }
                     >
                       <Show
-                        when={bestTimes().length > 0}
+                        when={summaryRows().length > 0}
                         fallback={
                           <div class="empty-text grid-view__panel-content--title-aligned">
-                            No suggested times yet
+                            No candidate times yet
                           </div>
                         }
                       >
-                        <div class="results">
-                          <For each={bestTimes()}>
-                            {(slot, i) => {
-                              const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
-                              const breakdown = () => {
-                                const parts: string[] = []
-
-                                if (myVal() === 1)
-                                  parts.push(
-                                    '<span class="results__tag results__tag--yes">✔ You</span>',
+                        <div class="summary-table-wrap">
+                          <table class="summary-table">
+                            <thead>
+                              <tr>
+                                <th>Time</th>
+                                <th class="summary-table__participant-col">You</th>
+                                <th class="summary-table__participants-col">Summary</th>
+                                <th class="summary-table__action-col">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <For each={summaryRows()}>
+                                {(row) => {
+                                  return (
+                                    <tr
+                                      classList={{
+                                        'summary-table__row': true,
+                                        'summary-table__row--best': row.kind === 'best',
+                                        'summary-table__row--almost': row.kind === 'almost',
+                                      }}
+                                    >
+                                      <td class="summary-table__time">
+                                        <b>
+                                          {row.day} {row.time}
+                                        </b>
+                                      </td>
+                                      <td class="summary-table__participant">
+                                        <Show
+                                          when={row.myCell.value === 0}
+                                          fallback={
+                                            <span
+                                              classList={{
+                                                'summary-table__cell': true,
+                                                'summary-table__cell--yes': row.myCell.value === 1,
+                                                'summary-table__cell--maybe': row.myCell.value === 2,
+                                                'summary-table__cell--no': row.myCell.value === 0,
+                                              }}
+                                            >
+                                              {summaryCellMark(row.myCell.value)}
+                                            </span>
+                                          }
+                                        >
+                                          <button
+                                            type="button"
+                                            classList={{
+                                              'summary-table__cell': true,
+                                              'summary-table__cell--yes': row.myCell.value === 1,
+                                              'summary-table__cell--maybe': row.myCell.value === 2,
+                                              'summary-table__cell--no': row.myCell.value === 0,
+                                              'summary-table__cell--clickable': true,
+                                            }}
+                                            onClick={() => setCellValue(row.dk, row.ti, 1)}
+                                            aria-label={`Set your availability to yes at ${row.day} ${row.time}`}
+                                          >
+                                            {summaryCellMark(row.myCell.value)}
+                                          </button>
+                                        </Show>
+                                      </td>
+                                      <td class="summary-table__participants">
+                                        <div class="summary-table__kind">
+                                          {summaryNeedText(row.missingNames)}
+                                        </div>
+                                        <div class="summary-table__stack">
+                                          <Show when={row.allGroups.yes.length > 0}>
+                                            <div class="summary-table__stack-row">
+                                              <span
+                                                classList={{
+                                                  'summary-table__cell': true,
+                                                  'summary-table__cell--yes': true,
+                                                  'summary-table__cell--mini': true,
+                                                }}
+                                              >
+                                                {summaryCellMark(1)}
+                                              </span>
+                                              <span class="summary-table__stack-names">
+                                                {row.allGroups.yes.join(', ')}
+                                              </span>
+                                            </div>
+                                          </Show>
+                                          <Show when={row.allGroups.maybe.length > 0}>
+                                            <div class="summary-table__stack-row">
+                                              <span
+                                                classList={{
+                                                  'summary-table__cell': true,
+                                                  'summary-table__cell--maybe': true,
+                                                  'summary-table__cell--mini': true,
+                                                }}
+                                              >
+                                                {summaryCellMark(2)}
+                                              </span>
+                                              <span class="summary-table__stack-names">
+                                                {row.allGroups.maybe.join(', ')}
+                                              </span>
+                                            </div>
+                                          </Show>
+                                          <Show when={row.allGroups.no.length > 0}>
+                                            <div class="summary-table__stack-row">
+                                              <span
+                                                classList={{
+                                                  'summary-table__cell': true,
+                                                  'summary-table__cell--no': true,
+                                                  'summary-table__cell--mini': true,
+                                                }}
+                                              />
+                                              <span class="summary-table__stack-names">
+                                                {row.allGroups.no.join(', ')}
+                                              </span>
+                                            </div>
+                                          </Show>
+                                        </div>
+                                      </td>
+                                      <td class="summary-table__action">
+                                        <Win95Button size="small" onClick={() => openConfirm(row.day, row.time)}>
+                                          <span class="hk">C</span>onfirm
+                                        </Win95Button>
+                                      </td>
+                                    </tr>
                                   )
-                                else if (myVal() === 2)
-                                  parts.push(
-                                    '<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> You</span>',
-                                  )
-                                Object.entries(others()).forEach(([name, data]) => {
-                                  const v = data[slot.dk]?.[slot.ti] ?? 0
-                                  const n = name.charAt(0).toUpperCase() + name.slice(1)
-
-                                  if (v === 1)
-                                    parts.push(
-                                      `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
-                                    )
-                                  else if (v === 2)
-                                    parts.push(
-                                      `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
-                                    )
-                                })
-
-                                return parts.join(' · ')
-                              }
-
-                              return (
-                                <div
-                                  classList={{
-                                    results__row: true,
-                                    'results__row--best': i() === 0,
-                                  }}
-                                >
-                                  <div class="results__main">
-                                    <div class="results__line">
-                                      <span class="results__rank">{RANKS[i()]}</span>{' '}
-                                      <b>
-                                        {slot.day} {slot.time}
-                                      </b>{' '}
-                                      · {slot.score}/{totalParticipants()}
-                                    </div>
-                                    <div class="results__breakdown" innerHTML={breakdown()} />
-                                  </div>
-                                  <Win95Button
-                                    size="small"
-                                    onClick={() => openConfirm(slot.day, slot.time)}
-                                  >
-                                    <span class="hk">C</span>onfirm
-                                  </Win95Button>
-                                </div>
-                              )
-                            }}
-                          </For>
-                          <div class="results__custom">
-                            <Win95Button size="small" onClick={() => openConfirm(null, null)}>
-                              Pick a different time...
-                            </Win95Button>
+                                }}
+                              </For>
+                            </tbody>
+                          </table>
+                          <div class="summary-table__footer">
+                            Pick a row and confirm the final time.
                           </div>
                         </div>
                       </Show>
                     </Show>
                   </GridAccordion>
 
-                  {/* Group heatmap sub-panel */}
-                  <GridAccordion
-                    id="group"
-                    title="Group availability"
-                    collapsed={groupCollapsed()}
-                    onToggle={() => setGroupCollapsed(!groupCollapsed())}
-                    spaced
-                  >
-                    <Show
-                      when={heatmapView().days.length > 0 && heatmapView().times.length > 0}
-                      fallback={
-                        <div class="empty-text grid-view__panel-content--title-aligned">
-                          Group availability will appear after someone marks a slot.
-                        </div>
-                      }
-                    >
-                      <div
-                        class="heatmap-grid"
-                        style={{
-                          '--days': String(Math.min(Math.max(heatmapView().days.length, 1), 7)),
-                        }}
-                      >
-                        <div class="heatmap-grid__corner" />
-                        <For each={heatmapView().days}>
-                          {(d) => <div class="heatmap-grid__day">{d.label}</div>}
-                        </For>
-                        <For each={heatmapView().times}>
-                          {(t, ti) => (
-                            <>
-                              <div class="heatmap-grid__time">{t.label}</div>
-                              <For each={heatmapView().days}>
-                                {(_, di) => {
-                                  const h = () => heatmapView().values[ti()]?.[di()] ?? 0
-
-                                  return (
-                                    <div
-                                      classList={{
-                                        'heatmap-grid__cell': true,
-                                        'heatmap-grid__cell--0': h() === 0,
-                                        'heatmap-grid__cell--1': h() === 1,
-                                        'heatmap-grid__cell--2': h() === 2,
-                                        'heatmap-grid__cell--3': h() >= 3,
-                                        'heatmap-grid__cell--first-row': ti() === 0,
-                                        'heatmap-grid__cell--first-col': di() === 0,
-                                      }}
-                                    >
-                                      <span class="heatmap-grid__value">{h() > 0 ? h() : ''}</span>
-                                    </div>
-                                  )
-                                }}
-                              </For>
-                            </>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                  </GridAccordion>
                 </div>
               </div>
             </div>
@@ -1421,7 +1467,7 @@ export default function Grid(props: Props) {
               <AvailabilityLegend mini class="help__cycle" />
             </p>
             <p class="help__step">
-              <b>3.</b> Check "Group availability" to see when everyone is free
+              <b>3.</b> Check "Summary" to compare best and near-match slots
             </p>
             <p class="help__step">
               <b>4.</b> Open "Share this link with participants" and send the link to others
