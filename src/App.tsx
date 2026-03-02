@@ -1,7 +1,8 @@
-import { createSignal, Show, onMount, onCleanup } from 'solid-js'
-import Landing from './Landing'
-import Grid from './Grid'
+import { createSignal, Show, Suspense, lazy, onMount, onCleanup } from 'solid-js'
 import { touchEventRecent } from './db'
+
+const Landing = lazy(() => import('./Landing'))
+const Grid = lazy(() => import('./Grid'))
 
 function parseEventIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/e\/([^/]+)$/)
@@ -47,8 +48,10 @@ export default function App() {
   })
 
   return (
-    <Show when={eventId() === null} fallback={<Grid eventId={eventId()!} />}>
-      <Landing onOpenEvent={navigateToEvent} />
-    </Show>
+    <Suspense fallback={null}>
+      <Show when={eventId() === null} fallback={<Grid eventId={eventId()!} />}>
+        <Landing onOpenEvent={navigateToEvent} />
+      </Show>
+    </Suspense>
   )
 }
