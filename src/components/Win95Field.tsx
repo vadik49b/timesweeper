@@ -11,6 +11,7 @@ interface BaseProps {
   wrapperClass?: string
   frameClass?: string
   controlClass?: string
+  size?: 'normal' | 'small'
 }
 
 interface InputProps extends BaseProps {
@@ -49,7 +50,14 @@ export default function Win95Field(props: Props) {
     }
   }
 
-  const wrapperClass = () => ['win95-field', props.wrapperClass].filter(Boolean).join(' ')
+  const wrapperClass = () =>
+    [
+      'win95-field',
+      `win95-field--${props.size ?? 'normal'}`,
+      props.wrapperClass,
+    ]
+      .filter(Boolean)
+      .join(' ')
   const frameClass = () =>
     [
       'win95-field__frame',

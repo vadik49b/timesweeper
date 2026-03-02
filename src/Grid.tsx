@@ -82,11 +82,12 @@ export default function Grid(props: Props) {
   const [bestCollapsed, setBestCollapsed] = createSignal(false)
   const [groupCollapsed, setGroupCollapsed] = createSignal(false)
 
-  type ActiveModal = null | 'name-picker' | 'share' | 'help' | 'confirm'
+  type ActiveModal = null | 'name-picker' | 'help' | 'confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
   const [statusFlash, setStatusFlash] = createSignal('')
+  const [shareCollapsed, setShareCollapsed] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
   let undoStack: UndoEntry[][] = []
@@ -371,9 +372,13 @@ export default function Grid(props: Props) {
     statusTimer = setTimeout(() => setStatusFlash(''), 2000)
   }
 
-  function openShareDialog() {
+  function revealSharePanel() {
+    setShareCollapsed(false)
     setCopyStatus('')
-    setActiveModal('share')
+    queueMicrotask(() => {
+      shareInputRef?.focus()
+      shareInputRef?.select()
+    })
   }
 
   async function copyLink(url: string) {
@@ -624,14 +629,6 @@ export default function Grid(props: Props) {
   })
 
   createEffect(() => {
-    if (activeModal() !== 'share') return
-    queueMicrotask(() => {
-      shareInputRef.focus()
-      shareInputRef.select()
-    })
-  })
-
-  createEffect(() => {
     if (!isConfirmed() && !activeModal()) return
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -698,11 +695,11 @@ export default function Grid(props: Props) {
       }
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
-        openShareDialog()
+        revealSharePanel()
       }
       if (e.key === 'F3') {
         e.preventDefault()
-        openShareDialog()
+        revealSharePanel()
       }
       if (e.key === 'F5') {
         e.preventDefault()
@@ -794,9 +791,6 @@ export default function Grid(props: Props) {
               </Show>
             </div>
             <div class="grid-view__deck-actions">
-              <Win95Button class="grid-view__deck-share" onClick={openShareDialog}>
-                <span class="hk">S</span>hare
-              </Win95Button>
               <Win95Button class="grid-view__deck-help" onClick={() => setActiveModal('help')}>
                 <span class="hk">H</span>elp
               </Win95Button>
@@ -808,10 +802,50 @@ export default function Grid(props: Props) {
             <div class="grid-view__panel">
               <div class="grid-view__panel-frame s">
                 <GridAccordion
+                  id="share"
+                  title="Invite people"
+                  collapsed={shareCollapsed()}
+                  onToggle={() => setShareCollapsed(!shareCollapsed())}
+                  bodyAlign="title"
+                >
+                  <p class="share-panel__instruction">
+                    Each person marks yes/maybe/no availability. TimeSweeper combines responses
+                    and suggests the best times.
+                  </p>
+                  <label for="share-link" class="share-panel__label">Event link:</label>
+                  <div class="share-panel__link-row">
+                    <Win95Field
+                      kind="input"
+                      id="share-link"
+                      name="shareLink"
+                      type="url"
+                      size="small"
+                      value={eventUrl()}
+                      readOnly
+                      wrapperClass="dialog__field share-panel__field"
+                      controlClass="dialog__control"
+                      inputRef={(el) => {
+                        shareInputRef = el
+                      }}
+                      onClick={() => shareInputRef.select()}
+                    />
+                    <Win95Button
+                      size="small"
+                      class="share-panel__copy-btn"
+                      onClick={() => copyLink(eventUrl())}
+                    >
+                      <span class="hk">C</span>opy
+                    </Win95Button>
+                  </div>
+                  <div class="copy-status" aria-live="polite">{copyStatus()}</div>
+                </GridAccordion>
+
+                <GridAccordion
                   id="edit"
                   title={`Your availability (${currentTimezone()})`}
                   collapsed={editCollapsed()}
                   onToggle={() => setEditCollapsed(!editCollapsed())}
+                  spaced
                 >
                   <div class="grid-view__legend">
                     <AvailabilityLegend withLabels />
@@ -1036,9 +1070,6 @@ export default function Grid(props: Props) {
             <button type="button" class="grid-view__function-item" onClick={doUndo}>
               <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
             </button>
-            <button type="button" class="grid-view__function-item" onClick={openShareDialog}>
-              <span class="grid-view__function-key">F3</span> <span class="hk">S</span>hare
-            </button>
             <button
               type="button"
               class="grid-view__function-item"
@@ -1146,35 +1177,6 @@ export default function Grid(props: Props) {
         </Win95Dialog>
       </Show>
 
-      <Show when={activeModal() === 'share'}>
-        <Win95Dialog title="Share Link" onClose={() => setActiveModal(null)}>
-          <label for="share-link">Send this link to participants:</label>
-          <Win95Field
-            kind="input"
-            id="share-link"
-            name="shareLink"
-            type="url"
-            value={eventUrl()}
-            readOnly
-            wrapperClass="dialog__field"
-            controlClass="dialog__control"
-            inputRef={(el) => {
-              shareInputRef = el
-            }}
-            onClick={() => shareInputRef.select()}
-          />
-          <div class="dialog-buttons">
-            <Win95Button class="dialog-btn" onClick={() => copyLink(eventUrl())}>
-              <span class="hk">C</span>opy
-            </Win95Button>
-            <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
-              Close
-            </Win95Button>
-          </div>
-          <div class="copy-status" aria-live="polite">{copyStatus()}</div>
-        </Win95Dialog>
-      </Show>
-
       <Show when={activeModal() === 'help'}>
         <Win95Dialog title="Help — TimeSweeper" class="dialog--help" bodyClass="dialog-body--help" onClose={() => setActiveModal(null)}>
           <p class="help__lead">
@@ -1192,7 +1194,7 @@ export default function Grid(props: Props) {
             <b>3.</b> Check "Group availability" to see when everyone is free
           </p>
           <p class="help__step">
-            <b>4.</b> Click <b>Share</b> to send the link to others
+            <b>4.</b> Open "Share this link with participants" and send the link to others
           </p>
           <p class="help__step">
             <b>5.</b> When the group agrees, click <b>Confirm</b>
@@ -1202,7 +1204,7 @@ export default function Grid(props: Props) {
             <br />
             <span class="help__key-line">F1 / U — Undo</span>
             <br />
-            <span class="help__key-line">S — Share link</span>
+            <span class="help__key-line">F3 / S — Focus share link</span>
             <br />
             <span class="help__key-line">Ctrl+Z — Undo</span>
           </p>

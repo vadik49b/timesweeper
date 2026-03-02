@@ -155,6 +155,14 @@ body {
 .win95-field__arrow:active {
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
 }
+.win95-field--small .win95-field__control {
+  font-size: 12px;
+  padding: 1px 3px;
+}
+.win95-field--small .win95-field__arrow {
+  width: 16px;
+  font-size: 8px;
+}
 
 @media (pointer: coarse) {
   /* Small touch-only comfort bump without changing Win95 frame proportions. */
@@ -400,11 +408,50 @@ body {
   border-top: 1px solid var(--blo);
 }
 .grid-view__panel-header--spaced {
-  margin-top: 4px;
+  margin-top: 12px;
+}
+.grid-view__panel-body {
+  padding-top: 4px;
 }
 .grid-view__panel-body--title,
 .grid-view__panel-content--title-aligned {
   padding-left: 22px;
+}
+.share-panel__instruction {
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0 0 6px;
+  max-width: 68ch;
+  padding-right: 16px;
+}
+.share-panel__label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.share-panel__link-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.share-panel__field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.share-panel__copy-btn {
+  min-width: 0;
+  padding: 1px 10px;
+}
+@media (max-width: 620px) {
+  .share-panel__instruction {
+    max-width: none;
+    padding-right: 0;
+  }
+  .share-panel__link-row {
+    flex-wrap: wrap;
+  }
 }
 
 /* Editing grid */
