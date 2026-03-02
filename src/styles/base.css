@@ -29,8 +29,22 @@
   --hm-col: 44px;
   --control-small-height: 22px;
   --landing-max: 420px;
+  --text-primary: #000;
+  --text-inverse: #fff;
   --text-muted: #404040;
   --text-subtle: #808080;
+  --text-disabled: #a0a0a0;
+  --text-link-hover: #a0a0ff;
+  --text-footer: #a0c0c0;
+  --text-footer-link: #e0e0e0;
+  --fs-xxs: 10px;
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-hero: 38px;
+  --fw-regular: 400;
+  --fw-bold: 700;
   --space-1: 4px;
   --space-2: 6px;
   --space-3: 10px;
@@ -80,7 +94,7 @@ body {
   font-family: var(--ui);
   cursor: pointer;
   background: var(--bg);
-  color: #000;
+  color: var(--text-primary);
   text-align: center;
   white-space: nowrap;
   user-select: none;
@@ -88,11 +102,11 @@ body {
   text-decoration: none;
 }
 .win95-button--normal {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   padding: 3px 8px;
 }
 .win95-button--small {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 0 6px;
   height: var(--control-small-height);
   display: inline-flex;
@@ -108,7 +122,7 @@ body {
   padding-right: 6px;
 }
 .win95-button--variant-cta {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   padding: 6px 20px;
 }
 .win95-button--full-width {
@@ -143,19 +157,19 @@ body {
   min-width: 0;
   display: block;
   font-family: var(--ui);
-  font-size: 15px;
+  font-size: var(--fs-sm);
   padding: 2px 4px;
   border: none;
   background: white;
-  color: #000;
-  -webkit-text-fill-color: #000;
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
   appearance: none;
   -webkit-appearance: none;
   outline: none;
   cursor: pointer;
 }
 .win95-field__control option {
-  color: #000;
+  color: var(--text-primary);
   background: #fff;
 }
 .win95-field__frame--input .win95-field__control {
@@ -175,15 +189,15 @@ body {
   align-items: center;
   justify-content: center;
   background: var(--bg);
-  color: #000;
-  font-size: 9px;
+  color: var(--text-primary);
+  font-size: var(--fs-xxs);
   cursor: pointer;
   flex-shrink: 0;
   border: 2px solid;
   border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
 }
 .win95-field--small .win95-field__control {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   height: 100%;
   line-height: 1.2;
   padding: 1px 3px 0;
@@ -214,12 +228,12 @@ body {
 
 /* === SHARED: EMPTY STATES === */
 .empty-text {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   color: var(--text-subtle);
   padding: var(--space-1) 2px;
 }
 .win95-field--small .win95-field__arrow {
-  font-size: 9px;
+  font-size: var(--fs-xxs);
 }
 .win95-field--small .win95-field__frame {
   height: var(--control-small-height);
@@ -239,8 +253,8 @@ body {
 @supports (-webkit-touch-callout: none) {
   .win95-field__control {
     font-size: 16px;
-    color: #000;
-    -webkit-text-fill-color: #000;
+    color: var(--text-primary);
+    -webkit-text-fill-color: var(--text-primary);
   }
 }
 
@@ -264,7 +278,7 @@ body {
   box-shadow: 2px 2px 0 #000;
 }
 .dialog .win95-window__title-bar {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   padding: 2px 4px;
   cursor: default;
 }
@@ -272,7 +286,7 @@ body {
   padding: 12px;
 }
 .dialog-body label {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   display: block;
   margin-bottom: 4px;
 }
@@ -286,14 +300,14 @@ body {
 }
 .dialog-btn {
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: var(--fs-sm);
   padding: 4px 20px;
   background: var(--bg);
   min-width: 75px;
 }
 .copy-status {
-  font-size: 12px;
-  color: #404040;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   margin-top: 6px;
   min-height: 14px;
 }

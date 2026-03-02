@@ -17,8 +17,8 @@
 }
 .hero h1 {
   font-family: var(--mono);
-  font-size: 38px;
-  color: white;
+  font-size: var(--fs-hero);
+  color: var(--text-inverse);
   text-shadow: 2px 2px 0 var(--navy);
   margin-bottom: 6px;
   letter-spacing: 1px;
@@ -32,8 +32,8 @@
   flex-shrink: 0;
 }
 .hero p {
-  font-size: 14px;
-  color: #e0e0e0;
+  font-size: var(--fs-sm);
+  color: var(--text-footer-link);
   line-height: 1.5;
 }
 
@@ -46,9 +46,9 @@
 }
 .landing label {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   margin-bottom: 2px;
-  font-weight: bold;
+  font-weight: var(--fw-bold);
 }
 .field {
   margin-bottom: 10px;
@@ -60,16 +60,16 @@
   min-width: 0;
 }
 .landing__group > legend {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   margin-bottom: 2px;
-  font-weight: bold;
+  font-weight: var(--fw-bold);
 }
 .landing__event-name {
   width: 100%;
 }
 .landing__text-input-control {
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   padding: 3px 4px;
 }
 .landing__calendar {
@@ -77,7 +77,7 @@
   touch-action: manipulation;
 }
 .landing__date-summary {
-  font-size: 10px;
+  font-size: var(--fs-xxs);
   color: var(--text-subtle);
   margin-top: 4px;
   text-align: center;
@@ -97,8 +97,8 @@
   margin-bottom: 12px;
 }
 .cal-header span {
-  font-size: 12px;
-  font-weight: bold;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
 }
 .cal-nav {
   background: var(--bg);
@@ -109,10 +109,10 @@
 }
 .cal-dow {
   text-align: center;
-  font-size: 10px;
+  font-size: var(--fs-xxs);
   color: var(--text-muted);
   padding: 2px 0;
-  font-weight: bold;
+  font-weight: var(--fw-bold);
 }
 .cal-day {
   appearance: none;
@@ -120,9 +120,9 @@
   border: none;
   text-align: center;
   font-family: var(--ui);
-  color: #000;
+  color: var(--text-primary);
   -webkit-text-fill-color: currentColor;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 3px 0;
   cursor: pointer;
   height: 30px;
@@ -138,17 +138,17 @@
 }
 .cal-day.selected {
   background: var(--navy);
-  color: white;
+  color: var(--text-inverse);
 }
 .cal-day.past {
-  color: #a0a0a0;
+  color: var(--text-disabled);
   cursor: default;
 }
 .cal-day.empty {
   cursor: default;
 }
 .cal-day.today {
-  font-weight: bold;
+  font-weight: var(--fw-bold);
 }
 
 /* Apply hover feedback only on pointer/hover-capable devices. */
@@ -163,11 +163,11 @@
 @media (max-width: 700px) {
   .cal-day {
     height: 44px;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     padding: 0;
   }
   .cal-dow {
-    font-size: 11px;
+    font-size: var(--fs-xs);
     padding: 4px 0;
   }
 }
@@ -176,7 +176,7 @@
   gap: var(--space-2);
 }
 .time-range span {
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .participant-row {
@@ -199,18 +199,18 @@
   .win95-window__title-button {
     width: 22px;
     height: 22px;
-    font-size: 12px;
+    font-size: var(--fs-xs);
   }
   .cal-nav {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     padding: 2px 9px;
   }
   .win95-field__arrow {
     width: 22px;
-    font-size: 10px;
+    font-size: var(--fs-xxs);
   }
   .p-rm {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     padding: 2px 7px;
   }
 
@@ -247,8 +247,8 @@
 }
 .how-title {
   font-family: var(--mono);
-  font-size: 22px;
-  color: white;
+  font-size: var(--fs-xl);
+  color: var(--text-inverse);
   text-shadow: 1px 1px 0 var(--navy);
   margin-bottom: 10px;
   text-align: center;
@@ -260,7 +260,7 @@
 .how-step {
   gap: var(--space-3);
   padding: 6px 4px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   border-bottom: 1px solid var(--blo);
 }
 .how-step:last-child {
@@ -268,15 +268,15 @@
 }
 .how-num {
   background: var(--navy);
-  color: white;
+  color: var(--text-inverse);
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: bold;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
 }
 .how-text {
   line-height: 1.5;
@@ -292,7 +292,7 @@
   padding: 8px 10px;
 }
 .recent-title {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-bottom: 6px;
   display: flex;
@@ -305,7 +305,7 @@
   border-top: 1px solid var(--blo);
 }
 .recent-empty {
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .recent-item {
   appearance: none;
@@ -317,7 +317,7 @@
   font-family: var(--ui);
   color: inherit;
   text-decoration: none;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   padding: 4px 6px;
   cursor: pointer;
   display: flex;
@@ -326,14 +326,14 @@
 }
 .recent-item:hover {
   background: var(--navy);
-  color: white;
+  color: var(--text-inverse);
 }
 .recent-date {
   color: var(--text-subtle);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .recent-item:hover .recent-date {
-  color: #a0a0ff;
+  color: var(--text-link-hover);
 }
 .flag-ico {
   display: inline-flex;
@@ -346,13 +346,13 @@
 
 .footer {
   margin-top: 40px;
-  font-size: 10px;
-  color: #a0c0c0;
+  font-size: var(--fs-xxs);
+  color: var(--text-footer);
   text-align: center;
   line-height: 1.6;
 }
 .footer a {
-  color: #e0e0e0;
+  color: var(--text-footer-link);
 }
 .footer-links {
   margin-top: 4px;
