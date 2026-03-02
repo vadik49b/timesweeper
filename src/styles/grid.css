@@ -66,6 +66,7 @@
 
 .grid-controls__name {
   font-weight: var(--fw-bold);
+  color: var(--text-primary);
 }
 
 .grid-view__deck {

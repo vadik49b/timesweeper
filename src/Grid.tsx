@@ -806,7 +806,7 @@ export default function Grid(props: Props) {
                     Each person marks yes/maybe/no availability. TimeSweeper combines responses
                     and suggests the best times.
                   </p>
-                  <label for="share-link" class="share-panel__label">Event link:</label>
+                  <label for="share-link" class="share-panel__label">Share this link:</label>
                   <div class="share-panel__link-row row">
                     <Win95Field
                       kind="input"
@@ -828,7 +828,7 @@ export default function Grid(props: Props) {
                       class="share-panel__copy-btn"
                       onClick={() => copyLink(eventUrl())}
                     >
-                      <span class="hk">C</span>opy link
+                      <span class="hk">C</span>opy
                     </Win95Button>
                   </div>
                   <div class="copy-status" aria-live="polite">{copyStatus()}</div>
