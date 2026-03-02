@@ -18,6 +18,7 @@ import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
+import GridAccordion from './components/GridAccordion'
 import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
@@ -806,70 +807,61 @@ export default function Grid(props: Props) {
             {/* Panel: Your availability */}
             <div class="grid-view__panel">
               <div class="grid-view__panel-frame s">
-                <button
-                  type="button"
-                  class="grid-view__panel-header"
-                  id="panel-toggle-edit"
-                  onClick={() => setEditCollapsed(!editCollapsed())}
-                  aria-controls="panel-body-edit"
-                  aria-expanded={!editCollapsed()}
+                <GridAccordion
+                  id="edit"
+                  title={`Your availability (${currentTimezone()})`}
+                  collapsed={editCollapsed()}
+                  onToggle={() => setEditCollapsed(!editCollapsed())}
                 >
-                  <div class="grid-view__panel-toggle">{editCollapsed() ? '▸' : '▾'}</div>
-                  <span>Your availability ({currentTimezone()})</span>
-                  <hr />
-                </button>
-                <Show when={!editCollapsed()}>
-                  <div class="grid-view__panel-body" id="panel-body-edit" role="region" aria-labelledby="panel-toggle-edit">
-                    <div class="grid-view__legend">
-                      <AvailabilityLegend withLabels />
-                    </div>
-                    <div class={`availability-grid ${dayCountClass()}`}>
-                      <div class="availability-grid__corner" />
-                      <For each={days()}>
-                        {(d) => (
-                          <div class="availability-grid__day">{d.label}</div>
-                        )}
-                      </For>
-                      <For each={times()}>
-                        {(t, ti) => (
-                          <>
-                            <div class="availability-grid__time">{t.label}</div>
-                            <For each={days()}>
-                              {(d, di) => (
-                                <button
-                                  type="button"
-                                  classList={{
-                                    'availability-grid__cell': true,
-                                    'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
-                                    'availability-grid__cell--maybe': myState[d.key]?.[ti()] === 2,
-                                    'availability-grid__cell--first-row': ti() === 0,
-                                    'availability-grid__cell--first-col': di() === 0,
-                                  }}
-                                  aria-label={`${d.label} at ${t.label}. Current status: ${
-                                    myState[d.key]?.[ti()] === 1
-                                      ? 'yes'
-                                      : myState[d.key]?.[ti()] === 2
-                                        ? 'maybe'
-                                        : 'no'
-                                  }. Activate to cycle.`}
-                                  disabled={isConfirmed()}
-                                  onClick={() => cycleCell(d.key, ti())}
-                                >
-                                  <Show when={myState[d.key]?.[ti()] === 1}>
-                                    <span class="availability-grid__icon">✔</span>
-                                  </Show>
-                                  <Show when={myState[d.key]?.[ti()] === 2}>
-                                    <span class="availability-grid__icon">?</span>
-                                  </Show>
-                                </button>
-                              )}
-                            </For>
-                          </>
-                        )}
-                      </For>
-                    </div>
+                  <div class="grid-view__legend">
+                    <AvailabilityLegend withLabels />
                   </div>
-                </Show>
+                  <div class={`availability-grid ${dayCountClass()}`}>
+                    <div class="availability-grid__corner" />
+                    <For each={days()}>
+                      {(d) => (
+                        <div class="availability-grid__day">{d.label}</div>
+                      )}
+                    </For>
+                    <For each={times()}>
+                      {(t, ti) => (
+                        <>
+                          <div class="availability-grid__time">{t.label}</div>
+                          <For each={days()}>
+                            {(d, di) => (
+                              <button
+                                type="button"
+                                classList={{
+                                  'availability-grid__cell': true,
+                                  'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
+                                  'availability-grid__cell--maybe': myState[d.key]?.[ti()] === 2,
+                                  'availability-grid__cell--first-row': ti() === 0,
+                                  'availability-grid__cell--first-col': di() === 0,
+                                }}
+                                aria-label={`${d.label} at ${t.label}. Current status: ${
+                                  myState[d.key]?.[ti()] === 1
+                                    ? 'yes'
+                                    : myState[d.key]?.[ti()] === 2
+                                      ? 'maybe'
+                                      : 'no'
+                                }. Activate to cycle.`}
+                                disabled={isConfirmed()}
+                                onClick={() => cycleCell(d.key, ti())}
+                              >
+                                <Show when={myState[d.key]?.[ti()] === 1}>
+                                  <span class="availability-grid__icon">✔</span>
+                                </Show>
+                                <Show when={myState[d.key]?.[ti()] === 2}>
+                                  <span class="availability-grid__icon">?</span>
+                                </Show>
+                              </button>
+                            )}
+                          </For>
+                        </>
+                      )}
+                    </For>
+                  </div>
+                </GridAccordion>
               </div>
             </div>
 
@@ -877,169 +869,157 @@ export default function Grid(props: Props) {
             <div class="grid-view__panel">
               <div class="grid-view__panel-frame s">
                 {/* Results sub-panel */}
-                <button
-                  type="button"
-                  class="grid-view__panel-header"
-                  id="panel-toggle-best"
-                  onClick={() => setBestCollapsed(!bestCollapsed())}
-                  aria-controls="panel-body-best"
-                  aria-expanded={!bestCollapsed()}
+                <GridAccordion
+                  id="best"
+                  title={
+                    <>
+                      Suggestions · {participantsWithAvailability()}/{totalParticipants()} shared
+                      availability
+                    </>
+                  }
+                  collapsed={bestCollapsed()}
+                  onToggle={() => setBestCollapsed(!bestCollapsed())}
                 >
-                  <div class="grid-view__panel-toggle">{bestCollapsed() ? '▸' : '▾'}</div>
-                  <span>
-                    Suggestions · {participantsWithAvailability()}/{totalParticipants()} shared
-                    availability
-                  </span>
-                  <hr />
-                </button>
-                <Show when={!bestCollapsed()}>
-                  <div class="grid-view__panel-body" id="panel-body-best" role="region" aria-labelledby="panel-toggle-best">
+                  <Show
+                    when={canShowSuggestions()}
+                    fallback={
+                      <div class="results__empty grid-view__panel-content--title-aligned">
+                        Not enough participants yet to suggest times.
+                      </div>
+                    }
+                  >
                     <Show
-                      when={canShowSuggestions()}
+                      when={bestTimes().length > 0}
                       fallback={
-                        <div class="results__empty">
-                          Not enough participants yet to suggest times.
+                        <div class="results__empty grid-view__panel-content--title-aligned">
+                          No suggested times yet
                         </div>
                       }
                     >
-                      <Show
-                        when={bestTimes().length > 0}
-                        fallback={<div class="results__empty">No suggested times yet</div>}
-                      >
-                        <div class="results">
-                          <For each={bestTimes()}>
-                            {(slot, i) => {
-                              const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
-                              const breakdown = () => {
-                                const parts: string[] = []
-                                if (myVal() === 1)
+                      <div class="results">
+                        <For each={bestTimes()}>
+                          {(slot, i) => {
+                            const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
+                            const breakdown = () => {
+                              const parts: string[] = []
+                              if (myVal() === 1)
+                                parts.push(
+                                  '<span class="results__tag results__tag--yes">✔ You</span>',
+                                )
+                              else if (myVal() === 2)
+                                parts.push(
+                                  '<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> You</span>',
+                                )
+                              Object.entries(others()).forEach(([name, data]) => {
+                                const v = data[slot.dk]?.[slot.ti] ?? 0
+                                const n = name.charAt(0).toUpperCase() + name.slice(1)
+                                if (v === 1)
                                   parts.push(
-                                    '<span class="results__tag results__tag--yes">✔ You</span>',
+                                    `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
                                   )
-                                else if (myVal() === 2)
+                                else if (v === 2)
                                   parts.push(
-                                    '<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> You</span>',
+                                    `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
                                   )
-                                Object.entries(others()).forEach(([name, data]) => {
-                                  const v = data[slot.dk]?.[slot.ti] ?? 0
-                                  const n = name.charAt(0).toUpperCase() + name.slice(1)
-                                  if (v === 1)
-                                    parts.push(
-                                      `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
-                                    )
-                                  else if (v === 2)
-                                    parts.push(
-                                      `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
-                                    )
-                                })
-                                return parts.join(' · ')
-                              }
-                              return (
-                                <div
-                                  classList={{
-                                    results__row: true,
-                                    'results__row--best': i() === 0,
-                                  }}
-                                >
-                                  <div class="results__main">
-                                    <div class="results__line">
-                                      <span class="results__rank">{RANKS[i()]}</span>{' '}
-                                      <b>
-                                        {slot.day} {slot.time}
-                                      </b>{' '}
-                                      · {slot.score}/{totalParticipants()}
-                                    </div>
-                                    <div class="results__breakdown" innerHTML={breakdown()} />
-                                  </div>
-                                  <Win95Button
-                                    size="small"
-                                    class="dialog-btn results__confirm-btn"
-                                    onClick={() => openConfirm(slot.day, slot.time)}
-                                  >
-                                    <span class="hk">C</span>onfirm
-                                  </Win95Button>
-                                </div>
-                              )
-                            }}
-                          </For>
-                          <div class="results__custom">
-                            <Win95Button
-                              class="dialog-btn results__custom-btn"
-                              onClick={() => openConfirm(null, null)}
-                            >
-                              Pick a different time...
-                            </Win95Button>
-                          </div>
-                        </div>
-                      </Show>
-                    </Show>
-                  </div>
-                </Show>
-
-                {/* Group heatmap sub-panel */}
-                <button
-                  type="button"
-                  class="grid-view__panel-header"
-                  classList={{ 'grid-view__panel-header--spaced': true }}
-                  id="panel-toggle-group"
-                  onClick={() => setGroupCollapsed(!groupCollapsed())}
-                  aria-controls="panel-body-group"
-                  aria-expanded={!groupCollapsed()}
-                >
-                  <div class="grid-view__panel-toggle">{groupCollapsed() ? '▸' : '▾'}</div>
-                  <span>Group availability</span>
-                  <hr />
-                </button>
-                <Show when={!groupCollapsed()}>
-                  <div class="grid-view__panel-body" id="panel-body-group" role="region" aria-labelledby="panel-toggle-group">
-                    <Show
-                      when={heatmapView().days.length > 0 && heatmapView().times.length > 0}
-                      fallback={
-                        <div class="heatmap-empty">
-                          Group availability will appear after someone marks a slot.
-                        </div>
-                      }
-                    >
-                      <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
-                        <div class="heatmap-grid__corner" />
-                        <For each={heatmapView().days}>
-                          {(d) => (
-                            <div class="heatmap-grid__day">{d.label}</div>
-                          )}
-                        </For>
-                        <For each={heatmapView().times}>
-                          {(t, ti) => (
-                            <>
-                              <div class="heatmap-grid__time">{t.label}</div>
-                              <For each={heatmapView().days}>
-                                {(_, di) => {
-                                  const h = () => heatmapView().values[ti()]?.[di()] ?? 0
-                                  return (
-                                    <div
-                                      classList={{
-                                        'heatmap-grid__cell': true,
-                                        'heatmap-grid__cell--0': h() === 0,
-                                        'heatmap-grid__cell--1': h() === 1,
-                                        'heatmap-grid__cell--2': h() === 2,
-                                        'heatmap-grid__cell--3': h() >= 3,
-                                        'heatmap-grid__cell--first-row': ti() === 0,
-                                        'heatmap-grid__cell--first-col': di() === 0,
-                                      }}
-                                    >
-                                      <span class="heatmap-grid__value">
-                                        {h() > 0 ? h() : ''}
-                                      </span>
-                                    </div>
-                                  )
+                              })
+                              return parts.join(' · ')
+                            }
+                            return (
+                              <div
+                                classList={{
+                                  results__row: true,
+                                  'results__row--best': i() === 0,
                                 }}
-                              </For>
-                            </>
-                          )}
+                              >
+                                <div class="results__main">
+                                  <div class="results__line">
+                                    <span class="results__rank">{RANKS[i()]}</span>{' '}
+                                    <b>
+                                      {slot.day} {slot.time}
+                                    </b>{' '}
+                                    · {slot.score}/{totalParticipants()}
+                                  </div>
+                                  <div class="results__breakdown" innerHTML={breakdown()} />
+                                </div>
+                                <Win95Button
+                                  size="small"
+                                  class="dialog-btn results__confirm-btn"
+                                  onClick={() => openConfirm(slot.day, slot.time)}
+                                >
+                                  <span class="hk">C</span>onfirm
+                                </Win95Button>
+                              </div>
+                            )
+                          }}
                         </For>
+                        <div class="results__custom">
+                          <Win95Button
+                            class="dialog-btn results__custom-btn"
+                            onClick={() => openConfirm(null, null)}
+                          >
+                            Pick a different time...
+                          </Win95Button>
+                        </div>
                       </div>
                     </Show>
-                  </div>
-                </Show>
+                  </Show>
+                </GridAccordion>
+
+                {/* Group heatmap sub-panel */}
+                <GridAccordion
+                  id="group"
+                  title="Group availability"
+                  collapsed={groupCollapsed()}
+                  onToggle={() => setGroupCollapsed(!groupCollapsed())}
+                  spaced
+                >
+                  <Show
+                    when={heatmapView().days.length > 0 && heatmapView().times.length > 0}
+                    fallback={
+                      <div class="heatmap-empty grid-view__panel-content--title-aligned">
+                        Group availability will appear after someone marks a slot.
+                      </div>
+                    }
+                  >
+                    <div class={`heatmap-grid ${heatmapDayCountClass()}`}>
+                      <div class="heatmap-grid__corner" />
+                      <For each={heatmapView().days}>
+                        {(d) => (
+                          <div class="heatmap-grid__day">{d.label}</div>
+                        )}
+                      </For>
+                      <For each={heatmapView().times}>
+                        {(t, ti) => (
+                          <>
+                            <div class="heatmap-grid__time">{t.label}</div>
+                            <For each={heatmapView().days}>
+                              {(_, di) => {
+                                const h = () => heatmapView().values[ti()]?.[di()] ?? 0
+                                return (
+                                  <div
+                                    classList={{
+                                      'heatmap-grid__cell': true,
+                                      'heatmap-grid__cell--0': h() === 0,
+                                      'heatmap-grid__cell--1': h() === 1,
+                                      'heatmap-grid__cell--2': h() === 2,
+                                      'heatmap-grid__cell--3': h() >= 3,
+                                      'heatmap-grid__cell--first-row': ti() === 0,
+                                      'heatmap-grid__cell--first-col': di() === 0,
+                                    }}
+                                  >
+                                    <span class="heatmap-grid__value">
+                                      {h() > 0 ? h() : ''}
+                                    </span>
+                                  </div>
+                                )
+                              }}
+                            </For>
+                          </>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </GridAccordion>
               </div>
             </div>
           </div>

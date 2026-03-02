@@ -402,6 +402,10 @@ body {
 .grid-view__panel-header--spaced {
   margin-top: 4px;
 }
+.grid-view__panel-body--title,
+.grid-view__panel-content--title-aligned {
+  padding-left: 22px;
+}
 
 /* Editing grid */
 .availability-grid {
@@ -630,7 +634,7 @@ body {
 .heatmap-empty {
   font-size: 14px;
   color: #808080;
-  padding: 4px 2px 4px 22px;
+  padding: 4px 2px;
 }
 
 .results {
@@ -714,7 +718,7 @@ body {
 .results__empty {
   font-size: 14px;
   color: #808080;
-  padding: 4px 2px 4px 22px;
+  padding: 4px 2px;
 }
 .results__row {
   margin-bottom: 4px;
