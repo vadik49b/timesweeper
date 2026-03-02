@@ -716,10 +716,6 @@ export default function Grid(props: Props) {
     await loadFromWorkerInBackground()
   }
 
-  const currentLabel = createMemo(
-    () => participantList().find((p) => p.key === currentName())?.label ?? currentName(),
-  )
-
   const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
   const heatmapView = createMemo(() => {
     const d = days()

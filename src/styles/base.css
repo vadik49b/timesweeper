@@ -168,6 +168,11 @@ body {
   outline: none;
   cursor: pointer;
 }
+.win95-field__control::placeholder {
+  color: var(--text-disabled);
+  -webkit-text-fill-color: var(--text-disabled);
+  opacity: 1;
+}
 .win95-field__control option {
   color: var(--text-primary);
   background: #fff;
