@@ -382,7 +382,7 @@ body {
 }
 
 .grid-view__panel-frame {
-  padding: 4px;
+  padding: 6px 8px 6px 6px;
 }
 
 .grid-view__panel-header {
