@@ -617,21 +617,7 @@
   font-weight: var(--fw-regular);
 }
 
-/* Status & function bars */
-.grid-view__status-bar {
-  margin-top: 5px;
-  font-size: var(--fs-sm);
-}
-.grid-view__status-segment {
-  padding: 2px 5px;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.grid-view__status-segment:last-child {
-  flex: 0 0 auto;
-}
+/* Function bar */
 .grid-view__function-bar {
   display: flex;
   margin-top: 4px;

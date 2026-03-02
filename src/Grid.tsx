@@ -104,12 +104,10 @@ export default function Grid(props: Props) {
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
-  const [statusFlash, setStatusFlash] = createSignal('')
   const [shareCollapsed, setShareCollapsed] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
   let undoStack: UndoEntry[][] = []
-  let statusTimer: ReturnType<typeof setTimeout> | null = null
   let persistTimer: ReturnType<typeof setTimeout> | undefined
   let shareInputRef!: HTMLInputElement
 
@@ -445,7 +443,6 @@ export default function Grid(props: Props) {
     void queueEventSync(updated)
     void flushPendingSync()
     setEvent(updated)
-    flashStatus('Confirmed time updated')
     setActiveModal(null)
   }
 
@@ -461,7 +458,6 @@ export default function Grid(props: Props) {
     void queueEventSync(updated)
     void flushPendingSync()
     setEvent(updated)
-    flashStatus('Confirmation removed')
   }
 
   function closeOpenDialog() {
@@ -472,13 +468,6 @@ export default function Grid(props: Props) {
     }
 
     if (activeModal()) setActiveModal(null)
-  }
-
-  function flashStatus(message: string) {
-    setStatusFlash(message)
-
-    if (statusTimer) clearTimeout(statusTimer)
-    statusTimer = setTimeout(() => setStatusFlash(''), 2000)
   }
 
   function revealSharePanel() {
@@ -504,7 +493,6 @@ export default function Grid(props: Props) {
 
     if (copied) {
       setCopyStatus('Copied to clipboard')
-      flashStatus('Link copied to clipboard')
     } else {
       setCopyStatus('Select and press Command+C')
     }
@@ -578,9 +566,7 @@ export default function Grid(props: Props) {
 
     try {
       await navigator.clipboard.writeText(summary)
-      flashStatus('Summary copied')
     } catch {
-      flashStatus('Copy failed')
     }
   }
 
@@ -787,16 +773,6 @@ export default function Grid(props: Props) {
   const confirmTimeOptions = createMemo(() =>
     times().map((t) => ({ value: t.label, label: t.label })),
   )
-  const statusLeft = createMemo(() => {
-    if (statusFlash()) return statusFlash()
-    const parts = [currentName() ? `Editing: ${currentLabel()}` : 'No participants yet']
-
-    if (confirmedInfo())
-      parts.push(`Confirmed | ${confirmedInfo()!.dayLabel} ${confirmedInfo()!.start}`)
-
-    return parts.join(' | ')
-  })
-
   createEffect(() => {
     if (!isConfirmed() && !activeModal()) {
       return
@@ -1313,12 +1289,6 @@ export default function Grid(props: Props) {
               </div>
             </div>
             {/* /panels */}
-
-            {/* Status bar */}
-            <div class="grid-view__status-bar row">
-              <div class="grid-view__status-segment st">{statusLeft()}</div>
-              <div class="grid-view__status-segment st">timesweeper.app</div>
-            </div>
 
             {/* Function bar */}
             <div class="grid-view__function-bar">
