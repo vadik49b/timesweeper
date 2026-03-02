@@ -358,3 +358,38 @@
   margin-top: 4px;
   display: inline-block;
 }
+
+.dialog--landing-error {
+  width: min(340px, calc(100vw - 16px));
+  max-width: 340px;
+}
+.dialog-body--landing-error {
+  font-size: var(--fs-sm);
+}
+.landing-error__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.landing-error__icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  background: #c00000;
+  color: var(--text-inverse);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+.landing-error__text {
+  margin: 1px 0 0;
+  line-height: 1.35;
+}
+.landing-error__actions {
+  justify-content: center;
+  margin-top: 12px;
+}

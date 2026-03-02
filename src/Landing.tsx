@@ -1,10 +1,11 @@
-import { createSignal, createMemo, createEffect, onMount, For, Index } from 'solid-js'
+import { createSignal, createMemo, createEffect, onMount, For, Index, Show } from 'solid-js'
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from './db'
 import { publishEventNow, queueEventSync, flushPendingSync } from './sync'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
+import Win95Dialog from './components/Win95Dialog'
 import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
 
@@ -54,6 +55,7 @@ export default function Landing(props: Props) {
   const [timeEnd, setTimeEnd] = createSignal('18:00')
   const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
   const [pendingParticipantFocus, setPendingParticipantFocus] = createSignal<number | null>(null)
+  const [validationError, setValidationError] = createSignal('')
   const participantInputRefs: HTMLInputElement[] = []
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -165,18 +167,26 @@ export default function Landing(props: Props) {
 
   async function create() {
     if (!eventName().trim()) {
+      setValidationError('Please enter an event name.')
       return
     }
     const dates = Object.keys(selectedDates()).sort()
     if (dates.length === 0) {
+      setValidationError('Please pick at least one date.')
+      return
+    }
+    if (timeStart() >= timeEnd()) {
+      setValidationError('Please choose a valid time range (start must be before end).')
       return
     }
     const participantNames = participants()
       .map((p) => p.trim())
       .filter(Boolean)
     if (participantNames.length === 0) {
+      setValidationError('Please add at least one participant.')
       return
     }
+    setValidationError('')
     const timeRange = { start: timeStart(), end: timeEnd() }
     const spd = computeTimeSlots(timeRange).length
     const event: AppEvent = {
@@ -437,6 +447,25 @@ export default function Landing(props: Props) {
           timesweeper.app
         </span>
       </div>
+
+      <Show when={!!validationError()}>
+        <Win95Dialog
+          title="Validation Error"
+          class="dialog--landing-error"
+          bodyClass="dialog-body--landing-error"
+          onClose={() => setValidationError('')}
+        >
+          <div class="landing-error__row">
+            <span class="landing-error__icon" aria-hidden="true">✖</span>
+            <p class="landing-error__text">{validationError()}</p>
+          </div>
+          <div class="dialog-buttons landing-error__actions">
+            <Win95Button class="dialog-btn" onClick={() => setValidationError('')}>
+              OK
+            </Win95Button>
+          </div>
+        </Win95Dialog>
+      </Show>
 
     </div>
   )
