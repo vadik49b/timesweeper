@@ -205,22 +205,7 @@
   height: 22px;
 }
 .availability-grid__day {
-  text-align: center;
-  font-size: 11px;
-  font-weight: bold;
-  padding: 2px 0 4px;
-  color: #000;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.availability-grid__time {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 3px;
-  font-size: 10px;
-  color: var(--text-muted);
-  height: var(--cell);
+  height: 22px;
 }
 .availability-grid__cell {
   appearance: none;
@@ -276,9 +261,11 @@
 
 .grid-view__legend {
   gap: 3px;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  padding: 3px 0 5px;
+  padding-left: 38px;
+  margin-top: 8px;
+  margin-bottom: 6px;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -332,13 +319,19 @@
   height: 16px;
 }
 .heatmap-grid__day {
+  height: 16px;
+}
+.availability-grid__day,
+.heatmap-grid__day {
   text-align: center;
   font-size: 11px;
   padding: 2px 0;
   color: var(--text-muted);
+  font-weight: normal;
   white-space: nowrap;
   overflow: hidden;
 }
+.availability-grid__time,
 .heatmap-grid__time {
   display: flex;
   align-items: center;
@@ -346,6 +339,11 @@
   padding-right: 3px;
   font-size: 10px;
   color: var(--text-subtle);
+}
+.availability-grid__time {
+  height: var(--cell);
+}
+.heatmap-grid__time {
   height: var(--hm-cell);
 }
 .heatmap-grid__cell {
@@ -493,21 +491,9 @@
 .results__maybe-mark {
   color: #ff0000;
 }
-.results__confirm-btn {
-  font-size: 12px;
-  padding: 2px 8px;
-  min-width: 0;
-  flex-shrink: 0;
-}
 .results__custom {
   margin-top: 6px;
   padding: 3px 4px;
-}
-.results__custom-btn {
-  font-size: 13px;
-  padding: 3px 10px;
-  min-width: 0;
-  display: inline-block;
 }
 
 .dialog--help {

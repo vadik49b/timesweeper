@@ -974,7 +974,6 @@ export default function Grid(props: Props) {
                                 </div>
                                 <Win95Button
                                   size="small"
-                                  class="dialog-btn results__confirm-btn"
                                   onClick={() => openConfirm(slot.day, slot.time)}
                                 >
                                   <span class="hk">C</span>onfirm
@@ -985,7 +984,7 @@ export default function Grid(props: Props) {
                         </For>
                         <div class="results__custom">
                           <Win95Button
-                            class="dialog-btn results__custom-btn"
+                            size="small"
                             onClick={() => openConfirm(null, null)}
                           >
                             Pick a different time...
