@@ -24,13 +24,19 @@ export function useGridState(args: UseGridStateArgs) {
 
   const days = createMemo(() => {
     const ev = args.event()
-    if (!ev) return []
+    if (!ev) {
+      return []
+    }
+
     return ev.dates.map((ds) => ({ key: ds, label: formatDateLabel(ds) }))
   })
 
   const times = createMemo(() => {
     const ev = args.event()
-    if (!ev) return []
+    if (!ev) {
+      return []
+    }
+
     return computeTimeSlots(ev.timeRange)
   })
 
@@ -41,7 +47,10 @@ export function useGridState(args: UseGridStateArgs) {
     const spd = slotsPerDay(ev)
     const result: Record<string, Record<string, number[]>> = {}
     ev.participants.forEach((p) => {
-      if (p.name === cur) return
+      if (p.name === cur) {
+        return
+      }
+
       result[p.name] = flatToRecord(p.slots, ev.dates, spd)
     })
     return result
@@ -49,7 +58,10 @@ export function useGridState(args: UseGridStateArgs) {
 
   const participantList = createMemo(() => {
     const ev = args.event()
-    if (!ev) return []
+    if (!ev) {
+      return []
+    }
+
     return ev.participants.map((p) => ({ key: p.name, label: p.name }))
   })
 
@@ -70,12 +82,19 @@ export function useGridState(args: UseGridStateArgs) {
   function heat(dk: string, ti: number) {
     let c = 0
     const m = myState[dk]?.[ti] ?? 0
-    if (m === 1) c += 1
-    else if (m === 2) c += 0.5
+    if (m === 1) {
+      c += 1
+    } else if (m === 2) {
+      c += 0.5
+    }
+
     Object.values(others()).forEach((p) => {
       const v = p[dk]?.[ti] ?? 0
-      if (v === 1) c += 1
-      else if (v === 2) c += 0.5
+      if (v === 1) {
+        c += 1
+      } else if (v === 2) {
+        c += 0.5
+      }
     })
     return Math.round(c)
   }
@@ -97,7 +116,10 @@ export function useGridState(args: UseGridStateArgs) {
   const totalParticipants = createMemo(() => args.event()?.participants.length ?? 0)
   const participantsWithAvailability = createMemo(() => {
     const ev = args.event()
-    if (!ev) return 0
+    if (!ev) {
+      return 0
+    }
+
     const spd = slotsPerDay(ev)
     return ev.participants.filter((p) => {
       if (p.name === args.currentName()) {
@@ -109,10 +131,16 @@ export function useGridState(args: UseGridStateArgs) {
   const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
 
   function cycleCell(dk: string, ti: number) {
-    if (args.isConfirmed()) return
+    if (args.isConfirmed()) {
+      return
+    }
+
     const prev = myState[dk]?.[ti] ?? 0
     const next = (prev + 1) % 3
-    if (prev === next) return
+    if (prev === next) {
+      return
+    }
+
     undoStack.push([{ dk, ti, prev }])
     setMyState(dk, ti, next)
     if (navigator.vibrate) navigator.vibrate(10)
@@ -120,14 +148,22 @@ export function useGridState(args: UseGridStateArgs) {
   }
 
   function doUndo() {
-    if (args.isConfirmed()) return
-    if (!undoStack.length) return
+    if (args.isConfirmed()) {
+      return
+    }
+
+    if (!undoStack.length) {
+      return
+    }
+
     const batch = undoStack.pop()!
     batch.forEach((u) => setMyState(u.dk, u.ti, u.prev))
     args.onSlotsChanged()
   }
 
-  const dayCountClass = createMemo(() => `grid-table--days-${Math.min(Math.max(days().length, 1), 7)}`)
+  const dayCountClass = createMemo(
+    () => `grid-table--days-${Math.min(Math.max(days().length, 1), 7)}`,
+  )
 
   const heatmapView = createMemo(() => {
     const d = days()
@@ -142,11 +178,25 @@ export function useGridState(args: UseGridStateArgs) {
 
     values.forEach((row, ri) => {
       row.forEach((value, ci) => {
-        if (value <= 0) return
-        if (ri < minRow) minRow = ri
-        if (ri > maxRow) maxRow = ri
-        if (ci < minCol) minCol = ci
-        if (ci > maxCol) maxCol = ci
+        if (value <= 0) {
+          return
+        }
+
+        if (ri < minRow) {
+          minRow = ri
+        }
+
+        if (ri > maxRow) {
+          maxRow = ri
+        }
+
+        if (ci < minCol) {
+          minCol = ci
+        }
+
+        if (ci > maxCol) {
+          maxCol = ci
+        }
       })
     })
 
@@ -162,8 +212,12 @@ export function useGridState(args: UseGridStateArgs) {
   const heatmapDayCountClass = createMemo(
     () => `heatmap-grid--days-${Math.min(Math.max(heatmapView().days.length, 1), 7)}`,
   )
-  const confirmDayOptions = createMemo(() => days().map((d) => ({ value: d.label, label: d.label })))
-  const confirmTimeOptions = createMemo(() => times().map((t) => ({ value: t.label, label: t.label })))
+  const confirmDayOptions = createMemo(() =>
+    days().map((d) => ({ value: d.label, label: d.label })),
+  )
+  const confirmTimeOptions = createMemo(() =>
+    times().map((t) => ({ value: t.label, label: t.label })),
+  )
   const currentLabel = createMemo(
     () => participantList().find((p) => p.key === args.currentName())?.label ?? args.currentName(),
   )

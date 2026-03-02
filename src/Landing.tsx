@@ -69,7 +69,10 @@ export default function Landing(props: Props) {
       month = calMonth()
     const first = new Date(year, month, 1)
     let startDow = first.getDay() - 1
-    if (startDow < 0) startDow = 6
+    if (startDow < 0) {
+      startDow = 6
+    }
+
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     const days: {
       day: number | null
@@ -96,7 +99,10 @@ export default function Landing(props: Props) {
 
   const selectedDateLabels = createMemo(() => {
     const keys = Object.keys(selectedDates()).sort()
-    if (keys.length === 0) return 'No dates selected'
+    if (keys.length === 0) {
+      return 'No dates selected'
+    }
+
     const labels = keys.map((ds) => {
       const [y, m, d] = ds.split('-').map(Number)
       const dt = new Date(y, m - 1, d)
@@ -127,7 +133,10 @@ export default function Landing(props: Props) {
       delete next[ds]
       setSelectedDates(next)
     } else {
-      if (Object.keys(cur).length >= 7) return
+      if (Object.keys(cur).length >= 7) {
+        return
+      }
+
       setSelectedDates({ ...cur, [ds]: true })
     }
   }
@@ -142,7 +151,10 @@ export default function Landing(props: Props) {
   }
 
   function removeParticipant(i: number) {
-    if (i === 0 || participants().length <= 1) return
+    if (i === 0 || participants().length <= 1) {
+      return
+    }
+
     setParticipants(participants().filter((_, idx) => idx !== i))
   }
 
@@ -154,11 +166,17 @@ export default function Landing(props: Props) {
 
   createEffect(() => {
     const idx = pendingParticipantFocus()
-    if (idx === null) return
+    if (idx === null) {
+      return
+    }
+
     participants()
     queueMicrotask(() => {
       const input = participantInputRefs[idx]
-      if (!input) return
+      if (!input) {
+        return
+      }
+
       input.focus()
       input.select()
       setPendingParticipantFocus(null)
@@ -365,7 +383,12 @@ export default function Landing(props: Props) {
                   onInput={(value) => updateParticipant(i, value)}
                 />
                 {i > 0 && (
-                  <Win95Button size="small" variant="icon" class="p-rm" onClick={() => removeParticipant(i)}>
+                  <Win95Button
+                    size="small"
+                    variant="icon"
+                    class="p-rm"
+                    onClick={() => removeParticipant(i)}
+                  >
                     x <span class="sr-only">Remove participant {i + 1}</span>
                   </Win95Button>
                 )}
@@ -400,7 +423,9 @@ export default function Landing(props: Props) {
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>
-            <div class="how-text">Confirm a time — it's locked in and visible to everyone who opens the link</div>
+            <div class="how-text">
+              Confirm a time — it's locked in and visible to everyone who opens the link
+            </div>
           </div>
         </div>
       </div>
@@ -443,9 +468,7 @@ export default function Landing(props: Props) {
       <div class="footer">
         No accounts | No tracking | Local-first
         <br />
-        <span class="footer-links">
-          timesweeper.app
-        </span>
+        <span class="footer-links">timesweeper.app</span>
       </div>
 
       <Show when={!!validationError()}>
@@ -456,7 +479,9 @@ export default function Landing(props: Props) {
           onClose={() => setValidationError('')}
         >
           <div class="landing-error__row">
-            <span class="landing-error__icon" aria-hidden="true">✖</span>
+            <span class="landing-error__icon" aria-hidden="true">
+              ✖
+            </span>
             <p class="landing-error__text">{validationError()}</p>
           </div>
           <div class="dialog-buttons landing-error__actions">
@@ -466,7 +491,6 @@ export default function Landing(props: Props) {
           </div>
         </Win95Dialog>
       </Show>
-
     </div>
   )
 }

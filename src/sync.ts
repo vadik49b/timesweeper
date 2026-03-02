@@ -79,7 +79,10 @@ export async function queueEventSync(event: AppEvent): Promise<void> {
 }
 
 export async function publishEventNow(event: AppEvent): Promise<boolean> {
-  if (!navigator.onLine) return false
+  if (!navigator.onLine) {
+    return false
+  }
+
   try {
     const resp = await fetch(`${apiBase()}/events/${encodeURIComponent(event.id)}`, {
       method: 'PUT',
@@ -95,7 +98,10 @@ export async function publishEventNow(event: AppEvent): Promise<boolean> {
 let flushing = false
 
 export async function flushPendingSync(): Promise<void> {
-  if (flushing || !navigator.onLine) return
+  if (flushing || !navigator.onLine) {
+    return
+  }
+
   flushing = true
   try {
     const pending = await listPendingSyncOps()
@@ -124,7 +130,10 @@ export async function pullRemoteEvent(eventId: string): Promise<AppEvent | null>
   } finally {
     window.clearTimeout(timeoutId)
   }
-  if (resp.status === 404) return null
+  if (resp.status === 404) {
+    return null
+  }
+
   if (!resp.ok) throw new Error(`pull event failed: ${resp.status}`)
   return (await resp.json()) as AppEvent
 }

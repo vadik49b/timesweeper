@@ -38,7 +38,10 @@ const ALLOWED_ORIGINS = new Set([
 ])
 
 function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return true
+  if (!origin) {
+    return true
+  }
+
   return ALLOWED_ORIGINS.has(origin)
 }
 
@@ -197,8 +200,7 @@ export class EventRoom {
       return json({ error: 'method_not_allowed' }, request, 405)
     }
 
-    if (request.method !== 'PUT')
-      return json({ error: 'method_not_allowed' }, request, 405)
+    if (request.method !== 'PUT') return json({ error: 'method_not_allowed' }, request, 405)
     const body = await readJson<{
       slots?: SlotValue[]
       baseVersion?: number
@@ -232,7 +234,10 @@ export class EventRoom {
       return json({ error: 'invalid_slots_length' }, request, 400)
     }
     const nextSlots: SlotValue[] = slots.map((value) => {
-      if (value === 1 || value === 2) return value
+      if (value === 1 || value === 2) {
+        return value
+      }
+
       return 0
     })
 

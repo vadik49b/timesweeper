@@ -1,6 +1,7 @@
 import { createSignal, Show, onMount, onCleanup } from 'solid-js'
 import Landing from './Landing'
 import Grid from './Grid'
+import { touchEventRecent } from './db'
 
 function parseEventIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/e\/([^/]+)$/)
@@ -12,18 +13,35 @@ export default function App() {
     parseEventIdFromPath(window.location.pathname),
   )
 
+  function touchRecentSilently(id: string | null) {
+    if (!id) {
+      return
+    }
+
+    queueMicrotask(() => {
+      touchEventRecent(id).catch(() => {})
+    })
+  }
+
   function navigateToEvent(id: string) {
     const nextPath = `/e/${encodeURIComponent(id)}`
     if (window.location.pathname !== nextPath) {
       window.history.pushState({ eventId: id }, '', nextPath)
     }
+
     setEventId(id)
+    touchRecentSilently(id)
   }
 
   onMount(() => {
     const onPopState = () => {
-      setEventId(parseEventIdFromPath(window.location.pathname))
+      const id = parseEventIdFromPath(window.location.pathname)
+      setEventId(id)
+      touchRecentSilently(id)
     }
+
+    const initialId = parseEventIdFromPath(window.location.pathname)
+    touchRecentSilently(initialId)
     window.addEventListener('popstate', onPopState)
     onCleanup(() => window.removeEventListener('popstate', onPopState))
   })

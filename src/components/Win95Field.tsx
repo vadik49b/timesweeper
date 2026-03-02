@@ -40,7 +40,10 @@ export default function Win95Field(props: Props) {
   let selectEl: HTMLSelectElement | undefined
 
   function openSelectMenu() {
-    if (!selectEl) return
+    if (!selectEl) {
+      return
+    }
+
     selectEl.focus()
     const picker = selectEl as HTMLSelectElement & { showPicker?: () => void }
     if (picker.showPicker) {
@@ -51,11 +54,7 @@ export default function Win95Field(props: Props) {
   }
 
   const wrapperClass = () =>
-    [
-      'win95-field',
-      `win95-field--${props.size ?? 'normal'}`,
-      props.wrapperClass,
-    ]
+    ['win95-field', `win95-field--${props.size ?? 'normal'}`, props.wrapperClass]
       .filter(Boolean)
       .join(' ')
   const frameClass = () =>
@@ -92,7 +91,10 @@ export default function Win95Field(props: Props) {
           <div class="win95-field__select-wrap">
             <select
               ref={(el) => {
-                if (props.kind !== 'select') return
+                if (props.kind !== 'select') {
+                  return
+                }
+
                 selectEl = el
                 props.selectRef?.(el)
               }}

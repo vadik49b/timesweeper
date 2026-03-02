@@ -12,7 +12,8 @@ interface Props {
 export default function Win95Dialog(props: Props) {
   const dialogClass = () => ['dialog', 'r', props.class].filter(Boolean).join(' ')
   const dialogBodyClass = () => ['dialog-body', props.bodyClass].filter(Boolean).join(' ')
-  const dialogTitleId = () => `dialog-title-${props.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  const dialogTitleId = () =>
+    `dialog-title-${props.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
   return (
     <div class="dialog-overlay" role="presentation">

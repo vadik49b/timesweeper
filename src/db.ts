@@ -9,7 +9,12 @@ interface TimeSweeper extends DBSchema {
   }
   localState: {
     key: string
-    value: { eventId: string; participantName: string; publishedAt?: number | null }
+    value: {
+      eventId: string
+      participantName: string
+      publishedAt?: number | null
+      recentAt?: number | null
+    }
   }
   pendingSync: {
     key: number
@@ -35,6 +40,29 @@ export type SyncOp =
   | { kind: 'event'; payload: EventSyncPayload; createdAt: number }
 
 let dbp: Promise<IDBPDatabase<TimeSweeper>> | null = null
+const MAX_LOCAL_EVENTS = 5
+
+function eventRecency(event: AppEvent, row?: { recentAt?: number | null }) {
+  return row?.recentAt ?? event.created
+}
+
+async function pruneStoredEvents(db: IDBPDatabase<TimeSweeper>): Promise<void> {
+  const [events, states] = await Promise.all([db.getAll('events'), db.getAll('localState')])
+  if (events.length <= MAX_LOCAL_EVENTS) {
+    return
+  }
+
+  const stateById = new Map(states.map((s) => [s.eventId, s]))
+  const ranked = events
+    .map((event) => ({ event, score: eventRecency(event, stateById.get(event.id)) }))
+    .sort((a, b) => b.score - a.score)
+  const keepIds = new Set(ranked.slice(0, MAX_LOCAL_EVENTS).map((r) => r.event.id))
+  await Promise.all(
+    events
+      .filter((event) => !keepIds.has(event.id))
+      .flatMap((event) => [db.delete('events', event.id), db.delete('localState', event.id)]),
+  )
+}
 
 function getDB() {
   if (!dbp) {
@@ -44,9 +72,11 @@ function getDB() {
           const store = db.createObjectStore('events', { keyPath: 'id' })
           store.createIndex('by-created', 'created')
         }
+
         if (!db.objectStoreNames.contains('localState')) {
           db.createObjectStore('localState', { keyPath: 'eventId' })
         }
+
         if (!db.objectStoreNames.contains('pendingSync')) {
           const pending = db.createObjectStore('pendingSync', {
             keyPath: 'id',
@@ -62,7 +92,16 @@ function getDB() {
 
 export async function saveEvent(event: AppEvent): Promise<void> {
   const db = await getDB()
+  const now = Date.now()
   await db.put('events', event)
+  const existing = await db.get('localState', event.id)
+  await db.put('localState', {
+    eventId: event.id,
+    participantName: existing?.participantName ?? '',
+    publishedAt: existing?.publishedAt ?? null,
+    recentAt: now,
+  })
+  await pruneStoredEvents(db)
 }
 
 export async function getEvent(id: string): Promise<AppEvent | undefined> {
@@ -72,8 +111,11 @@ export async function getEvent(id: string): Promise<AppEvent | undefined> {
 
 export async function listEvents(): Promise<AppEvent[]> {
   const db = await getDB()
-  const all = await db.getAllFromIndex('events', 'by-created')
-  return all.reverse()
+  const [events, states] = await Promise.all([db.getAll('events'), db.getAll('localState')])
+  const stateById = new Map(states.map((s) => [s.eventId, s]))
+  return events
+    .sort((a, b) => eventRecency(b, stateById.get(b.id)) - eventRecency(a, stateById.get(a.id)))
+    .slice(0, MAX_LOCAL_EVENTS)
 }
 
 export async function updateParticipantSlots(
@@ -85,11 +127,15 @@ export async function updateParticipantSlots(
 ): Promise<void> {
   const db = await getDB()
   const event = await db.get('events', eventId)
-  if (!event) return
+  if (!event) {
+    return
+  }
+
   const idx = event.participants.findIndex((p) => p.name === name)
   if (idx !== -1) {
     event.participants[idx] = { ...event.participants[idx], slots, updatedAt, version }
   }
+
   await db.put('events', event)
 }
 
@@ -109,6 +155,7 @@ export async function setSelectedParticipant(
     eventId,
     participantName,
     publishedAt: existing?.publishedAt ?? null,
+    recentAt: existing?.recentAt ?? null,
   })
 }
 
@@ -125,7 +172,20 @@ export async function setPublishedAt(eventId: string, publishedAt: number): Prom
     eventId,
     participantName: existing?.participantName ?? '',
     publishedAt,
+    recentAt: existing?.recentAt ?? null,
   })
+}
+
+export async function touchEventRecent(eventId: string): Promise<void> {
+  const db = await getDB()
+  const existing = await db.get('localState', eventId)
+  await db.put('localState', {
+    eventId,
+    participantName: existing?.participantName ?? '',
+    publishedAt: existing?.publishedAt ?? null,
+    recentAt: Date.now(),
+  })
+  await pruneStoredEvents(db)
 }
 
 export async function enqueueSyncOp(op: SyncOp): Promise<number> {
@@ -147,7 +207,10 @@ export async function removePendingSyncOp(id: number): Promise<void> {
 export async function hasPendingSyncForEvent(eventId: string): Promise<boolean> {
   const pending = await listPendingSyncOps()
   return pending.some((op) => {
-    if (op.kind === 'event') return op.payload.event.id === eventId
+    if (op.kind === 'event') {
+      return op.payload.event.id === eventId
+    }
+
     return op.payload.eventId === eventId
   })
 }

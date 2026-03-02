@@ -102,3 +102,12 @@ Participant {
 2. Consolidate event mutation helpers (confirm, merge, slot update)
 3. Share model contracts between frontend and worker to prevent drift
 4. Keep button/field behavior in shared components only
+
+## Code Style
+
+- Never use one-line `if` statements.
+- Always use braces for `if` / `else if` / `else` blocks, even for a single statement.
+- After a closing curly brace `}`, add a blank line before the next statement (except where syntax requires adjacency, like `} else {`).
+- Do not silence async errors with call-site `void` patterns; handle ignored errors inside helper functions with explicit `try/catch`.
+- Use BEM naming for CSS classes: `block`, `block__element`, `block--modifier` (kebab-case only).
+- Keep utility helpers explicit (for example `u-*`), and do not mix utility naming into component block names.
