@@ -6,6 +6,7 @@ const Grid = lazy(() => import('./Grid'))
 
 function parseEventIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/e\/([^/]+)$/)
+
   return match ? decodeURIComponent(match[1]) : null
 }
 
@@ -26,6 +27,7 @@ export default function App() {
 
   function navigateToEvent(id: string) {
     const nextPath = `/e/${encodeURIComponent(id)}`
+
     if (window.location.pathname !== nextPath) {
       window.history.pushState({ eventId: id }, '', nextPath)
     }

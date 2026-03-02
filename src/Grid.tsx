@@ -45,6 +45,7 @@ export default function Grid(props: Props) {
 
   const days = createMemo(() => {
     const ev = event()
+
     if (!ev) {
       return []
     }
@@ -54,6 +55,7 @@ export default function Grid(props: Props) {
 
   const times = createMemo(() => {
     const ev = event()
+
     if (!ev) {
       return []
     }
@@ -67,6 +69,7 @@ export default function Grid(props: Props) {
   // Read-only slots for all other participants
   const others = createMemo(() => {
     const ev = event()
+
     if (!ev) return {}
     const cur = currentName()
     const spd = slotsPerDay(ev)
@@ -78,11 +81,13 @@ export default function Grid(props: Props) {
 
       result[p.name] = flatToRecord(p.slots, ev.dates, spd)
     })
+
     return result
   })
 
   const participantList = createMemo(() => {
     const ev = event()
+
     if (!ev) {
       return []
     }
@@ -120,6 +125,7 @@ export default function Grid(props: Props) {
     const wrapped = ((total % 1440) + 1440) % 1440
     const oh = Math.floor(wrapped / 60)
     const om = wrapped % 60
+
     return `${String(oh).padStart(2, '0')}:${String(om).padStart(2, '0')}`
   }
 
@@ -128,6 +134,7 @@ export default function Grid(props: Props) {
     const [h, mm] = hhmm.split(':').map(Number)
     const dt = new Date(Date.UTC(y, m - 1, d, h, mm, 0))
     const stamp = dt.toISOString().replace(/[-:]/g, '')
+
     return stamp.slice(0, 15) + 'Z'
   }
 
@@ -147,6 +154,7 @@ export default function Grid(props: Props) {
   function heat(dk: string, ti: number) {
     let c = 0
     const m = myState[dk]?.[ti] ?? 0
+
     if (m === 1) {
       c += 1
     } else if (m === 2) {
@@ -155,17 +163,20 @@ export default function Grid(props: Props) {
 
     Object.values(others()).forEach((p) => {
       const v = p[dk]?.[ti] ?? 0
+
       if (v === 1) {
         c += 1
       } else if (v === 2) {
         c += 0.5
       }
     })
+
     return Math.round(c)
   }
 
   function slotContributorCount(dk: string, ti: number) {
     let count = 0
+
     if ((myState[dk]?.[ti] ?? 0) > 0) {
       count += 1
     }
@@ -175,6 +186,7 @@ export default function Grid(props: Props) {
         count += 1
       }
     })
+
     return count
   }
 
@@ -186,26 +198,31 @@ export default function Grid(props: Props) {
       t.forEach((slot, ti) => {
         const h = heat(day.key, ti)
         const contributors = slotContributorCount(day.key, ti)
+
         if (h > 0 && contributors >= 2)
           slots.push({ day: day.label, time: slot.label, score: h, dk: day.key, ti })
       }),
     )
     slots.sort((a, b) => b.score - a.score)
+
     return slots.slice(0, 3)
   })
 
   const totalParticipants = createMemo(() => event()?.participants.length ?? 0)
   const participantsWithAvailability = createMemo(() => {
     const ev = event()
+
     if (!ev) {
       return 0
     }
 
     const spd = slotsPerDay(ev)
+
     return ev.participants.filter((p) => {
       if (p.name === currentName()) {
         return recordToFlat(myState, ev.dates, spd).some((v) => v > 0)
       }
+
       return p.slots.some((v) => v > 0)
     }).length
   })
@@ -214,6 +231,7 @@ export default function Grid(props: Props) {
   function loadParticipantSlots(ev: AppEvent, name: string) {
     const spd = slotsPerDay(ev)
     const p = ev.participants.find((pp) => pp.name === name)
+
     if (p) {
       setMyState(reconcile(flatToRecord(p.slots, ev.dates, spd)))
     } else {
@@ -229,20 +247,24 @@ export default function Grid(props: Props) {
     const localByName = new Map(local.participants.map((p) => [p.name, p]))
     const mergedParticipants = remote.participants.map((rp) => {
       const lp = localByName.get(rp.name)
+
       if (!lp) {
         return rp
       }
 
       const lv = lp.version ?? 0
       const rv = rp.version ?? 0
+
       if (lv !== rv) {
         return lv > rv ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
       }
       const lu = lp.updatedAt ?? 0
       const ru = rp.updatedAt ?? 0
+
       return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
     })
     const mergedRemote: AppEvent = { ...remote, participants: mergedParticipants }
+
     return {
       ...mergedRemote,
       dates: local.dates,
@@ -253,18 +275,22 @@ export default function Grid(props: Props) {
 
   async function applyRemoteEvent(remote: AppEvent) {
     const local = event()
+
     if (!local) {
       setEvent(remote)
       const selected = currentName()
+
       if (selected && remote.participants.some((p) => p.name === selected)) {
         loadParticipantSlots(remote, selected)
       }
       void saveEvent(remote).catch(() => {})
+
       return
     }
     const next = mergeRemoteIntoLocal(local, remote)
     setEvent(next)
     const selected = currentName()
+
     if (selected && next.participants.some((p) => p.name === selected)) {
       loadParticipantSlots(next, selected)
     }
@@ -279,21 +305,25 @@ export default function Grid(props: Props) {
     version: number,
   ) {
     const ev = event()
+
     if (!ev || ev.id !== eventId) {
       return
     }
 
     const idx = ev.participants.findIndex((p) => p.name === participantName)
+
     if (idx === -1) {
       return
     }
 
     const currentVersion = ev.participants[idx].version ?? 0
+
     if (currentVersion > version) {
       return
     }
 
     const currentUpdated = ev.participants[idx].updatedAt ?? 0
+
     if (currentVersion === version && currentUpdated >= updatedAt) {
       return
     }
@@ -306,6 +336,7 @@ export default function Grid(props: Props) {
     }
     await saveEvent(updated)
     setEvent(updated)
+
     if (participantName === currentName()) {
       loadParticipantSlots(updated, participantName)
     }
@@ -313,6 +344,7 @@ export default function Grid(props: Props) {
 
   async function persistCurrentSlots() {
     const ev = event()
+
     if (!ev || !currentName()) {
       return
     }
@@ -320,10 +352,12 @@ export default function Grid(props: Props) {
     const spd = slotsPerDay(ev)
     const flat = recordToFlat(myState, ev.dates, spd)
     const prevFlat = ev.participants.find((p) => p.name === currentName())?.slots ?? []
+
     if (
       prevFlat.length === flat.length &&
       prevFlat.every((value, index) => value === (flat[index] ?? 0))
     )
+
       return
     const updatedAt = Date.now()
     const prevVersion = ev.participants.find((p) => p.name === currentName())?.version ?? 0
@@ -351,12 +385,14 @@ export default function Grid(props: Props) {
 
     const prev = myState[dk]?.[ti] ?? 0
     const next = (prev + 1) % 3
+
     if (prev === next) {
       return
     }
 
     undoStack.push([{ dk, ti, prev }])
     setMyState(dk, ti, next)
+
     if (navigator.vibrate) navigator.vibrate(10)
     schedulePersist()
   }
@@ -383,12 +419,14 @@ export default function Grid(props: Props) {
 
   function doConfirm() {
     const ev = event()
+
     if (!ev) {
       return
     }
 
     const day = days().find((d) => d.label === confirmDay())
     const time = times().find((t) => t.label === confirmTime())
+
     if (!day || !time) {
       return
     }
@@ -412,6 +450,7 @@ export default function Grid(props: Props) {
 
   function undoConfirmedTime() {
     const ev = event()
+
     if (!ev) {
       return
     }
@@ -427,13 +466,16 @@ export default function Grid(props: Props) {
   function closeOpenDialog() {
     if (activeModal() === 'name-picker' && !event()) {
       goToLanding()
+
       return
     }
+
     if (activeModal()) setActiveModal(null)
   }
 
   function flashStatus(message: string) {
     setStatusFlash(message)
+
     if (statusTimer) clearTimeout(statusTimer)
     statusTimer = setTimeout(() => setStatusFlash(''), 2000)
   }
@@ -455,8 +497,10 @@ export default function Grid(props: Props) {
     } catch {
       shareInputRef.focus()
       shareInputRef.select()
+
       if (document.execCommand) copied = document.execCommand('copy')
     }
+
     if (copied) {
       setCopyStatus('Copied to clipboard')
       flashStatus('Link copied to clipboard')
@@ -470,6 +514,7 @@ export default function Grid(props: Props) {
 
   const confirmedInfo = createMemo(() => {
     const ev = event()
+
     if (!ev || ev.status !== 'confirmed' || !ev.confirmedSlot) {
       return null
     }
@@ -478,6 +523,7 @@ export default function Grid(props: Props) {
     const start =
       times().find((t) => t.value === ev.confirmedSlot!.startTime)?.label ??
       ev.confirmedSlot.startTime
+
     return {
       dayLabel,
       start,
@@ -488,6 +534,7 @@ export default function Grid(props: Props) {
 
   const confirmedPickedLine = createMemo(() => {
     const info = confirmedInfo()
+
     if (!info) {
       return ''
     }
@@ -496,6 +543,7 @@ export default function Grid(props: Props) {
   })
   const participantsLine = createMemo(() => {
     const ev = event()
+
     if (!ev) {
       return ''
     }
@@ -505,11 +553,13 @@ export default function Grid(props: Props) {
   const summaryDetailsText = createMemo(() => {
     const ev = event()
     const info = confirmedInfo()
+
     if (!ev || !info) {
       return ''
     }
 
     const end = times().find((t) => t.value === info.slot.endTime)?.label ?? info.slot.endTime
+
     return [
       `Event: ${ev.name}`,
       `Created by: ${createdByName()}`,
@@ -520,6 +570,7 @@ export default function Grid(props: Props) {
 
   async function copyConfirmedSummary() {
     const summary = summaryDetailsText()
+
     if (!summary) {
       return
     }
@@ -535,6 +586,7 @@ export default function Grid(props: Props) {
   function downloadIcs() {
     const info = confirmedInfo()
     const ev = event()
+
     if (!info || !ev) {
       return
     }
@@ -576,12 +628,14 @@ export default function Grid(props: Props) {
 
   async function selectParticipant(name: string) {
     const ev = event()
+
     if (!ev) {
       return
     }
 
     const now = Date.now()
     const idx = ev.participants.findIndex((p) => p.name === name)
+
     if (idx === -1) {
       return
     }
@@ -600,18 +654,22 @@ export default function Grid(props: Props) {
 
   async function addParticipantFromPicker() {
     const trimmed = newParticipantName().trim()
+
     if (!trimmed) {
       return
     }
 
     const ev = event()
+
     if (!ev || ev.participants.length >= ev.maxParticipants) {
       return
     }
 
     const existing = ev.participants.find((p) => p.name.toLowerCase() === trimmed.toLowerCase())
+
     if (existing) {
       await selectParticipant(existing.name)
+
       return
     }
 
@@ -639,6 +697,7 @@ export default function Grid(props: Props) {
   async function initializeSelectedParticipant(ev: AppEvent) {
     const savedName = await getSelectedParticipant(ev.id)
     const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
+
     if (savedName && exists) {
       loadParticipantSlots(ev, savedName)
       setCurrentName(savedName)
@@ -651,10 +710,12 @@ export default function Grid(props: Props) {
   async function loadFromWorkerInBackground() {
     try {
       const remote = await pullRemoteEvent(props.eventId)
+
       if (remote) {
         await applyRemoteEvent(remote)
         void initializeSelectedParticipant(remote)
         setLoadError('none')
+
         return
       }
       setLoadError('not-found')
@@ -677,6 +738,7 @@ export default function Grid(props: Props) {
     const d = days()
     const t = times()
     const values = t.map((_, ti) => d.map((day) => heat(day.key, ti)))
+
     if (d.length === 0 || t.length === 0) return { days: d, times: t, values }
 
     let minRow = t.length
@@ -709,6 +771,7 @@ export default function Grid(props: Props) {
     })
 
     // Hide the heatmap entirely when everyone is completely unavailable.
+
     if (maxRow === -1 || maxCol === -1) return { days: [], times: [], values: [] as number[][] }
 
     return {
@@ -726,8 +789,10 @@ export default function Grid(props: Props) {
   const statusLeft = createMemo(() => {
     if (statusFlash()) return statusFlash()
     const parts = [currentName() ? `Editing: ${currentLabel()}` : 'No participants yet']
+
     if (confirmedInfo())
       parts.push(`Confirmed | ${confirmedInfo()!.dayLabel} ${confirmedInfo()!.start}`)
+
     return parts.join(' | ')
   })
 
@@ -745,6 +810,53 @@ export default function Grid(props: Props) {
 
   // Global event listeners + initial load
   onMount(() => {
+    let wsConnected = false
+    let fallbackPollTimer: number | undefined
+    let fallbackPollDelay = 3000
+    const fallbackPollMin = 3000
+    const fallbackPollMax = 30000
+
+    function clearFallbackPoll() {
+      if (fallbackPollTimer === undefined) {
+        return
+      }
+
+      window.clearTimeout(fallbackPollTimer)
+      fallbackPollTimer = undefined
+    }
+
+    function scheduleFallbackPoll() {
+      if (wsConnected || fallbackPollTimer !== undefined) {
+        return
+      }
+
+      fallbackPollTimer = window.setTimeout(() => {
+        fallbackPollTimer = undefined
+
+        if (wsConnected || !navigator.onLine) {
+          scheduleFallbackPoll()
+
+          return
+        }
+
+        void pullRemoteEvent(props.eventId)
+          .then((remote) => {
+            if (remote) {
+              void applyRemoteEvent(remote)
+            }
+
+            fallbackPollDelay = fallbackPollMin
+          })
+          .catch(() => {
+            fallbackPollDelay = Math.min(fallbackPollDelay * 2, fallbackPollMax)
+          })
+          .finally(() => {
+            void flushPendingSync()
+            scheduleFallbackPoll()
+          })
+      }, fallbackPollDelay)
+    }
+
     const disconnectSocket = connectEventSocket(props.eventId, {
       onEventUpdated: (remote) => {
         void applyRemoteEvent(remote)
@@ -752,11 +864,30 @@ export default function Grid(props: Props) {
       onParticipantUpdated: (eventId, participantName, slots, updatedAt, version) => {
         void applyRemoteParticipantUpdate(eventId, participantName, slots, updatedAt, version)
       },
+      onConnectionChange: (connected) => {
+        wsConnected = connected
+
+        if (connected) {
+          fallbackPollDelay = fallbackPollMin
+          clearFallbackPoll()
+
+          return
+        }
+
+        scheduleFallbackPoll()
+      },
     })
 
     const onOnline = () => {
       void flushPendingSync()
-      if (!event()) void retryLoadFromWorker()
+
+      if (!event()) {
+        void retryLoadFromWorker()
+      }
+
+      if (!wsConnected) {
+        scheduleFallbackPoll()
+      }
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -766,20 +897,12 @@ export default function Grid(props: Props) {
             if (remote) void applyRemoteEvent(remote)
           })
           .catch(() => {})
+
+        if (!wsConnected) {
+          scheduleFallbackPoll()
+        }
       }
     }
-    const pollId = window.setInterval(() => {
-      if (!navigator.onLine) {
-        return
-      }
-
-      void pullRemoteEvent(props.eventId)
-        .then((remote) => {
-          if (remote) void applyRemoteEvent(remote)
-        })
-        .catch(() => {})
-      void flushPendingSync()
-    }, 15000)
     window.addEventListener('online', onOnline)
     document.addEventListener('visibilitychange', onVisibilityChange)
 
@@ -787,33 +910,42 @@ export default function Grid(props: Props) {
       if (e.key === 'Escape') {
         e.preventDefault()
         closeOpenDialog()
+
         return
       }
+
       if (
         (e.target as HTMLElement).tagName === 'INPUT' ||
         (e.target as HTMLElement).tagName === 'SELECT'
       )
+
         return
+
       if (e.key === 'F1') {
         e.preventDefault()
         doUndo()
       }
+
       if (e.key === 'u' || e.key === 'U') {
         e.preventDefault()
         doUndo()
       }
+
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
         revealSharePanel()
       }
+
       if (e.key === 'F3') {
         e.preventDefault()
         revealSharePanel()
       }
+
       if (e.key === 'F5') {
         e.preventDefault()
         openConfirm(null, null)
       }
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault()
         doUndo()
@@ -824,7 +956,7 @@ export default function Grid(props: Props) {
 
     onCleanup(() => {
       disconnectSocket()
-      window.clearInterval(pollId)
+      clearFallbackPoll()
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       document.removeEventListener('keydown', onKeyDown)
@@ -835,6 +967,7 @@ export default function Grid(props: Props) {
     void (async () => {
       try {
         localEvent = await getEvent(props.eventId)
+
         if (localEvent) {
           setEvent(localEvent)
           await initializeSelectedParticipant(localEvent)
@@ -847,6 +980,7 @@ export default function Grid(props: Props) {
 
       try {
         await loadFromWorkerInBackground()
+
         if (!event() && localEvent) {
           // Event exists locally but not on server yet: seed remote once.
           await queueEventSync(localEvent)
@@ -1056,6 +1190,7 @@ export default function Grid(props: Props) {
                               const myVal = () => myState[slot.dk]?.[slot.ti] ?? 0
                               const breakdown = () => {
                                 const parts: string[] = []
+
                                 if (myVal() === 1)
                                   parts.push(
                                     '<span class="results__tag results__tag--yes">✔ You</span>',
@@ -1067,6 +1202,7 @@ export default function Grid(props: Props) {
                                 Object.entries(others()).forEach(([name, data]) => {
                                   const v = data[slot.dk]?.[slot.ti] ?? 0
                                   const n = name.charAt(0).toUpperCase() + name.slice(1)
+
                                   if (v === 1)
                                     parts.push(
                                       `<span class="results__tag results__tag--yes">✔ ${n}</span>`,
@@ -1076,8 +1212,10 @@ export default function Grid(props: Props) {
                                       `<span class="results__tag results__tag--maybe"><span class="results__maybe-mark">?</span> ${n}</span>`,
                                     )
                                 })
+
                                 return parts.join(' · ')
                               }
+
                               return (
                                 <div
                                   classList={{
@@ -1148,6 +1286,7 @@ export default function Grid(props: Props) {
                               <For each={heatmapView().days}>
                                 {(_, di) => {
                                   const h = () => heatmapView().values[ti()]?.[di()] ?? 0
+
                                   return (
                                     <div
                                       classList={{

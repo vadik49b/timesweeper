@@ -35,6 +35,7 @@ const TIMES = (() => {
       out.push({ label: `${hh}:${mm} ${ampm}`, value: `${String(h).padStart(2, '0')}:${mm}` })
     }
   }
+
   return out
 })()
 
@@ -69,6 +70,7 @@ export default function Landing(props: Props) {
       month = calMonth()
     const first = new Date(year, month, 1)
     let startDow = first.getDay() - 1
+
     if (startDow < 0) {
       startDow = 6
     }
@@ -94,11 +96,13 @@ export default function Landing(props: Props) {
         isSelected: !!selectedDates()[ds],
       })
     }
+
     return days
   })
 
   const selectedDateLabels = createMemo(() => {
     const keys = Object.keys(selectedDates()).sort()
+
     if (keys.length === 0) {
       return 'No dates selected'
     }
@@ -106,18 +110,22 @@ export default function Landing(props: Props) {
     const labels = keys.map((ds) => {
       const [y, m, d] = ds.split('-').map(Number)
       const dt = new Date(y, m - 1, d)
+
       return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()] + ' ' + d
     })
+
     return `${labels.join(', ')} (${keys.length} day${keys.length > 1 ? 's' : ''})`
   })
 
   function calNav(dir: number) {
     let m = calMonth() + dir,
       y = calYear()
+
     if (m > 11) {
       m = 0
       y++
     }
+
     if (m < 0) {
       m = 11
       y--
@@ -128,6 +136,7 @@ export default function Landing(props: Props) {
 
   function toggleDate(ds: string) {
     const cur = selectedDates()
+
     if (cur[ds]) {
       const next = { ...cur }
       delete next[ds]
@@ -166,6 +175,7 @@ export default function Landing(props: Props) {
 
   createEffect(() => {
     const idx = pendingParticipantFocus()
+
     if (idx === null) {
       return
     }
@@ -173,6 +183,7 @@ export default function Landing(props: Props) {
     participants()
     queueMicrotask(() => {
       const input = participantInputRefs[idx]
+
       if (!input) {
         return
       }
@@ -186,22 +197,29 @@ export default function Landing(props: Props) {
   async function create() {
     if (!eventName().trim()) {
       setValidationError('Please enter an event name.')
+
       return
     }
     const dates = Object.keys(selectedDates()).sort()
+
     if (dates.length === 0) {
       setValidationError('Please pick at least one date.')
+
       return
     }
+
     if (timeStart() >= timeEnd()) {
       setValidationError('Please choose a valid time range (start must be before end).')
+
       return
     }
     const participantNames = participants()
       .map((p) => p.trim())
       .filter(Boolean)
+
     if (participantNames.length === 0) {
       setValidationError('Please add at least one participant.')
+
       return
     }
     setValidationError('')
@@ -229,8 +247,10 @@ export default function Landing(props: Props) {
     props.onOpenEvent(event.id)
     void (async () => {
       const published = await publishEventNow(event)
+
       if (published) {
         await setPublishedAt(event.id, Date.now())
+
         return
       }
       await queueEventSync(event)

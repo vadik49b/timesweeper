@@ -24,6 +24,7 @@ export default function Win95Button(props: Props) {
     ]
       .filter(Boolean)
       .join(' ')
+
   return (
     <button
       type="button"

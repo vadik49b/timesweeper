@@ -1,5 +1,6 @@
 import type { AppEvent, SlotValue } from './types'
 import { type SyncOp, enqueueSyncOp, getEvent, listPendingSyncOps, removePendingSyncOp } from './db'
+import ReconnectingWebSocket from 'reconnecting-websocket'
 
 const API_ORIGIN = window.location.origin
 
@@ -10,6 +11,7 @@ function apiBase() {
 function wsBase() {
   const proto = API_ORIGIN.startsWith('https') ? 'wss:' : 'ws:'
   const host = new URL(API_ORIGIN).host
+
   return `${proto}//${host}/api`
 }
 
@@ -26,25 +28,32 @@ async function sendSyncOp(op: SyncOp): Promise<void> {
         },
       )
     let resp = await sendParticipant(baseVersion)
+
     if (resp.status === 404) {
       // Server doesn't have this event yet; seed it from local cache, then retry once.
       const local = await getEvent(eventId)
+
       if (local) {
         const seedResp = await fetch(`${apiBase()}/events/${encodeURIComponent(eventId)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(local),
         })
+
         if (seedResp.ok) resp = await sendParticipant(baseVersion)
       }
     }
+
     if (resp.status === 409) {
       const conflict = (await resp.json().catch(() => null)) as { currentVersion?: number } | null
+
       if (typeof conflict?.currentVersion === 'number') {
         resp = await sendParticipant(conflict.currentVersion)
       }
     }
+
     if (!resp.ok) throw new Error(`participant sync failed: ${resp.status}`)
+
     return
   }
   const { event } = op.payload
@@ -53,6 +62,7 @@ async function sendSyncOp(op: SyncOp): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(event),
   })
+
   if (!resp.ok) throw new Error(`event sync failed: ${resp.status}`)
 }
 
@@ -89,6 +99,7 @@ export async function publishEventNow(event: AppEvent): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event),
     })
+
     return resp.ok
   } catch {
     return false
@@ -130,11 +141,13 @@ export async function pullRemoteEvent(eventId: string): Promise<AppEvent | null>
   } finally {
     window.clearTimeout(timeoutId)
   }
+
   if (resp.status === 404) {
     return null
   }
 
   if (!resp.ok) throw new Error(`pull event failed: ${resp.status}`)
+
   return (await resp.json()) as AppEvent
 }
 
@@ -158,19 +171,33 @@ export interface SyncSocketHandlers {
     updatedAt: number,
     version: number,
   ) => void
+  onConnectionChange?: (connected: boolean) => void
 }
 
 export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers): () => void {
-  let ws: WebSocket | null = null
-  try {
-    ws = new WebSocket(`${wsBase()}/events/${encodeURIComponent(eventId)}/ws`)
-  } catch {
-    return () => {}
+  const ws = new ReconnectingWebSocket(`${wsBase()}/events/${encodeURIComponent(eventId)}/ws`, [], {
+    minReconnectionDelay: 1000,
+    maxReconnectionDelay: 30000,
+    reconnectionDelayGrowFactor: 1.8,
+    connectionTimeout: 4000,
+    maxRetries: Infinity,
+  })
+  let connected = false
+
+  const onOpen = () => {
+    if (!connected) {
+      connected = true
+
+      if (handlers.onConnectionChange) {
+        handlers.onConnectionChange(true)
+      }
+    }
   }
 
-  ws.onmessage = (ev) => {
+  const onMessage = (ev: MessageEvent) => {
     try {
       const msg = JSON.parse(String(ev.data)) as WsEventMessage
+
       if (msg.type === 'event.updated') {
         handlers.onEventUpdated(msg.event)
       } else if (msg.type === 'participant.updated') {
@@ -187,7 +214,32 @@ export function connectEventSocket(eventId: string, handlers: SyncSocketHandlers
     }
   }
 
+  const onClose = () => {
+    if (connected) {
+      connected = false
+
+      if (handlers.onConnectionChange) {
+        handlers.onConnectionChange(false)
+      }
+    }
+  }
+
+  ws.addEventListener('open', onOpen)
+  ws.addEventListener('message', onMessage)
+  ws.addEventListener('close', onClose)
+
   return () => {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.close()
+    ws.removeEventListener('open', onOpen)
+    ws.removeEventListener('message', onMessage)
+    ws.removeEventListener('close', onClose)
+
+    if (connected) {
+      connected = false
+
+      if (handlers.onConnectionChange) {
+        handlers.onConnectionChange(false)
+      }
+    }
+    ws.close(1000, 'cleanup')
   }
 }

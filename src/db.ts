@@ -48,6 +48,7 @@ function eventRecency(event: AppEvent, row?: { recentAt?: number | null }) {
 
 async function pruneStoredEvents(db: IDBPDatabase<TimeSweeper>): Promise<void> {
   const [events, states] = await Promise.all([db.getAll('events'), db.getAll('localState')])
+
   if (events.length <= MAX_LOCAL_EVENTS) {
     return
   }
@@ -87,6 +88,7 @@ function getDB() {
       },
     })
   }
+
   return dbp
 }
 
@@ -106,6 +108,7 @@ export async function saveEvent(event: AppEvent): Promise<void> {
 
 export async function getEvent(id: string): Promise<AppEvent | undefined> {
   const db = await getDB()
+
   return db.get('events', id)
 }
 
@@ -113,6 +116,7 @@ export async function listEvents(): Promise<AppEvent[]> {
   const db = await getDB()
   const [events, states] = await Promise.all([db.getAll('events'), db.getAll('localState')])
   const stateById = new Map(states.map((s) => [s.eventId, s]))
+
   return events
     .sort((a, b) => eventRecency(b, stateById.get(b.id)) - eventRecency(a, stateById.get(a.id)))
     .slice(0, MAX_LOCAL_EVENTS)
@@ -127,11 +131,13 @@ export async function updateParticipantSlots(
 ): Promise<void> {
   const db = await getDB()
   const event = await db.get('events', eventId)
+
   if (!event) {
     return
   }
 
   const idx = event.participants.findIndex((p) => p.name === name)
+
   if (idx !== -1) {
     event.participants[idx] = { ...event.participants[idx], slots, updatedAt, version }
   }
@@ -142,6 +148,7 @@ export async function updateParticipantSlots(
 export async function getSelectedParticipant(eventId: string): Promise<string | null> {
   const db = await getDB()
   const row = await db.get('localState', eventId)
+
   return row?.participantName ?? null
 }
 
@@ -162,6 +169,7 @@ export async function setSelectedParticipant(
 export async function getPublishedAt(eventId: string): Promise<number | null> {
   const db = await getDB()
   const row = await db.get('localState', eventId)
+
   return row?.publishedAt ?? null
 }
 
@@ -190,12 +198,14 @@ export async function touchEventRecent(eventId: string): Promise<void> {
 
 export async function enqueueSyncOp(op: SyncOp): Promise<number> {
   const db = await getDB()
+
   return db.add('pendingSync', op)
 }
 
 export async function listPendingSyncOps(): Promise<Array<SyncOp & { id: number }>> {
   const db = await getDB()
   const ops = await db.getAllFromIndex('pendingSync', 'by-created')
+
   return ops.filter((op): op is SyncOp & { id: number } => typeof op.id === 'number')
 }
 
@@ -206,6 +216,7 @@ export async function removePendingSyncOp(id: number): Promise<void> {
 
 export async function hasPendingSyncForEvent(eventId: string): Promise<boolean> {
   const pending = await listPendingSyncOps()
+
   return pending.some((op) => {
     if (op.kind === 'event') {
       return op.payload.event.id === eventId

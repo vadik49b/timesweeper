@@ -46,6 +46,7 @@ export default function Win95Field(props: Props) {
 
     selectEl.focus()
     const picker = selectEl as HTMLSelectElement & { showPicker?: () => void }
+
     if (picker.showPicker) {
       picker.showPicker()
     } else {

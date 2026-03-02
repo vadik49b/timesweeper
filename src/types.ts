@@ -32,6 +32,7 @@ export interface AppEvent {
 export function slotsPerDay(event: AppEvent): number {
   const [sh, sm] = event.timeRange.start.split(':').map(Number)
   const [eh, em] = event.timeRange.end.split(':').map(Number)
+
   return (eh * 60 + em - (sh * 60 + sm)) / SLOT_DURATION
 }
 
@@ -51,6 +52,7 @@ export function computeTimeSlots(timeRange: {
     const mm = String(min).padStart(2, '0')
     out.push({ label: `${hh}:${mm}`, value: `${String(h).padStart(2, '0')}:${mm}` })
   }
+
   return out
 }
 
@@ -58,6 +60,7 @@ export function formatDateLabel(ds: string): string {
   const [y, m, d] = ds.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
   const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()]
+
   return `${dow} ${d}`
 }
 
@@ -70,6 +73,7 @@ export function flatToRecord(
   dates.forEach((ds, di) => {
     record[ds] = Array.from({ length: spd }, (_, ti) => slots[di * spd + ti] ?? 0)
   })
+
   return record
 }
 
@@ -85,5 +89,6 @@ export function recordToFlat(
       flat[di * spd + ti] = (day[ti] ?? 0) as SlotValue
     }
   })
+
   return flat
 }

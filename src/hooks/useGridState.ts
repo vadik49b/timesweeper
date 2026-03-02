@@ -24,6 +24,7 @@ export function useGridState(args: UseGridStateArgs) {
 
   const days = createMemo(() => {
     const ev = args.event()
+
     if (!ev) {
       return []
     }
@@ -33,6 +34,7 @@ export function useGridState(args: UseGridStateArgs) {
 
   const times = createMemo(() => {
     const ev = args.event()
+
     if (!ev) {
       return []
     }
@@ -42,6 +44,7 @@ export function useGridState(args: UseGridStateArgs) {
 
   const others = createMemo(() => {
     const ev = args.event()
+
     if (!ev) return {}
     const cur = args.currentName()
     const spd = slotsPerDay(ev)
@@ -53,11 +56,13 @@ export function useGridState(args: UseGridStateArgs) {
 
       result[p.name] = flatToRecord(p.slots, ev.dates, spd)
     })
+
     return result
   })
 
   const participantList = createMemo(() => {
     const ev = args.event()
+
     if (!ev) {
       return []
     }
@@ -68,8 +73,10 @@ export function useGridState(args: UseGridStateArgs) {
   function loadParticipantSlots(ev: AppEvent, name: string) {
     const spd = slotsPerDay(ev)
     const p = ev.participants.find((pp) => pp.name === name)
+
     if (p) {
       setMyState(reconcile(flatToRecord(p.slots, ev.dates, spd)))
+
       return
     }
     const empty: Record<string, number[]> = {}
@@ -82,6 +89,7 @@ export function useGridState(args: UseGridStateArgs) {
   function heat(dk: string, ti: number) {
     let c = 0
     const m = myState[dk]?.[ti] ?? 0
+
     if (m === 1) {
       c += 1
     } else if (m === 2) {
@@ -90,12 +98,14 @@ export function useGridState(args: UseGridStateArgs) {
 
     Object.values(others()).forEach((p) => {
       const v = p[dk]?.[ti] ?? 0
+
       if (v === 1) {
         c += 1
       } else if (v === 2) {
         c += 0.5
       }
     })
+
     return Math.round(c)
   }
 
@@ -106,25 +116,30 @@ export function useGridState(args: UseGridStateArgs) {
     d.forEach((day) =>
       t.forEach((slot, ti) => {
         const h = heat(day.key, ti)
+
         if (h > 0) slots.push({ day: day.label, time: slot.label, score: h, dk: day.key, ti })
       }),
     )
     slots.sort((a, b) => b.score - a.score)
+
     return slots.slice(0, 3)
   })
 
   const totalParticipants = createMemo(() => args.event()?.participants.length ?? 0)
   const participantsWithAvailability = createMemo(() => {
     const ev = args.event()
+
     if (!ev) {
       return 0
     }
 
     const spd = slotsPerDay(ev)
+
     return ev.participants.filter((p) => {
       if (p.name === args.currentName()) {
         return recordToFlat(myState, ev.dates, spd).some((v) => v > 0)
       }
+
       return p.slots.some((v) => v > 0)
     }).length
   })
@@ -137,12 +152,14 @@ export function useGridState(args: UseGridStateArgs) {
 
     const prev = myState[dk]?.[ti] ?? 0
     const next = (prev + 1) % 3
+
     if (prev === next) {
       return
     }
 
     undoStack.push([{ dk, ti, prev }])
     setMyState(dk, ti, next)
+
     if (navigator.vibrate) navigator.vibrate(10)
     args.onSlotsChanged()
   }
@@ -169,6 +186,7 @@ export function useGridState(args: UseGridStateArgs) {
     const d = days()
     const t = times()
     const values = t.map((_, ti) => d.map((day) => heat(day.key, ti)))
+
     if (d.length === 0 || t.length === 0) return { days: d, times: t, values }
 
     let minRow = t.length

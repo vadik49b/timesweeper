@@ -108,6 +108,7 @@ Participant {
 - Never use one-line `if` statements.
 - Always use braces for `if` / `else if` / `else` blocks, even for a single statement.
 - After a closing curly brace `}`, add a blank line before the next statement (except where syntax requires adjacency, like `} else {`).
+- Add a blank line before standalone `if` statements and before standalone `return` statements.
 - Do not silence async errors with call-site `void` patterns; handle ignored errors inside helper functions with explicit `try/catch`.
 - Use BEM naming for CSS classes: `block`, `block__element`, `block--modifier` (kebab-case only).
 - Keep utility helpers explicit (for example `u-*`), and do not mix utility naming into component block names.
