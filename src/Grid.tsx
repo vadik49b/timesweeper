@@ -834,7 +834,7 @@ export default function Grid(props: Props) {
                       class="share-panel__copy-btn"
                       onClick={() => copyLink(eventUrl())}
                     >
-                      <span class="hk">C</span>opy
+                      <span class="hk">C</span>opy link
                     </Win95Button>
                   </div>
                   <div class="copy-status" aria-live="polite">{copyStatus()}</div>

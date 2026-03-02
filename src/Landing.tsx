@@ -343,6 +343,7 @@ export default function Landing(props: Props) {
                   kind="input"
                   id={`participant-${i}`}
                   name={`participant-${i}`}
+                  size="small"
                   value={p()}
                   placeholder={i === 0 ? 'You' : `Person ${i + 1}`}
                   wrapperClass="landing__participant-field"

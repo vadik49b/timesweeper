@@ -27,6 +27,7 @@
   --cell: 44px;
   --hm-cell: 44px;
   --hm-col: 44px;
+  --control-small-height: 22px;
 }
 
 body {
@@ -86,7 +87,11 @@ body {
 }
 .win95-button--small {
   font-size: 11px;
-  padding: 1px 6px;
+  padding: 0 6px;
+  height: var(--control-small-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .win95-button--full-width {
   width: 100%;
@@ -157,11 +162,17 @@ body {
 }
 .win95-field--small .win95-field__control {
   font-size: 12px;
-  padding: 1px 3px;
+  height: 100%;
+  line-height: 1.2;
+  padding: 1px 3px 0;
 }
 .win95-field--small .win95-field__arrow {
+  height: 100%;
   width: 16px;
   font-size: 8px;
+}
+.win95-field--small .win95-field__frame {
+  height: var(--control-small-height);
 }
 
 @media (pointer: coarse) {
@@ -431,8 +442,8 @@ body {
 }
 .share-panel__link-row {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 8px;
   margin-bottom: 6px;
 }
 .share-panel__field {
@@ -1188,8 +1199,6 @@ body {
   margin-bottom: 4px;
 }
 .p-rm {
-  font-size: 11px;
-  padding: 1px 6px;
   background: var(--bg);
 }
 .p-rm:active {
