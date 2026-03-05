@@ -1209,13 +1209,13 @@ export default function Grid(props: Props) {
                     <span class="grid-controls__name">{currentName() || 'there'}</span>
                   </a>
                 </Show>
-                ! Follow the 3 easy steps below: share the event link, fill your availability, then choose and
-                confirm the best suggested time once everyone has responded.
+                ! Share the event link with anyone who needs to respond, fill your availability,
+                then choose and confirm the best suggested time.
               </p>
             </section>
 
             {/* Single-column layout */}
-            <h2 class="grid-view__pane-title grid-view__pane-title--steps">Steps</h2>
+            <h2 class="grid-view__pane-title grid-view__pane-title--steps">Pick Event Time Together</h2>
             <section class="grid-view__steps-panel r">
               <div class="grid-view__panels">
                 <div class="grid-view__panel-frame">
