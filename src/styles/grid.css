@@ -6,62 +6,59 @@
   display: flex;
   justify-content: center;
   min-height: 100dvh;
-  padding: 4px;
+  padding: 12px 8px;
 }
 .grid-view__loading {
   padding: 20px;
 }
 
-/* Win95 window */
-.grid-view__window {
-  background: var(--bg);
+.grid-view__shell {
+  background: transparent;
   width: 100%;
   max-width: 1100px;
-  min-height: 100dvh;
+  min-height: calc(100dvh - 24px);
   display: flex;
   flex-direction: column;
+  padding: 10px 6px;
   font-family: var(--ui);
 }
 
-.win95-window__title-bar {
-  background: var(--title-bar);
+.grid-view__hero {
+  gap: var(--space-2);
+  margin-bottom: 14px;
+}
+.grid-view__event-name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: var(--fs-hero);
+  letter-spacing: 1px;
+  line-height: 1.05;
   color: var(--text-inverse);
-  padding: 3px 4px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
+  text-shadow: 2px 2px 0 var(--navy);
 }
-.win95-window__title-buttons {
-  display: flex;
-  gap: 2px;
+.grid-view__hero-actions {
+  margin-left: auto;
+  flex-shrink: 0;
 }
-.win95-window__title-button {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  background: var(--bg);
+.grid-view__hero-timezone {
+  color: var(--text-inverse);
   font-size: var(--fs-xs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: sans-serif;
+  line-height: 1;
+  margin-left: 8px;
+  white-space: nowrap;
 }
 
-.grid-view__window-body {
+.grid-view__content {
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 6px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-.grid-view__title {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  overflow: visible;
 }
 
 .grid-controls__name {
@@ -69,42 +66,66 @@
   color: var(--text-primary);
 }
 
-.grid-view__deck {
-  gap: var(--space-2);
-  padding: 4px 6px;
-  margin-bottom: 6px;
+.grid-controls__name-link {
+  color: var(--text-primary);
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
-.grid-view__deck-left {
-  gap: var(--space-2);
-  min-width: 0;
+
+.grid-controls__name-link:hover {
+  text-decoration-style: solid;
 }
-.grid-view__deck-display {
-  flex: 0 1 auto;
-  padding: 2px 6px;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+
+.grid-controls__name-link:focus-visible {
+  outline: 1px dotted var(--bdk);
+  outline-offset: 1px;
+}
+
+.grid-view__intro-panel {
+  padding: 10px 12px;
+  margin-bottom: 0;
   background: var(--bg);
 }
-.grid-view__deck-actions {
-  gap: var(--space-1);
-  margin-left: auto;
+.grid-view__pane-title {
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-regular);
+  letter-spacing: 0.6px;
+  line-height: 1.1;
+  color: var(--text-inverse);
+  text-shadow: 1px 1px 0 var(--navy);
+}
+.grid-view__pane-title--steps {
+  margin-top: 14px;
+  margin-bottom: 3px;
+}
+
+.grid-view__intro-text {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.grid-view__steps-panel {
+  margin-top: 0;
+  background: var(--bg);
 }
 
 .grid-view__panels {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  height: 100%;
+  gap: 0;
   min-height: 0;
-  overflow: auto;
-  padding-right: 1px;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .grid-view__panel-frame {
-  padding: 6px 8px 6px 6px;
+  padding: 8px 10px 10px;
 }
 .grid-view__section + .grid-view__section {
   margin-top: 36px;
@@ -140,13 +161,6 @@
 .grid-view__panel-content--title-aligned {
   padding-left: 22px;
 }
-.share-panel__instruction {
-  font-size: var(--fs-sm);
-  line-height: 1.35;
-  margin: 0 0 var(--space-2);
-  max-width: 85%;
-  padding-right: 16px;
-}
 .share-panel__label {
   display: block;
   font-size: var(--fs-sm);
@@ -181,9 +195,32 @@
   pointer-events: none;
 }
 @media (max-width: 620px) {
-  .share-panel__instruction {
-    max-width: none;
-    padding-right: 0;
+  .grid-view {
+    padding: 8px 4px;
+  }
+  .grid-view__shell {
+    min-height: calc(100dvh - 16px);
+    padding: 8px 4px;
+  }
+  .grid-view__hero {
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .grid-view__event-name {
+    font-size: var(--fs-hero);
+    letter-spacing: 0.5px;
+  }
+  .grid-view__hero-actions {
+    margin-left: 0;
+  }
+  .grid-view__intro-panel {
+    padding: 8px 10px;
+  }
+  .grid-view__steps-panel {
+    margin-top: 0;
+  }
+  .grid-view__panel-frame {
+    padding: 8px;
   }
   .share-panel__link-row {
     flex-wrap: wrap;

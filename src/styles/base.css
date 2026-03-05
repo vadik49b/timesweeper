@@ -83,6 +83,33 @@ body {
   border-color: var(--blo) var(--bhi) var(--bhi) var(--blo);
 }
 
+/* Shared window title chrome (used by dialogs and window-like shells). */
+.win95-window__title-bar {
+  background: var(--title-bar);
+  color: var(--text-inverse);
+  padding: 3px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+.win95-window__title-buttons {
+  display: flex;
+  gap: 2px;
+}
+.win95-window__title-button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: var(--bg);
+  font-size: var(--fs-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: sans-serif;
+}
+
 .hk {
   text-decoration: underline;
 }

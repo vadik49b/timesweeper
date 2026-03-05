@@ -1141,46 +1141,59 @@ export default function Grid(props: Props) {
   return (
     <div class="grid-view">
       <Show when={localReady()} fallback={null}>
-        <div class="grid-view__window r">
-          {/* Title bar */}
-          <div class="win95-window__title-bar">
-            <span class="grid-view__title">
-              <MineIcon size={16} /> TimeSweeper — {event()?.name ?? 'Opening event'}
-            </span>
-            <div class="win95-window__title-buttons">
+        <div class="grid-view__shell">
+          <div class="grid-view__hero row row--between row--center">
+            <h1 class="grid-view__event-name">
+              <MineIcon size={20} /> {event()?.name ?? 'Opening event'}
+            </h1>
+            <div class="grid-view__hero-actions row row--center row--gap-xs">
+              <Win95Button variant="toolbar" onClick={() => setActiveModal('help')}>
+                <span class="hk">H</span>elp
+              </Win95Button>
               <a
                 href="/"
-                class="win95-button r win95-button--small win95-window__title-button"
-                aria-label="Close event and return to home"
+                class="win95-button r win95-button--small"
+                aria-label="Return to home"
               >
-                ×
+                Home
               </a>
+              <span class="grid-view__hero-timezone">
+                Timezone: <b>{currentTimezone()}</b>
+              </span>
             </div>
           </div>
 
-          <div class="grid-view__window-body">
-            {/* Minesweeper-style control deck */}
-            <div class="grid-view__deck s row row--center row--gap-sm">
-              <div class="grid-view__deck-left row row--center row--gap-sm">
-                <div class="grid-view__deck-display">
-                  Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
-                  <span class="grid-view__deck-timezone"> · {currentTimezone()}</span>
-                </div>
-                <Show when={!isConfirmed()}>
-                  <Win95Button variant="toolbar" onClick={() => setActiveModal('name-picker')}>
-                    Switch...
-                  </Win95Button>
+          <div class="grid-view__content">
+            <h2 class="grid-view__pane-title">Overview</h2>
+            <section class="grid-view__intro-panel r">
+              <p class="grid-view__intro-text">
+                Hi{' '}
+                <Show
+                  when={!isConfirmed()}
+                  fallback={<span class="grid-controls__name">{currentName() || 'there'}</span>}
+                >
+                  <a
+                    href="#"
+                    class="grid-controls__name-link"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      setActiveModal('name-picker')
+                    }}
+                    aria-label="Switch participant name"
+                  >
+                    <span class="grid-controls__name">{currentName() || 'there'}</span>
+                  </a>
                 </Show>
-              </div>
-              <div class="grid-view__deck-actions row row--center row--gap-xs">
-                <Win95Button variant="toolbar" onClick={() => setActiveModal('help')}>
-                  <span class="hk">H</span>elp
-                </Win95Button>
-              </div>
-            </div>
+                ! Follow the 3 easy steps below: share the event link, fill yours, then choose and
+                confirm the best suggested time once everyone has responded.
+              </p>
+            </section>
+
             {/* Single-column layout */}
-            <div class="grid-view__panels">
-              <div class="grid-view__panel-frame">
+            <h2 class="grid-view__pane-title grid-view__pane-title--steps">Steps</h2>
+            <section class="grid-view__steps-panel r">
+              <div class="grid-view__panels">
+                <div class="grid-view__panel-frame">
                 <section class="grid-view__section">
                   <div class="grid-view__section-header">
                     <span class="grid-view__section-number">1.</span>
@@ -1188,10 +1201,6 @@ export default function Grid(props: Props) {
                     <hr />
                   </div>
                   <div class="grid-view__section-body grid-view__section-body--title">
-                    <p class="share-panel__instruction">
-                      Each person marks yes/maybe/no availability. TimeSweeper combines responses
-                      and suggests the best times.
-                    </p>
                     <label for="share-link" class="share-panel__label">
                       Share this link:
                     </label>
@@ -1474,8 +1483,9 @@ export default function Grid(props: Props) {
                     </Show>
                   </div>
                 </section>
+                </div>
               </div>
-            </div>
+            </section>
             {/* /panels */}
 
             <Show when={isConfirmed()}>
@@ -1520,9 +1530,9 @@ export default function Grid(props: Props) {
               </div>
             </Show>
           </div>
-          {/* /grid-view__window-body */}
+          {/* /grid-view__content */}
         </div>
-        {/* /grid-view__window */}
+        {/* /grid-view__shell */}
 
         {/* === DIALOGS === */}
 
@@ -1592,7 +1602,7 @@ export default function Grid(props: Props) {
               <b>How to use TimeSweeper:</b>
             </p>
             <p class="help__step">
-              <b>1.</b> Click <b>Switch...</b> and pick your participant name
+              <b>1.</b> Click your <b>name</b> and pick your participant name
             </p>
             <p class="help__step">
               <b>2.</b> Click a cell to mark availability:
