@@ -107,7 +107,7 @@
   padding: 6px 8px 6px 6px;
 }
 .grid-view__section + .grid-view__section {
-  margin-top: 18px;
+  margin-top: 36px;
 }
 .grid-view__section-header {
   display: flex;
@@ -155,7 +155,8 @@
 .share-panel__link-row {
   align-items: flex-end;
   gap: 8px;
-  margin-bottom: var(--space-2);
+  margin-bottom: 0;
+  position: relative;
 }
 .share-panel__field {
   flex: 1;
@@ -170,6 +171,14 @@
 }
 .share-panel__copy-btn {
   min-width: 0;
+}
+.copy-status {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  pointer-events: none;
 }
 @media (max-width: 620px) {
   .share-panel__instruction {
@@ -474,7 +483,7 @@
 }
 .summary-list__actions-row {
   display: flex;
-  gap: 8px;
+  gap: 16px;
 }
 .summary-table {
   width: 100%;
@@ -601,7 +610,6 @@
 .summary-table__date-list {
   display: grid;
   grid-template-columns: 1fr;
-  row-gap: 6px;
 }
 .summary-table__date-row {
   display: block;
@@ -613,13 +621,15 @@
   flex-wrap: wrap;
 }
 .summary-table__date-title {
+  font-family: "Lucida Console", "Courier New", monospace;
   font-weight: var(--fw-bold);
+  letter-spacing: 0;
   white-space: nowrap;
 }
 .summary-table__time-list {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px;
 }
 .summary-table__time-option {
   display: inline-flex;

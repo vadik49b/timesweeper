@@ -705,7 +705,7 @@ export default function Grid(props: Props) {
     }
 
     if (copied) {
-      setCopyStatus('Copied to clipboard')
+      setCopyStatus('Copied to clipboard!')
     } else {
       setCopyStatus('Select and press Command+C')
     }
@@ -1218,9 +1218,9 @@ export default function Grid(props: Props) {
                       >
                         <span class="hk">C</span>opy
                       </Win95Button>
-                    </div>
-                    <div class="copy-status" aria-live="polite">
-                      {copyStatus()}
+                      <div class="copy-status" aria-live="polite">
+                        {copyStatus()}
+                      </div>
                     </div>
                   </div>
                 </section>
