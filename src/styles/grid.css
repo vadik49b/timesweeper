@@ -99,7 +99,7 @@
 }
 
 .grid-view__intro-panel {
-  padding: 10px 12px;
+  padding: 14px 12px 28px;
   margin-bottom: 0;
   background: var(--bg);
 }
@@ -140,7 +140,7 @@
 }
 
 .grid-view__panel-frame {
-  padding: 8px 10px 10px;
+  padding: 14px 12px 28px;
 }
 .grid-view__section + .grid-view__section {
   margin-top: 36px;
@@ -233,13 +233,13 @@
     margin-left: 0;
   }
   .grid-view__intro-panel {
-    padding: 8px 10px;
+    padding: 12px 10px 24px;
   }
   .grid-view__steps-panel {
     margin-top: 0;
   }
   .grid-view__panel-frame {
-    padding: 8px;
+    padding: 12px 10px 24px;
   }
   .share-panel__link-row {
     flex-wrap: wrap;

@@ -41,7 +41,7 @@
   background: var(--bg);
   width: 100%;
   max-width: var(--landing-max);
-  padding: 10px;
+  padding: 14px 12px 28px;
   margin-bottom: 16px;
 }
 .landing label {
@@ -255,7 +255,7 @@
 }
 .how-steps {
   background: var(--bg);
-  padding: 10px;
+  padding: 14px 12px 28px;
 }
 .how-step {
   gap: var(--space-3);
@@ -289,7 +289,7 @@
 }
 .recent-panel {
   background: var(--bg);
-  padding: 8px 10px;
+  padding: 14px 12px 28px;
 }
 .recent-title {
   font-size: var(--fs-xs);
