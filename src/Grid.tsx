@@ -341,6 +341,33 @@ export default function Grid(props: Props) {
     }).length
   })
   const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
+  const suggestionsHelperText = createMemo(() => {
+    const ev = event()
+    const base = 'Suggestions update as people continue filling availability.'
+
+    if (!ev) {
+      return base
+    }
+
+    const pending = ev.participants
+      .filter((participant) => {
+        if (participant.name === currentName()) {
+          return false
+        }
+
+        const hasUpdated = participant.updatedAt !== null
+        const hasAnyAvailability = participant.slots.some((value) => value > 0)
+
+        return !hasUpdated && !hasAnyAvailability
+      })
+      .map((participant) => participant.name)
+
+    if (pending.length === 0) {
+      return `${base} Everyone has seen the link you shared.`
+    }
+
+    return `${base} ${pending.join(', ')} haven't opened the link yet.`
+  })
 
   function loadParticipantSlots(ev: AppEvent, name: string) {
     const spd = slotsPerDay(ev)
@@ -845,21 +872,14 @@ export default function Grid(props: Props) {
       return
     }
 
-    const now = Date.now()
-    const idx = ev.participants.findIndex((p) => p.name === name)
+    const exists = ev.participants.some((participant) => participant.name === name)
 
-    if (idx === -1) {
+    if (!exists) {
       return
     }
 
-    const updated: AppEvent = {
-      ...ev,
-      participants: ev.participants.map((p, i) => (i === idx ? { ...p, visitedAt: now } : p)),
-    }
-    await saveEvent(updated)
-    await setSelectedParticipant(updated.id, name)
-    setEvent(updated)
-    loadParticipantSlots(updated, name)
+    await setSelectedParticipant(ev.id, name)
+    loadParticipantSlots(ev, name)
     setCurrentName(name)
     setActiveModal(null)
   }
@@ -890,7 +910,6 @@ export default function Grid(props: Props) {
       name: trimmed,
       timezone: '',
       slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
-      visitedAt: Date.now(),
       updatedAt: null,
       version: 0,
     }
@@ -1351,6 +1370,9 @@ export default function Grid(props: Props) {
                     <hr />
                   </div>
                   <div class="grid-view__section-body">
+                    <p class="grid-view__suggestions-helper grid-view__panel-content--title-aligned">
+                      {suggestionsHelperText()}
+                    </p>
                     <Show
                       when={canShowSuggestions()}
                       fallback={

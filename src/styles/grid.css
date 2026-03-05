@@ -176,6 +176,12 @@
 .grid-view__panel-content--title-aligned {
   padding-left: 22px;
 }
+.grid-view__suggestions-helper {
+  margin: 0 0 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
 .share-panel__label {
   display: block;
   font-size: var(--fs-sm);

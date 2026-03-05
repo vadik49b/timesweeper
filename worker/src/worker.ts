@@ -4,7 +4,6 @@ interface Participant {
   name: string
   timezone: string
   slots: SlotValue[]
-  visitedAt: number | null
   updatedAt: number | null
   version?: number
 }

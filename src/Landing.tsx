@@ -237,7 +237,6 @@ export default function Landing(props: Props) {
         name: name.trim(),
         timezone: '',
         slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
-        visitedAt: null,
         updatedAt: null,
         version: 0,
       })),
