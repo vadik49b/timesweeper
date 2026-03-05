@@ -39,17 +39,24 @@ interface Props {
 type UndoEntry = { dk: string; ti: number; prev: number }
 type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
 type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
-type SummaryRow = {
-  dk: string
-  ti: number
+type SummaryIntersectionTime = {
   day: string
+  dk: string
   time: string
+  ti: number
+}
+type SummaryIntersectionDate = {
+  day: string
+  dk: string
+  times: SummaryIntersectionTime[]
+}
+type SummaryIntersection = {
+  key: string
+  allGroups: SummaryGroups
   score: number
   canAttend: number
   kind: 'best' | 'almost' | 'partial'
-  missingNames: string[]
-  myCell: SummaryCell
-  allGroups: SummaryGroups
+  dates: SummaryIntersectionDate[]
 }
 
 export default function Grid(props: Props) {
@@ -107,6 +114,12 @@ export default function Grid(props: Props) {
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
+  const [selectedSummarySlot, setSelectedSummarySlot] = createSignal<{
+    intersectionKey: string
+    day: string
+    time: string
+  } | null>(null)
+  const [summaryValidationError, setSummaryValidationError] = createSignal('')
   const [shareCollapsed, setShareCollapsed] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
@@ -153,10 +166,11 @@ export default function Grid(props: Props) {
   }
 
   // --- Logic ---
-  const summaryRows = createMemo<SummaryRow[]>(() => {
+  const summaryIntersections = createMemo<SummaryIntersection[]>(() => {
     const ev = event()
     const d = days()
     const t = times()
+
     if (!ev || d.length === 0 || t.length === 0) {
       return []
     }
@@ -172,7 +186,20 @@ export default function Grid(props: Props) {
 
       return 0
     })
-    const rows: SummaryRow[] = []
+
+    const dayOrder = new Map(ev.dates.map((dayKey, index) => [dayKey, index]))
+    const intersections = new Map<
+      string,
+      {
+        key: string
+        allGroups: SummaryGroups
+        score: number
+        canAttend: number
+        kind: 'best' | 'almost' | 'partial'
+        times: SummaryIntersectionTime[]
+      }
+    >()
+
     d.forEach((day) => {
       t.forEach((slot, ti) => {
         const cells: SummaryCell[] = participantNames.map((name) => {
@@ -190,6 +217,7 @@ export default function Grid(props: Props) {
         const yesCount = cells.filter((cell) => cell.value === 1).length
         const maybeCount = cells.filter((cell) => cell.value === 2).length
         const canAttend = yesCount + maybeCount
+
         if (canAttend === 0) {
           return
         }
@@ -197,10 +225,7 @@ export default function Grid(props: Props) {
         const score = yesCount + maybeCount * 0.5
         const noCount = cells.length - canAttend
         const kind = noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial'
-        const missingNames = cells
-          .filter((cell) => cell.value === 0)
-          .map((cell) => (cell.isCurrent ? 'You' : cell.name))
-        const myCell = cells.find((cell) => cell.isCurrent) ?? { name: 'You', value: 0, isCurrent: true }
+        const key = cells.map((cell) => String(cell.value)).join('')
         const allGroups: SummaryGroups = {
           yes: cells
             .filter((cell) => cell.value === 1)
@@ -212,22 +237,69 @@ export default function Grid(props: Props) {
             .filter((cell) => cell.value === 0)
             .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
         }
-        rows.push({
-          dk: day.key,
-          ti,
-          day: day.label,
-          time: slot.label,
-          score,
-          canAttend,
-          kind,
-          missingNames,
-          myCell,
-          allGroups,
-        })
+
+        const existing = intersections.get(key)
+
+        if (!existing) {
+          intersections.set(key, {
+            key,
+            allGroups,
+            score,
+            canAttend,
+            kind,
+            times: [{ dk: day.key, ti, day: day.label, time: slot.label }],
+          })
+
+          return
+        }
+
+        existing.times.push({ dk: day.key, ti, day: day.label, time: slot.label })
       })
     })
-    const kindRank: Record<SummaryRow['kind'], number> = { best: 0, almost: 1, partial: 2 }
-    rows.sort((a, b) => {
+
+    const entries: SummaryIntersection[] = [...intersections.values()].map((entry) => {
+      const byDate = new Map<string, SummaryIntersectionDate>()
+      entry.times.forEach((timeEntry) => {
+        const dateGroup = byDate.get(timeEntry.dk)
+
+        if (!dateGroup) {
+          byDate.set(timeEntry.dk, {
+            day: timeEntry.day,
+            dk: timeEntry.dk,
+            times: [timeEntry],
+          })
+
+          return
+        }
+
+        dateGroup.times.push(timeEntry)
+      })
+
+      const dates = [...byDate.values()]
+        .sort((a, b) => {
+          const aOrder = dayOrder.get(a.dk) ?? Number.MAX_SAFE_INTEGER
+          const bOrder = dayOrder.get(b.dk) ?? Number.MAX_SAFE_INTEGER
+
+          return aOrder - bOrder
+        })
+        .map((dateGroup) => ({
+          ...dateGroup,
+          times: [...dateGroup.times].sort((a, b) => a.ti - b.ti),
+        }))
+
+      return {
+        key: entry.key,
+        allGroups: entry.allGroups,
+        score: entry.score,
+        canAttend: entry.canAttend,
+        kind: entry.kind,
+        dates,
+      }
+    })
+
+    const kindRank: Record<SummaryIntersection['kind'], number> = { best: 0, almost: 1, partial: 2 }
+
+    entries.sort((a, b) => {
       if (kindRank[a.kind] !== kindRank[b.kind]) {
         return kindRank[a.kind] - kindRank[b.kind]
       }
@@ -240,14 +312,10 @@ export default function Grid(props: Props) {
         return b.canAttend - a.canAttend
       }
 
-      if (a.day !== b.day) {
-        return a.day.localeCompare(b.day)
-      }
-
-      return a.time.localeCompare(b.time)
+      return b.dates.reduce((sum, day) => sum + day.times.length, 0) - a.dates.reduce((sum, day) => sum + day.times.length, 0)
     })
 
-    return rows
+    return entries
   })
 
   const participantsWithAvailability = createMemo(() => {
@@ -438,27 +506,6 @@ export default function Grid(props: Props) {
     schedulePersist()
   }
 
-  function setCellValue(dk: string, ti: number, next: SlotValue) {
-    if (isConfirmed()) {
-      return
-    }
-
-    const prev = myState[dk]?.[ti] ?? 0
-
-    if (prev === next) {
-      return
-    }
-
-    undoStack.push([{ dk, ti, prev }])
-    setMyState(dk, ti, next)
-
-    if (navigator.vibrate) {
-      navigator.vibrate(10)
-    }
-
-    schedulePersist()
-  }
-
   function summaryCellMark(value: SlotValue) {
     if (value === 1) {
       return '✓'
@@ -471,23 +518,45 @@ export default function Grid(props: Props) {
     return ''
   }
 
-  function summaryNeedText(missingNames: string[]) {
-    if (missingNames.length === 0) {
-      return 'Works for everyone'
+  function summaryGroupCells(groups: SummaryGroups) {
+    const sections: Array<{ value: SlotValue; names: string[] }> = [
+      { value: 1, names: groups.yes },
+      { value: 2, names: groups.maybe },
+      { value: 0, names: groups.no },
+    ]
+
+    return sections.filter((section) => section.names.length > 0)
+  }
+
+  function isSummarySlotSelected(intersectionKey: string, day: string, time: string) {
+    const selected = selectedSummarySlot()
+
+    if (!selected) {
+      return false
     }
 
-    const missingYou = missingNames.includes('You')
-    const others = missingNames.filter((name) => name !== 'You')
+    return (
+      selected.intersectionKey === intersectionKey &&
+      selected.day === day &&
+      selected.time === time
+    )
+  }
 
-    if (!missingYou) {
-      return `Ask ${others.join(', ')} if they can make it`
+  function selectSummarySlot(intersectionKey: string, day: string, time: string) {
+    setSummaryValidationError('')
+    setSelectedSummarySlot({ intersectionKey, day, time })
+  }
+
+  function confirmSelectedSummarySlot() {
+    const selected = selectedSummarySlot()
+
+    if (!selected) {
+      setSummaryValidationError('Please select a time first.')
+      return
     }
 
-    if (others.length === 0) {
-      return 'Can you make it?'
-    }
-
-    return `Can you and ${others.join(', ')} make it?`
+    setSummaryValidationError('')
+    openConfirm(selected.day, selected.time)
   }
 
   function doUndo() {
@@ -1190,7 +1259,7 @@ export default function Grid(props: Props) {
                       }
                     >
                       <Show
-                        when={summaryRows().length > 0}
+                        when={summaryIntersections().length > 0}
                         fallback={
                           <div class="empty-text grid-view__panel-content--title-aligned">
                             No candidate times yet
@@ -1198,129 +1267,106 @@ export default function Grid(props: Props) {
                         }
                       >
                         <div class="summary-table-wrap">
-                          <table class="summary-table">
-                            <thead>
-                              <tr>
-                                <th>Time</th>
-                                <th class="summary-table__participant-col">You</th>
-                                <th class="summary-table__participants-col">Summary</th>
-                                <th class="summary-table__action-col">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <For each={summaryRows()}>
-                                {(row) => {
-                                  return (
-                                    <tr
-                                      classList={{
-                                        'summary-table__row': true,
-                                        'summary-table__row--best': row.kind === 'best',
-                                        'summary-table__row--almost': row.kind === 'almost',
-                                      }}
-                                    >
-                                      <td class="summary-table__time">
-                                        <b>
-                                          {row.day} {row.time}
-                                        </b>
-                                      </td>
-                                      <td class="summary-table__participant">
-                                        <Show
-                                          when={row.myCell.value === 0}
-                                          fallback={
-                                            <span
-                                              classList={{
-                                                'summary-table__cell': true,
-                                                'summary-table__cell--yes': row.myCell.value === 1,
-                                                'summary-table__cell--maybe': row.myCell.value === 2,
-                                                'summary-table__cell--no': row.myCell.value === 0,
-                                              }}
-                                            >
-                                              {summaryCellMark(row.myCell.value)}
+                          <div class="summary-list">
+                            <For each={summaryIntersections()}>
+                              {(intersection) => {
+                                const groups = summaryGroupCells(intersection.allGroups)
+                                const isAllYes =
+                                  intersection.allGroups.maybe.length === 0 &&
+                                  intersection.allGroups.no.length === 0
+
+                                return (
+                                  <section
+                                    classList={{
+                                      'summary-list__item': true,
+                                      'summary-list__item--all-yes': isAllYes,
+                                    }}
+                                  >
+                                    <header class="summary-list__header">
+                                      <div class="summary-table__name-groups">
+                                        <For each={groups}>
+                                          {(group) => (
+                                            <span class="summary-table__name-group">
+                                              <span
+                                                classList={{
+                                                  'summary-table__cell': true,
+                                                  'summary-table__cell--mini': true,
+                                                  'summary-table__cell--yes': group.value === 1,
+                                                  'summary-table__cell--maybe': group.value === 2,
+                                                  'summary-table__cell--no': group.value === 0,
+                                                }}
+                                              >
+                                                {summaryCellMark(group.value)}
+                                              </span>
+                                              <span class="summary-table__stack-names">
+                                                {group.names.join(', ')}
+                                              </span>
                                             </span>
-                                          }
-                                        >
-                                          <button
-                                            type="button"
-                                            classList={{
-                                              'summary-table__cell': true,
-                                              'summary-table__cell--yes': row.myCell.value === 1,
-                                              'summary-table__cell--maybe': row.myCell.value === 2,
-                                              'summary-table__cell--no': row.myCell.value === 0,
-                                              'summary-table__cell--clickable': true,
-                                            }}
-                                            onClick={() => setCellValue(row.dk, row.ti, 1)}
-                                            aria-label={`Set your availability to yes at ${row.day} ${row.time}`}
-                                          >
-                                            {summaryCellMark(row.myCell.value)}
-                                          </button>
-                                        </Show>
-                                      </td>
-                                      <td class="summary-table__participants">
-                                        <div class="summary-table__kind">
-                                          {summaryNeedText(row.missingNames)}
-                                        </div>
-                                        <div class="summary-table__stack">
-                                          <Show when={row.allGroups.yes.length > 0}>
-                                            <div class="summary-table__stack-row">
-                                              <span
-                                                classList={{
-                                                  'summary-table__cell': true,
-                                                  'summary-table__cell--yes': true,
-                                                  'summary-table__cell--mini': true,
-                                                }}
-                                              >
-                                                {summaryCellMark(1)}
-                                              </span>
-                                              <span class="summary-table__stack-names">
-                                                {row.allGroups.yes.join(', ')}
-                                              </span>
+                                          )}
+                                        </For>
+                                      </div>
+                                    </header>
+                                    <div class="summary-list__body">
+                                      <div class="summary-table__date-list">
+                                        <For each={intersection.dates}>
+                                          {(dateGroup) => (
+                                            <div class="summary-table__date-row">
+                                              <div class="summary-table__date-inline">
+                                                <span class="summary-table__date-title">{dateGroup.day}:</span>
+                                                <span class="summary-table__time-list">
+                                                  <For each={dateGroup.times}>
+                                                    {(timeEntry) => (
+                                                      <label
+                                                        classList={{
+                                                          'summary-table__time-option': true,
+                                                          'summary-table__time-option--selected': isSummarySlotSelected(
+                                                            intersection.key,
+                                                            timeEntry.day,
+                                                            timeEntry.time,
+                                                          ),
+                                                        }}
+                                                      >
+                                                        <input
+                                                          type="radio"
+                                                          name="summary-slot"
+                                                          class="summary-table__time-radio"
+                                                          checked={isSummarySlotSelected(
+                                                            intersection.key,
+                                                            timeEntry.day,
+                                                            timeEntry.time,
+                                                          )}
+                                                          onChange={() =>
+                                                            selectSummarySlot(
+                                                              intersection.key,
+                                                              timeEntry.day,
+                                                              timeEntry.time,
+                                                            )
+                                                          }
+                                                          aria-label={`Select ${timeEntry.day} ${timeEntry.time} for confirmation`}
+                                                        />
+                                                        <span class="summary-table__time-label">{timeEntry.time}</span>
+                                                      </label>
+                                                    )}
+                                                  </For>
+                                                </span>
+                                              </div>
                                             </div>
-                                          </Show>
-                                          <Show when={row.allGroups.maybe.length > 0}>
-                                            <div class="summary-table__stack-row">
-                                              <span
-                                                classList={{
-                                                  'summary-table__cell': true,
-                                                  'summary-table__cell--maybe': true,
-                                                  'summary-table__cell--mini': true,
-                                                }}
-                                              >
-                                                {summaryCellMark(2)}
-                                              </span>
-                                              <span class="summary-table__stack-names">
-                                                {row.allGroups.maybe.join(', ')}
-                                              </span>
-                                            </div>
-                                          </Show>
-                                          <Show when={row.allGroups.no.length > 0}>
-                                            <div class="summary-table__stack-row">
-                                              <span
-                                                classList={{
-                                                  'summary-table__cell': true,
-                                                  'summary-table__cell--no': true,
-                                                  'summary-table__cell--mini': true,
-                                                }}
-                                              />
-                                              <span class="summary-table__stack-names">
-                                                {row.allGroups.no.join(', ')}
-                                              </span>
-                                            </div>
-                                          </Show>
-                                        </div>
-                                      </td>
-                                      <td class="summary-table__action">
-                                        <Win95Button size="small" onClick={() => openConfirm(row.day, row.time)}>
-                                          <span class="hk">C</span>onfirm
-                                        </Win95Button>
-                                      </td>
-                                    </tr>
-                                  )
-                                }}
-                              </For>
-                            </tbody>
-                          </table>
-                          <div class="summary-table__footer">
-                            Pick a row and confirm the final time.
+                                          )}
+                                        </For>
+                                      </div>
+                                    </div>
+                                  </section>
+                                )
+                              }}
+                            </For>
+                          </div>
+                          <div class="summary-list__actions">
+                            <Win95Button size="small" onClick={doUndo}>
+                              <span class="hk">U</span>ndo
+                            </Win95Button>
+                            <Win95Button size="small" onClick={confirmSelectedSummarySlot}>
+                              <span class="hk">C</span>onfirm selected time
+                            </Win95Button>
                           </div>
                         </div>
                       </Show>
@@ -1332,19 +1378,6 @@ export default function Grid(props: Props) {
             </div>
             {/* /panels */}
 
-            {/* Function bar */}
-            <div class="grid-view__function-bar">
-              <button type="button" class="grid-view__function-item" onClick={doUndo}>
-                <span class="grid-view__function-key">F1</span> <span class="hk">U</span>ndo
-              </button>
-              <button
-                type="button"
-                class="grid-view__function-item"
-                onClick={() => openConfirm(null, null)}
-              >
-                <span class="grid-view__function-key">F5</span> <span class="hk">C</span>onfirm
-              </button>
-            </div>
             <Show when={isConfirmed()}>
               <div class="grid-view__confirmed-overlay">
                 <div class="grid-view__confirmed-box r">
@@ -1537,6 +1570,26 @@ export default function Grid(props: Props) {
               </Win95Button>
               <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
                 Cancel
+              </Win95Button>
+            </div>
+          </Win95Dialog>
+        </Show>
+        <Show when={!!summaryValidationError()}>
+          <Win95Dialog
+            title="Cannot confirm yet"
+            class="dialog--landing-error"
+            bodyClass="dialog-body--landing-error"
+            onClose={() => setSummaryValidationError('')}
+          >
+            <div class="landing-error__row">
+              <span class="landing-error__icon" aria-hidden="true">
+                !
+              </span>
+              <p class="landing-error__text">{summaryValidationError()}</p>
+            </div>
+            <div class="dialog-buttons landing-error__actions">
+              <Win95Button class="dialog-btn" onClick={() => setSummaryValidationError('')}>
+                OK
               </Win95Button>
             </div>
           </Win95Dialog>
