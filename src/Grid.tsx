@@ -19,7 +19,6 @@ import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
-import GridAccordion from './components/GridAccordion'
 import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
@@ -107,9 +106,6 @@ export default function Grid(props: Props) {
     return result
   })
 
-  const [editCollapsed, setEditCollapsed] = createSignal(false)
-  const [bestCollapsed, setBestCollapsed] = createSignal(false)
-
   type ActiveModal = null | 'name-picker' | 'help' | 'confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
@@ -120,7 +116,7 @@ export default function Grid(props: Props) {
     time: string
   } | null>(null)
   const [summaryValidationError, setSummaryValidationError] = createSignal('')
-  const [shareCollapsed, setShareCollapsed] = createSignal(false)
+  const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
   let undoStack: UndoEntry[][] = []
@@ -559,6 +555,44 @@ export default function Grid(props: Props) {
     openConfirm(selected.day, selected.time)
   }
 
+  function renderAvailabilityCell(
+    dayKey: string,
+    dayLabel: string,
+    timeLabel: string,
+    timeIndex: number,
+    rowIndex: number,
+    colIndex: number,
+  ) {
+    return (
+      <button
+        type="button"
+        classList={{
+          'availability-grid__cell': true,
+          'availability-grid__cell--yes': myState[dayKey]?.[timeIndex] === 1,
+          'availability-grid__cell--maybe': myState[dayKey]?.[timeIndex] === 2,
+          'availability-grid__cell--first-row': rowIndex === 0,
+          'availability-grid__cell--first-col': colIndex === 0,
+        }}
+        aria-label={`${dayLabel} at ${timeLabel}. Current status: ${
+          myState[dayKey]?.[timeIndex] === 1
+            ? 'yes'
+            : myState[dayKey]?.[timeIndex] === 2
+              ? 'maybe'
+              : 'no'
+        }. Activate to cycle.`}
+        disabled={isConfirmed()}
+        onClick={() => cycleCell(dayKey, timeIndex)}
+      >
+        <Show when={myState[dayKey]?.[timeIndex] === 1}>
+          <span class="availability-grid__icon">✔</span>
+        </Show>
+        <Show when={myState[dayKey]?.[timeIndex] === 2}>
+          <span class="availability-grid__icon">?</span>
+        </Show>
+      </button>
+    )
+  }
+
   function doUndo() {
     if (isConfirmed()) {
       return
@@ -634,7 +668,6 @@ export default function Grid(props: Props) {
   }
 
   function revealSharePanel() {
-    setShareCollapsed(false)
     setCopyStatus('')
     queueMicrotask(() => {
       shareInputRef?.focus()
@@ -900,6 +933,14 @@ export default function Grid(props: Props) {
 
   // Global event listeners + initial load
   onMount(() => {
+    const desktopQuery = window.matchMedia('(min-width: 700px)')
+    const onDesktopChange = () => {
+      setIsDesktop(desktopQuery.matches)
+    }
+
+    onDesktopChange()
+    desktopQuery.addEventListener('change', onDesktopChange)
+
     let wsConnected = false
     let fallbackPollTimer: number | undefined
     let fallbackPollDelay = 3000
@@ -1046,6 +1087,7 @@ export default function Grid(props: Props) {
     makeEventListener(document, 'keydown', onKeyDown)
 
     onCleanup(() => {
+      desktopQuery.removeEventListener('change', onDesktopChange)
       disconnectSocket()
       clearFallbackPoll()
     })
@@ -1119,6 +1161,7 @@ export default function Grid(props: Props) {
               <div class="grid-view__deck-left row row--center row--gap-sm">
                 <div class="grid-view__deck-display">
                   Hi <span class="grid-controls__name">{currentName() || 'there'}</span>!
+                  <span class="grid-view__deck-timezone"> · {currentTimezone()}</span>
                 </div>
                 <Show when={!isConfirmed()}>
                   <Win95Button variant="toolbar" onClick={() => setActiveModal('name-picker')}>
@@ -1132,18 +1175,16 @@ export default function Grid(props: Props) {
                 </Win95Button>
               </div>
             </div>
-            {/* Two-panel layout */}
+            {/* Single-column layout */}
             <div class="grid-view__panels">
-              {/* Panel: Your availability */}
-              <div class="grid-view__panel">
-                <div class="grid-view__panel-frame s">
-                  <GridAccordion
-                    id="share"
-                    title="Invite people"
-                    collapsed={shareCollapsed()}
-                    onToggle={() => setShareCollapsed(!shareCollapsed())}
-                    bodyAlign="title"
-                  >
+              <div class="grid-view__panel-frame">
+                <section class="grid-view__section">
+                  <div class="grid-view__section-header">
+                    <span class="grid-view__section-number">1.</span>
+                    <span>Share the link with your group</span>
+                    <hr />
+                  </div>
+                  <div class="grid-view__section-body grid-view__section-body--title">
                     <p class="share-panel__instruction">
                       Each person marks yes/maybe/no availability. TimeSweeper combines responses
                       and suggests the best times.
@@ -1178,78 +1219,101 @@ export default function Grid(props: Props) {
                     <div class="copy-status" aria-live="polite">
                       {copyStatus()}
                     </div>
-                  </GridAccordion>
+                  </div>
+                </section>
 
-                  <GridAccordion
-                    id="edit"
-                    title={`Your availability (${currentTimezone()})`}
-                    collapsed={editCollapsed()}
-                    onToggle={() => setEditCollapsed(!editCollapsed())}
-                    spaced
-                  >
-                    <div class="grid-view__legend">
+                <section class="grid-view__section">
+                  <div class="grid-view__section-header">
+                    <span class="grid-view__section-number">2.</span>
+                    <span>Mark your availability</span>
+                    <hr />
+                  </div>
+                  <div class="grid-view__section-body">
+                    <div
+                      classList={{
+                        'grid-view__legend': true,
+                        'grid-view__legend--horizontal': isDesktop(),
+                      }}
+                    >
                       <AvailabilityLegend withLabels />
                     </div>
-                    <div
-                      class="availability-grid"
-                      style={{ '--days': String(Math.min(Math.max(days().length, 1), 7)) }}
-                    >
-                      <div class="availability-grid__corner" />
-                      <For each={days()}>
-                        {(d) => <div class="availability-grid__day">{d.label}</div>}
-                      </For>
-                      <For each={times()}>
-                        {(t, ti) => (
-                          <>
-                            <div class="availability-grid__time">{t.label}</div>
-                            <For each={days()}>
-                              {(d, di) => (
-                                <button
-                                  type="button"
-                                  classList={{
-                                    'availability-grid__cell': true,
-                                    'availability-grid__cell--yes': myState[d.key]?.[ti()] === 1,
-                                    'availability-grid__cell--maybe': myState[d.key]?.[ti()] === 2,
-                                    'availability-grid__cell--first-row': ti() === 0,
-                                    'availability-grid__cell--first-col': di() === 0,
-                                  }}
-                                  aria-label={`${d.label} at ${t.label}. Current status: ${
-                                    myState[d.key]?.[ti()] === 1
-                                      ? 'yes'
-                                      : myState[d.key]?.[ti()] === 2
-                                        ? 'maybe'
-                                        : 'no'
-                                  }. Activate to cycle.`}
-                                  disabled={isConfirmed()}
-                                  onClick={() => cycleCell(d.key, ti())}
-                                >
-                                  <Show when={myState[d.key]?.[ti()] === 1}>
-                                    <span class="availability-grid__icon">✔</span>
-                                  </Show>
-                                  <Show when={myState[d.key]?.[ti()] === 2}>
-                                    <span class="availability-grid__icon">?</span>
-                                  </Show>
-                                </button>
-                              )}
-                            </For>
-                          </>
-                        )}
-                      </For>
+                    <div class="availability-grid-wrap">
+                      <div
+                        classList={{
+                          'availability-grid': true,
+                          'availability-grid--horizontal': isDesktop(),
+                        }}
+                        style={{
+                          '--days': String(Math.min(Math.max(days().length, 1), 7)),
+                          '--times': String(Math.max(times().length, 1)),
+                        }}
+                      >
+                        <Show
+                          when={isDesktop()}
+                          fallback={
+                            <>
+                              <div class="availability-grid__corner" />
+                              <For each={days()}>
+                                {(d) => <div class="availability-grid__day">{d.label}</div>}
+                              </For>
+                              <For each={times()}>
+                                {(t, ti) => (
+                                  <>
+                                    <div class="availability-grid__time">{t.label}</div>
+                                    <For each={days()}>
+                                      {(d, di) =>
+                                        renderAvailabilityCell(
+                                          d.key,
+                                          d.label,
+                                          t.label,
+                                          ti(),
+                                          ti(),
+                                          di(),
+                                        )}
+                                    </For>
+                                  </>
+                                )}
+                              </For>
+                            </>
+                          }
+                        >
+                          <div class="availability-grid__corner" />
+                          <For each={times()}>
+                            {(t) => <div class="availability-grid__day availability-grid__day--time-head">{t.label}</div>}
+                          </For>
+                          <For each={days()}>
+                            {(d, di) => (
+                              <>
+                                <div class="availability-grid__time availability-grid__time--day-head">
+                                  {d.label}
+                                </div>
+                                <For each={times()}>
+                                  {(t, ti) =>
+                                    renderAvailabilityCell(
+                                      d.key,
+                                      d.label,
+                                      t.label,
+                                      ti(),
+                                      di(),
+                                      ti(),
+                                    )}
+                                </For>
+                              </>
+                            )}
+                          </For>
+                        </Show>
+                      </div>
                     </div>
-                  </GridAccordion>
-                </div>
-              </div>
+                  </div>
+                </section>
 
-              {/* Panel: Results + Group heatmap */}
-              <div class="grid-view__panel">
-                <div class="grid-view__panel-frame s">
-                  {/* Results sub-panel */}
-                  <GridAccordion
-                    id="best"
-                    title={`Summary (${currentTimezone()})`}
-                    collapsed={bestCollapsed()}
-                    onToggle={() => setBestCollapsed(!bestCollapsed())}
-                  >
+                <section class="grid-view__section">
+                  <div class="grid-view__section-header">
+                    <span class="grid-view__section-number">3.</span>
+                    <span>Confirm time</span>
+                    <hr />
+                  </div>
+                  <div class="grid-view__section-body">
                     <Show
                       when={canShowSuggestions()}
                       fallback={
@@ -1371,9 +1435,8 @@ export default function Grid(props: Props) {
                         </div>
                       </Show>
                     </Show>
-                  </GridAccordion>
-
-                </div>
+                  </div>
+                </section>
               </div>
             </div>
             {/* /panels */}
