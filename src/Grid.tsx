@@ -1143,9 +1143,9 @@ export default function Grid(props: Props) {
       <Show when={localReady()} fallback={null}>
         <div class="grid-view__shell">
           <div class="grid-view__hero row row--between row--center">
-            <h1 class="grid-view__event-name">
-              <MineIcon size={20} /> {event()?.name ?? 'Opening event'}
-            </h1>
+            <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
+              <MineIcon size={18} /> TimeSweeper
+            </a>
             <div class="grid-view__hero-actions row row--center row--gap-xs">
               <Win95Button variant="toolbar" onClick={() => setActiveModal('help')}>
                 <span class="hk">H</span>elp
@@ -1164,7 +1164,9 @@ export default function Grid(props: Props) {
           </div>
 
           <div class="grid-view__content">
-            <h2 class="grid-view__pane-title">Overview</h2>
+            <Show when={event()}>
+              {(loadedEvent) => <h2 class="grid-view__pane-title">{loadedEvent().name}</h2>}
+            </Show>
             <section class="grid-view__intro-panel r">
               <p class="grid-view__intro-text">
                 Hi{' '}
