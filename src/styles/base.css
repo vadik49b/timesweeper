@@ -13,8 +13,7 @@
   --bhi: #ffffff;
   --blo: #808080;
   --bdk: #404040;
-  --ui: 'Segoe UI', Tahoma, 'MS Sans Serif', Geneva, sans-serif;
-  --mono: 'VT323', 'Courier New', monospace;
+  --ui: 'VT323', monospace;
   --teal: #008080;
   --navy: #000080;
   --title-bar: linear-gradient(90deg, #000080, #1084d0);
@@ -37,12 +36,13 @@
   --text-link-hover: #a0a0ff;
   --text-footer: #a0c0c0;
   --text-footer-link: #e0e0e0;
-  --fs-xxs: 10px;
-  --fs-xs: 12px;
-  --fs-sm: 14px;
-  --fs-lg: 18px;
-  --fs-xl: 22px;
-  --fs-hero: 38px;
+  --fs-base: 18px;
+  --fs-xxs: 12px;
+  --fs-xs: 16px;
+  --fs-sm: 18px;
+  --fs-lg: 22px;
+  --fs-xl: 26px;
+  --fs-hero: 42px;
   --fw-regular: 400;
   --fw-bold: 700;
   --space-1: 4px;
@@ -53,6 +53,7 @@
 body {
   background: var(--teal);
   font-family: var(--ui);
+  font-size: var(--fs-base);
   min-height: 100vh;
   user-select: none;
 }
@@ -107,7 +108,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: sans-serif;
+  font-family: var(--ui);
 }
 
 .hk {

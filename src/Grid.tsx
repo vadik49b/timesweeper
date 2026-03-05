@@ -1184,7 +1184,7 @@ export default function Grid(props: Props) {
                     <span class="grid-controls__name">{currentName() || 'there'}</span>
                   </a>
                 </Show>
-                ! Follow the 3 easy steps below: share the event link, fill yours, then choose and
+                ! Follow the 3 easy steps below: share the event link, fill your availability, then choose and
                 confirm the best suggested time once everyone has responded.
               </p>
             </section>

@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: var(--fs-hero);
   letter-spacing: 1px;
   line-height: 1.05;
@@ -90,7 +90,7 @@
 }
 .grid-view__pane-title {
   margin: 0 0 10px;
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: var(--fs-xl);
   font-weight: var(--fw-regular);
   letter-spacing: 0.6px;
@@ -260,7 +260,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   background: var(--bg);
   border: 2px solid;
   border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
@@ -280,7 +280,7 @@
 }
 .availability-grid__cell.availability-grid__cell--yes .availability-grid__icon {
   color: #006800;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   pointer-events: none;
 }
 .availability-grid__cell.availability-grid__cell--maybe {
@@ -291,7 +291,7 @@
 }
 .availability-grid__cell.availability-grid__cell--maybe .availability-grid__icon {
   color: #ff0000;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   pointer-events: none;
 }
 .availability-grid__cell.availability-grid__cell--first-row.availability-grid__cell--yes,
@@ -394,7 +394,7 @@
 .availability-grid--horizontal .availability-grid__time--day-head {
   justify-content: flex-end;
   padding-right: 6px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-xxs);
 }
 .availability-grid__time {
   height: var(--cell);
@@ -658,7 +658,7 @@
   flex-wrap: wrap;
 }
 .summary-table__date-title {
-  font-family: "Lucida Console", "Courier New", monospace;
+  font-family: var(--ui);
   font-weight: var(--fw-bold);
   letter-spacing: 0;
   white-space: nowrap;

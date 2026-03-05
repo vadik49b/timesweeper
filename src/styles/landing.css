@@ -16,7 +16,7 @@
   max-width: var(--landing-max);
 }
 .hero h1 {
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: var(--fs-hero);
   color: var(--text-inverse);
   text-shadow: 2px 2px 0 var(--navy);
@@ -246,7 +246,7 @@
   margin-bottom: 16px;
 }
 .how-title {
-  font-family: var(--mono);
+  font-family: var(--ui);
   font-size: var(--fs-xl);
   color: var(--text-inverse);
   text-shadow: 1px 1px 0 var(--navy);
@@ -279,7 +279,7 @@
   font-weight: var(--fw-bold);
 }
 .how-text {
-  line-height: 1.5;
+  line-height: 1.2;
 }
 
 .recent-section {
