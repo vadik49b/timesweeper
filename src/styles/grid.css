@@ -529,9 +529,7 @@
   margin: 0;
 }
 .summary-list__actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  position: static;
   display: block;
   margin-top: 0;
   padding: 8px 6px 6px;

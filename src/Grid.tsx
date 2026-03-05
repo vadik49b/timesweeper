@@ -1,6 +1,7 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import { makeEventListener } from '@solid-primitives/event-listener'
+import { Title, Meta } from '@solidjs/meta'
 import {
   getEvent,
   getSelectedParticipant,
@@ -713,6 +714,17 @@ export default function Grid(props: Props) {
 
   const createdByName = createMemo(() => event()?.participants[0]?.name ?? 'Unknown')
   const currentTimezone = createMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const pageTitle = createMemo(() => {
+    const ev = event()
+
+    if (!ev) {
+      return 'TimeSweeper — Group scheduling, no login needed'
+    }
+
+    return `${ev.name} — TimeSweeper`
+  })
+  const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
+  const pageImage = `${window.location.origin}/anti-tank-mine-logo.png`
 
   const confirmedInfo = createMemo(() => {
     const ev = event()
@@ -1139,24 +1151,35 @@ export default function Grid(props: Props) {
   })
 
   return (
-    <div class="grid-view">
-      <Show when={localReady()} fallback={null}>
+    <>
+      <Title>{pageTitle()}</Title>
+      <Meta
+        name="description"
+        content="Share your availability for this event to help find a time that works for all."
+      />
+      <Meta property="og:type" content="website" />
+      <Meta property="og:url" content={pageUrl} />
+      <Meta property="og:title" content={pageTitle()} />
+      <Meta
+        property="og:description"
+        content="Share your availability for this event to help find a time that works for all."
+      />
+      <Meta property="og:image" content={pageImage} />
+      <Meta name="twitter:card" content="summary_large_image" />
+      <Meta name="twitter:title" content={pageTitle()} />
+      <Meta
+        name="twitter:description"
+        content="Share your availability for this event to help find a time that works for all."
+      />
+      <Meta name="twitter:image" content={pageImage} />
+      <div class="grid-view">
+        <Show when={localReady()} fallback={null}>
         <div class="grid-view__shell">
           <div class="grid-view__hero row row--between row--center">
             <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
               <MineIcon size={18} /> TimeSweeper
             </a>
-            <div class="grid-view__hero-actions row row--center row--gap-xs">
-              <Win95Button variant="toolbar" onClick={() => setActiveModal('help')}>
-                <span class="hk">H</span>elp
-              </Win95Button>
-              <a
-                href="/"
-                class="win95-button r win95-button--small"
-                aria-label="Return to home"
-              >
-                Home
-              </a>
+            <div class="grid-view__hero-actions row row--center">
               <span class="grid-view__hero-timezone">
                 Timezone: <b>{currentTimezone()}</b>
               </span>
@@ -1540,7 +1563,7 @@ export default function Grid(props: Props) {
 
         <Show when={activeModal() === 'name-picker'}>
           <Win95Dialog
-            title="Choose participant"
+            title="Who dis?"
             class="dialog--name-picker"
             onClose={() => (event() ? setActiveModal(null) : goToLanding())}
           >
@@ -1553,8 +1576,10 @@ export default function Grid(props: Props) {
               }
             >
               <p class="participant-picker__lead">
-                Choose your participant name to start editing availability.
+                {createdByName()} is organizing "{event()?.name ?? 'this event'}" and wants to know
+                when you're available.
               </p>
+              <p class="participant-picker__label">Who are you?</p>
               <div class="participant-picker__list">
                 <For each={event()?.participants ?? []}>
                   {(p) => (
@@ -1572,20 +1597,20 @@ export default function Grid(props: Props) {
               </div>
               <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
                 <label class="participant-picker__label" for="new-participant-name">
-                  I'm not in the list
+                  Not on the list?
                 </label>
                 <Win95Field
                   kind="input"
                   id="new-participant-name"
                   name="newParticipantName"
                   value={newParticipantName()}
-                  placeholder="Your name"
+                  placeholder="Enter your name"
                   wrapperClass="dialog__field"
                   onInput={setNewParticipantName}
                 />
                 <div class="dialog-buttons">
                   <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
-                    Add
+                    Join
                   </Win95Button>
                 </div>
               </Show>
@@ -1702,7 +1727,8 @@ export default function Grid(props: Props) {
             </div>
           </Win95Dialog>
         </Show>
-      </Show>
-    </div>
+        </Show>
+      </div>
+    </>
   )
 }
