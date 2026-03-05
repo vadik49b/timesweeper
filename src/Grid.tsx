@@ -35,7 +35,6 @@ interface Props {
   eventId: string
 }
 
-type UndoEntry = { dk: string; ti: number; prev: number }
 type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
 type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
 type SummaryIntersectionTime = {
@@ -116,10 +115,10 @@ export default function Grid(props: Props) {
     time: string
   } | null>(null)
   const [summaryValidationError, setSummaryValidationError] = createSignal('')
+  const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
   const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
-  let undoStack: UndoEntry[][] = []
   let persistTimer: ReturnType<typeof setTimeout> | undefined
   let shareInputRef!: HTMLInputElement
 
@@ -313,6 +312,15 @@ export default function Grid(props: Props) {
 
     return entries
   })
+  const visibleSummaryIntersections = createMemo(() => {
+    const all = summaryIntersections()
+
+    if (showAllSummaryRows()) {
+      return all
+    }
+
+    return all.slice(0, 3)
+  })
 
   const participantsWithAvailability = createMemo(() => {
     const ev = event()
@@ -495,7 +503,6 @@ export default function Grid(props: Props) {
       return
     }
 
-    undoStack.push([{ dk, ti, prev }])
     setMyState(dk, ti, next)
 
     if (navigator.vibrate) navigator.vibrate(10)
@@ -514,14 +521,38 @@ export default function Grid(props: Props) {
     return ''
   }
 
-  function summaryGroupCells(groups: SummaryGroups) {
+  function summaryLegendGroups(groups: SummaryGroups) {
+    const sortNames = (names: string[]) =>
+      [...names].sort((a, b) => {
+        if (a === 'You') {
+          return -1
+        }
+
+        if (b === 'You') {
+          return 1
+        }
+
+        return a.localeCompare(b)
+      })
+
     const sections: Array<{ value: SlotValue; names: string[] }> = [
-      { value: 1, names: groups.yes },
-      { value: 2, names: groups.maybe },
-      { value: 0, names: groups.no },
+      { value: 1, names: sortNames(groups.yes) },
+      { value: 2, names: sortNames(groups.maybe) },
+      { value: 0, names: sortNames(groups.no) },
     ]
 
     return sections.filter((section) => section.names.length > 0)
+  }
+
+  function summaryLegendCount(groups: SummaryGroups) {
+    const total = groups.yes.length + groups.maybe.length + groups.no.length
+    const canAttend = groups.yes.length + groups.maybe.length
+
+    if (groups.maybe.length > 0) {
+      return `${canAttend}/${total}*`
+    }
+
+    return `${canAttend}/${total}`
   }
 
   function isSummarySlotSelected(intersectionKey: string, day: string, time: string) {
@@ -591,20 +622,6 @@ export default function Grid(props: Props) {
         </Show>
       </button>
     )
-  }
-
-  function doUndo() {
-    if (isConfirmed()) {
-      return
-    }
-
-    if (!undoStack.length) {
-      return
-    }
-
-    const batch = undoStack.pop()!
-    batch.forEach((u) => setMyState(u.dk, u.ti, u.prev))
-    schedulePersist()
   }
 
   function openConfirm(day: string | null, time: string | null) {
@@ -1053,16 +1070,6 @@ export default function Grid(props: Props) {
 
         return
 
-      if (e.key === 'F1') {
-        e.preventDefault()
-        doUndo()
-      }
-
-      if (e.key === 'u' || e.key === 'U') {
-        e.preventDefault()
-        doUndo()
-      }
-
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
         revealSharePanel()
@@ -1078,10 +1085,6 @@ export default function Grid(props: Props) {
         openConfirm(null, null)
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault()
-        doUndo()
-      }
     }
 
     makeEventListener(document, 'keydown', onKeyDown)
@@ -1331,45 +1334,46 @@ export default function Grid(props: Props) {
                         }
                       >
                         <div class="summary-table-wrap">
-                          <div class="summary-list">
-                            <For each={summaryIntersections()}>
+                          <div class="summary-list summary-list--scrollable">
+                            <For each={visibleSummaryIntersections()}>
                               {(intersection) => {
-                                const groups = summaryGroupCells(intersection.allGroups)
-                                const isAllYes =
-                                  intersection.allGroups.maybe.length === 0 &&
-                                  intersection.allGroups.no.length === 0
+                                const legendGroups = summaryLegendGroups(intersection.allGroups)
 
                                 return (
-                                  <section
-                                    classList={{
-                                      'summary-list__item': true,
-                                      'summary-list__item--all-yes': isAllYes,
-                                    }}
-                                  >
-                                    <header class="summary-list__header">
-                                      <div class="summary-table__name-groups">
-                                        <For each={groups}>
-                                          {(group) => (
-                                            <span class="summary-table__name-group">
-                                              <span
-                                                classList={{
-                                                  'summary-table__cell': true,
-                                                  'summary-table__cell--mini': true,
-                                                  'summary-table__cell--yes': group.value === 1,
-                                                  'summary-table__cell--maybe': group.value === 2,
-                                                  'summary-table__cell--no': group.value === 0,
-                                                }}
-                                              >
-                                                {summaryCellMark(group.value)}
+                                  <fieldset class="summary-list__item">
+                                    <legend class="summary-list__legend">
+                                      <span class="summary-list__legend-count">
+                                        {summaryLegendCount(intersection.allGroups)}
+                                      </span>
+                                      <span class="summary-list__legend-separator"> · </span>
+                                      <span class="summary-table__name-groups">
+                                        <For each={legendGroups}>
+                                          {(group, groupIndex) => (
+                                            <>
+                                              <Show when={groupIndex() > 0}>
+                                                <span class="summary-list__legend-separator"> · </span>
+                                              </Show>
+                                              <span class="summary-table__name-group">
+                                                <span
+                                                  classList={{
+                                                    'summary-table__cell': true,
+                                                    'summary-table__cell--mini': true,
+                                                    'summary-table__cell--yes': group.value === 1,
+                                                    'summary-table__cell--maybe': group.value === 2,
+                                                    'summary-table__cell--no': group.value === 0,
+                                                  }}
+                                                >
+                                                  {summaryCellMark(group.value)}
+                                                </span>
+                                                <span class="summary-table__stack-names">
+                                                  {group.names.join(', ')}
+                                                </span>
                                               </span>
-                                              <span class="summary-table__stack-names">
-                                                {group.names.join(', ')}
-                                              </span>
-                                            </span>
+                                            </>
                                           )}
                                         </For>
-                                      </div>
-                                    </header>
+                                      </span>
+                                    </legend>
                                     <div class="summary-list__body">
                                       <div class="summary-table__date-list">
                                         <For each={intersection.dates}>
@@ -1419,18 +1423,51 @@ export default function Grid(props: Props) {
                                         </For>
                                       </div>
                                     </div>
-                                  </section>
+                                  </fieldset>
                                 )
                               }}
                             </For>
                           </div>
+                          <Show
+                            when={
+                              summaryIntersections().some(
+                                (intersection) => intersection.allGroups.maybe.length > 0,
+                              ) || summaryIntersections().length > 3
+                            }
+                          >
+                            <div class="summary-list__meta-row">
+                              <Show
+                                when={summaryIntersections().some(
+                                  (intersection) => intersection.allGroups.maybe.length > 0,
+                                )}
+                              >
+                                <div class="summary-list__maybe-note">
+                                  * includes maybe responses
+                                </div>
+                              </Show>
+                              <Show when={summaryIntersections().length > 3}>
+                                <div class="summary-list__toggle-row">
+                                  <Win95Button
+                                    size="small"
+                                    onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
+                                  >
+                                    <Show
+                                      when={showAllSummaryRows()}
+                                      fallback={`Show all ${summaryIntersections().length} variants`}
+                                    >
+                                      Show fewer variants
+                                    </Show>
+                                  </Win95Button>
+                                </div>
+                              </Show>
+                            </div>
+                          </Show>
                           <div class="summary-list__actions">
-                            <Win95Button size="small" onClick={doUndo}>
-                              <span class="hk">U</span>ndo
-                            </Win95Button>
-                            <Win95Button size="small" onClick={confirmSelectedSummarySlot}>
-                              <span class="hk">C</span>onfirm selected time
-                            </Win95Button>
+                            <div class="summary-list__actions-row">
+                              <Win95Button class="dialog-btn" onClick={confirmSelectedSummarySlot}>
+                                <span class="hk">C</span>onfirm selected time
+                              </Win95Button>
+                            </div>
                           </div>
                         </div>
                       </Show>
@@ -1574,11 +1611,7 @@ export default function Grid(props: Props) {
             <p class="help__keys">
               <b>Keyboard shortcuts:</b>
               <br />
-              <span class="help__key-line">F1 / U — Undo</span>
-              <br />
               <span class="help__key-line">F3 / S — Focus share link</span>
-              <br />
-              <span class="help__key-line">Ctrl+Z — Undo</span>
             </p>
             <div class="dialog-buttons">
               <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
