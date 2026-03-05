@@ -141,13 +141,22 @@ body {
   align-items: center;
   justify-content: center;
 }
+.win95-button--small.win95-window__title-button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
 .win95-button--variant-toolbar {
   padding: 2px 8px;
 }
 .win95-button--variant-icon {
+  width: var(--control-small-height);
   min-width: var(--control-small-height);
-  padding-left: 6px;
-  padding-right: 6px;
+  height: var(--control-small-height);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .win95-button--variant-cta {
   font-size: var(--fs-sm);
