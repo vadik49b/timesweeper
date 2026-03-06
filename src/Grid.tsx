@@ -20,6 +20,7 @@ import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
+import StatusMiniCell from './components/StatusMiniCell'
 import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
@@ -110,13 +111,8 @@ export default function Grid(props: Props) {
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
-  const [selectedSummarySlot, setSelectedSummarySlot] = createSignal<{
-    intersectionKey: string
-    day: string
-    time: string
-  } | null>(null)
-  const [summaryValidationError, setSummaryValidationError] = createSignal('')
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
+  const [expandedSummaryNames, setExpandedSummaryNames] = createStore<Record<string, boolean>>({})
   const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
@@ -537,18 +533,6 @@ export default function Grid(props: Props) {
     schedulePersist()
   }
 
-  function summaryCellMark(value: SlotValue) {
-    if (value === 1) {
-      return '✓'
-    }
-
-    if (value === 2) {
-      return '?'
-    }
-
-    return ''
-  }
-
   function summaryLegendGroups(groups: SummaryGroups) {
     const sortNames = (names: string[]) =>
       [...names].sort((a, b) => {
@@ -572,46 +556,25 @@ export default function Grid(props: Props) {
     return sections.filter((section) => section.names.length > 0)
   }
 
-  function summaryLegendCount(groups: SummaryGroups) {
-    const total = groups.yes.length + groups.maybe.length + groups.no.length
-    const canAttend = groups.yes.length + groups.maybe.length
-
-    if (groups.maybe.length > 0) {
-      return `${canAttend}/${total}*`
-    }
-
-    return `${canAttend}/${total}`
+  function summaryLegendStats(groups: SummaryGroups) {
+    return [
+      { value: 1 as SlotValue, label: 'yes', count: groups.yes.length },
+      { value: 2 as SlotValue, label: 'maybe', count: groups.maybe.length },
+      { value: 0 as SlotValue, label: 'no', count: groups.no.length },
+    ]
   }
 
-  function isSummarySlotSelected(intersectionKey: string, day: string, time: string) {
-    const selected = selectedSummarySlot()
-
-    if (!selected) {
-      return false
-    }
-
-    return (
-      selected.intersectionKey === intersectionKey &&
-      selected.day === day &&
-      selected.time === time
-    )
+  function areSummaryNamesExpanded(intersectionKey: string) {
+    return expandedSummaryNames[intersectionKey] === true
   }
 
-  function selectSummarySlot(intersectionKey: string, day: string, time: string) {
-    setSummaryValidationError('')
-    setSelectedSummarySlot({ intersectionKey, day, time })
+  function toggleSummaryNames(intersectionKey: string) {
+    const nextValue = !areSummaryNamesExpanded(intersectionKey)
+    setExpandedSummaryNames(intersectionKey, nextValue)
   }
 
-  function confirmSelectedSummarySlot() {
-    const selected = selectedSummarySlot()
-
-    if (!selected) {
-      setSummaryValidationError('Please select a time first.')
-      return
-    }
-
-    setSummaryValidationError('')
-    openConfirm(selected.day, selected.time)
+  function confirmSummaryTime(day: string, time: string) {
+    openConfirm(day, time)
   }
 
   function renderAvailabilityCell(
@@ -741,6 +704,84 @@ export default function Grid(props: Props) {
 
   const createdByName = createMemo(() => event()?.participants[0]?.name ?? 'Unknown')
   const currentTimezone = createMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const confirmSlotPreview = createMemo(() => {
+    const ev = event()
+
+    if (!ev) {
+      return {
+        yes: [] as string[],
+        maybe: [] as string[],
+        no: [] as string[],
+      }
+    }
+
+    const day = days().find((entry) => entry.label === confirmDay())
+    const timeIndex = times().findIndex((entry) => entry.label === confirmTime())
+    const spd = slotsPerDay(ev)
+
+    if (!day || timeIndex < 0) {
+      return {
+        yes: [] as string[],
+        maybe: [] as string[],
+        no: [] as string[],
+      }
+    }
+
+    const dayIndex = ev.dates.findIndex((dateKey) => dateKey === day.key)
+
+    if (dayIndex < 0) {
+      return {
+        yes: [] as string[],
+        maybe: [] as string[],
+        no: [] as string[],
+      }
+    }
+
+    const slotIndex = dayIndex * spd + timeIndex
+    const yes: string[] = []
+    const maybe: string[] = []
+    const no: string[] = []
+
+    ev.participants.forEach((participant) => {
+      const value =
+        participant.name === currentName()
+          ? ((myState[day.key]?.[timeIndex] ?? 0) as SlotValue)
+          : ((participant.slots[slotIndex] ?? 0) as SlotValue)
+
+      if (value === 1) {
+        yes.push(participant.name)
+
+        return
+      }
+
+      if (value === 2) {
+        maybe.push(participant.name)
+
+        return
+      }
+
+      no.push(participant.name)
+    })
+
+    const sortNames = (names: string[]) =>
+      [...names].sort((a, b) => {
+        if (a === currentName()) {
+          return -1
+        }
+
+        if (b === currentName()) {
+          return 1
+        }
+
+        return a.localeCompare(b)
+      })
+
+    return {
+      yes: sortNames(yes),
+      maybe: sortNames(maybe),
+      no: sortNames(no),
+    }
+  })
   const pageTitle = createMemo(() => {
     const ev = event()
 
@@ -967,6 +1008,35 @@ export default function Grid(props: Props) {
   const confirmTimeOptions = createMemo(() =>
     times().map((t) => ({ value: t.label, label: t.label })),
   )
+  const useParticipantSelect = createMemo(() => {
+    const count = event()?.participants.length ?? 0
+
+    return count > 5
+  })
+  const participantPickerOptions = createMemo(() => {
+    const ev = event()
+
+    if (!ev) {
+      return []
+    }
+
+    return [
+      { value: '', label: 'Select your name...' },
+      ...ev.participants.map((participant) => ({ value: participant.name, label: participant.name })),
+    ]
+  })
+
+  async function onParticipantPickerChange(name: string) {
+    if (!name) {
+      return
+    }
+
+    try {
+      await selectParticipant(name)
+    } catch {
+    }
+  }
+
   createEffect(() => {
     if (!isConfirmed() && !activeModal()) {
       return
@@ -1394,36 +1464,21 @@ export default function Grid(props: Props) {
                             <For each={visibleSummaryIntersections()}>
                               {(intersection) => {
                                 const legendGroups = summaryLegendGroups(intersection.allGroups)
+                                const legendStats = summaryLegendStats(intersection.allGroups)
 
                                 return (
                                   <fieldset class="summary-list__item">
                                     <legend class="summary-list__legend">
-                                      <span class="summary-list__legend-count">
-                                        {summaryLegendCount(intersection.allGroups)}
-                                      </span>
-                                      <span class="summary-list__legend-separator"> · </span>
-                                      <span class="summary-table__name-groups">
-                                        <For each={legendGroups}>
-                                          {(group, groupIndex) => (
+                                      <span class="summary-list__stats">
+                                        <For each={legendStats}>
+                                          {(stat, statIndex) => (
                                             <>
-                                              <Show when={groupIndex() > 0}>
+                                              <Show when={statIndex() > 0}>
                                                 <span class="summary-list__legend-separator"> · </span>
                                               </Show>
-                                              <span class="summary-table__name-group">
-                                                <span
-                                                  classList={{
-                                                    'summary-table__cell': true,
-                                                    'summary-table__cell--mini': true,
-                                                    'summary-table__cell--yes': group.value === 1,
-                                                    'summary-table__cell--maybe': group.value === 2,
-                                                    'summary-table__cell--no': group.value === 0,
-                                                  }}
-                                                >
-                                                  {summaryCellMark(group.value)}
-                                                </span>
-                                                <span class="summary-table__stack-names">
-                                                  {group.names.join(', ')}
-                                                </span>
+                                              <span class="summary-list__stat">
+                                                <span>{stat.count}</span>
+                                                <span>{stat.label}</span>
                                               </span>
                                             </>
                                           )}
@@ -1440,36 +1495,18 @@ export default function Grid(props: Props) {
                                                 <span class="summary-table__time-list">
                                                   <For each={dateGroup.times}>
                                                     {(timeEntry) => (
-                                                      <label
-                                                        classList={{
-                                                          'summary-table__time-option': true,
-                                                          'summary-table__time-option--selected': isSummarySlotSelected(
-                                                            intersection.key,
+                                                      <Win95Button
+                                                        size="small"
+                                                        class="summary-table__time-option"
+                                                        onClick={() =>
+                                                          confirmSummaryTime(
                                                             timeEntry.day,
                                                             timeEntry.time,
-                                                          ),
-                                                        }}
+                                                          )
+                                                        }
                                                       >
-                                                        <input
-                                                          type="radio"
-                                                          name="summary-slot"
-                                                          class="summary-table__time-radio"
-                                                          checked={isSummarySlotSelected(
-                                                            intersection.key,
-                                                            timeEntry.day,
-                                                            timeEntry.time,
-                                                          )}
-                                                          onChange={() =>
-                                                            selectSummarySlot(
-                                                              intersection.key,
-                                                              timeEntry.day,
-                                                              timeEntry.time,
-                                                            )
-                                                          }
-                                                          aria-label={`Select ${timeEntry.day} ${timeEntry.time} for confirmation`}
-                                                        />
                                                         <span class="summary-table__time-label">{timeEntry.time}</span>
-                                                      </label>
+                                                      </Win95Button>
                                                     )}
                                                   </For>
                                                 </span>
@@ -1478,6 +1515,34 @@ export default function Grid(props: Props) {
                                           )}
                                         </For>
                                       </div>
+                                      <div class="summary-list__names-toggle-row">
+                                        <Win95Button
+                                          size="small"
+                                          variant="toolbar"
+                                          onClick={() => toggleSummaryNames(intersection.key)}
+                                        >
+                                          <Show
+                                            when={areSummaryNamesExpanded(intersection.key)}
+                                            fallback="Show names"
+                                          >
+                                            Hide names
+                                          </Show>
+                                        </Win95Button>
+                                      </div>
+                                      <Show when={areSummaryNamesExpanded(intersection.key)}>
+                                        <div class="summary-list__names">
+                                          <For each={legendGroups}>
+                                            {(group) => (
+                                              <div class="summary-table__stack-row">
+                                                <StatusMiniCell value={group.value} />
+                                                <span class="summary-table__stack-names">
+                                                  {group.names.join(', ')}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </For>
+                                        </div>
+                                      </Show>
                                     </div>
                                   </fieldset>
                                 )
@@ -1485,22 +1550,9 @@ export default function Grid(props: Props) {
                             </For>
                           </div>
                           <Show
-                            when={
-                              summaryIntersections().some(
-                                (intersection) => intersection.allGroups.maybe.length > 0,
-                              ) || summaryIntersections().length > 3
-                            }
+                            when={summaryIntersections().length > 3}
                           >
                             <div class="summary-list__meta-row">
-                              <Show
-                                when={summaryIntersections().some(
-                                  (intersection) => intersection.allGroups.maybe.length > 0,
-                                )}
-                              >
-                                <div class="summary-list__maybe-note">
-                                  * includes maybe responses
-                                </div>
-                              </Show>
                               <Show when={summaryIntersections().length > 3}>
                                 <div class="summary-list__toggle-row">
                                   <Win95Button
@@ -1518,13 +1570,6 @@ export default function Grid(props: Props) {
                               </Show>
                             </div>
                           </Show>
-                          <div class="summary-list__actions">
-                            <div class="summary-list__actions-row">
-                              <Win95Button class="dialog-btn" onClick={confirmSelectedSummarySlot}>
-                                <span class="hk">C</span>onfirm selected time
-                              </Win95Button>
-                            </div>
-                          </div>
                         </div>
                       </Show>
                     </Show>
@@ -1602,21 +1647,41 @@ export default function Grid(props: Props) {
                 when you're available.
               </p>
               <p class="participant-picker__label">Who are you?</p>
-              <div class="participant-picker__list">
-                <For each={event()?.participants ?? []}>
-                  {(p) => (
-                    <Win95Button
-                      size="small"
-                      class={`dialog-btn participant-picker__item${
-                        currentName() === p.name ? ' participant-picker__item--selected' : ''
-                      }`}
-                      onClick={() => selectParticipant(p.name)}
-                    >
-                      {p.name}
-                    </Win95Button>
-                  )}
-                </For>
-              </div>
+              <Show
+                when={useParticipantSelect()}
+                fallback={
+                  <div class="participant-picker__list">
+                    <For each={event()?.participants ?? []}>
+                      {(participant) => (
+                        <Win95Button
+                          size="small"
+                          class={`dialog-btn participant-picker__item${
+                            currentName() === participant.name
+                              ? ' participant-picker__item--selected'
+                              : ''
+                          }`}
+                          onClick={() => {
+                            void selectParticipant(participant.name)
+                          }}
+                        >
+                          {participant.name}
+                        </Win95Button>
+                      )}
+                    </For>
+                  </div>
+                }
+              >
+                <Win95Field
+                  kind="select"
+                  id="participant-picker-select"
+                  name="participantPicker"
+                  size="small"
+                  value={currentName() || ''}
+                  options={participantPickerOptions()}
+                  wrapperClass="dialog__field participant-picker__select-field"
+                  onChange={onParticipantPickerChange}
+                />
+              </Show>
               <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
                 <label class="participant-picker__label" for="new-participant-name">
                   Not on the list?
@@ -1714,6 +1779,39 @@ export default function Grid(props: Props) {
               wrapperClass="confirm__field confirm__field--time"
               onChange={setConfirmTime}
             />
+            <div class="confirm__preview s">
+              <div class="confirm__preview-counts">
+                <span class="confirm__preview-stat">
+                  {confirmSlotPreview().yes.length} yes
+                </span>
+                <span> · </span>
+                <span class="confirm__preview-stat">
+                  {confirmSlotPreview().maybe.length} maybe
+                </span>
+                <span> · </span>
+                <span class="confirm__preview-stat">
+                  {confirmSlotPreview().no.length} no
+                </span>
+              </div>
+              <Show when={confirmSlotPreview().yes.length > 0}>
+                <div class="confirm__preview-row">
+                  <StatusMiniCell value={1} />
+                  <span>{confirmSlotPreview().yes.join(', ')}</span>
+                </div>
+              </Show>
+              <Show when={confirmSlotPreview().maybe.length > 0}>
+                <div class="confirm__preview-row">
+                  <StatusMiniCell value={2} />
+                  <span>{confirmSlotPreview().maybe.join(', ')}</span>
+                </div>
+              </Show>
+              <Show when={confirmSlotPreview().no.length > 0}>
+                <div class="confirm__preview-row">
+                  <StatusMiniCell value={0} />
+                  <span>{confirmSlotPreview().no.join(', ')}</span>
+                </div>
+              </Show>
+            </div>
             <p class="confirm__note">
               Everyone will see the confirmed time.
               <br />
@@ -1725,26 +1823,6 @@ export default function Grid(props: Props) {
               </Win95Button>
               <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
                 Cancel
-              </Win95Button>
-            </div>
-          </Win95Dialog>
-        </Show>
-        <Show when={!!summaryValidationError()}>
-          <Win95Dialog
-            title="Cannot confirm yet"
-            class="dialog--landing-error"
-            bodyClass="dialog-body--landing-error"
-            onClose={() => setSummaryValidationError('')}
-          >
-            <div class="landing-error__row">
-              <span class="landing-error__icon" aria-hidden="true">
-                !
-              </span>
-              <p class="landing-error__text">{summaryValidationError()}</p>
-            </div>
-            <div class="dialog-buttons landing-error__actions">
-              <Win95Button class="dialog-btn" onClick={() => setSummaryValidationError('')}>
-                OK
               </Win95Button>
             </div>
           </Win95Dialog>
