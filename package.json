@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "wrangler dev -c worker/wrangler.toml",
+    "seed:local": "node scripts/seed-local-wrangler.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "format": "prettier --write src/ && prettier --write worker/src",
