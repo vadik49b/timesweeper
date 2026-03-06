@@ -58,6 +58,17 @@ type SummaryIntersection = {
   kind: 'best' | 'almost' | 'partial'
   dates: SummaryIntersectionDate[]
 }
+type SummarySplitRow = {
+  key: string
+  groups: SummaryGroups
+  yesCount: number
+  maybeCount: number
+  noCount: number
+  kind: 'best' | 'almost' | 'partial'
+  slots: SummaryIntersectionTime[]
+}
+
+const SPLIT_ROWS_PREVIEW_COUNT = 10
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
@@ -111,8 +122,10 @@ export default function Grid(props: Props) {
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
+  const [confirmCandidates, setConfirmCandidates] = createSignal<SummaryIntersectionTime[] | null>(
+    null,
+  )
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
-  const [expandedSummaryNames, setExpandedSummaryNames] = createStore<Record<string, boolean>>({})
   const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
@@ -309,14 +322,45 @@ export default function Grid(props: Props) {
 
     return entries
   })
-  const visibleSummaryIntersections = createMemo(() => {
-    const all = summaryIntersections()
+  const summarySplitRows = createMemo<SummarySplitRow[]>(() => {
+    const intersections = summaryIntersections()
+    const rows: SummarySplitRow[] = []
+
+    intersections.forEach((intersection) => {
+      const slots: SummaryIntersectionTime[] = []
+
+      intersection.dates.forEach((dateGroup) => {
+        dateGroup.times.forEach((timeEntry) => {
+          slots.push(timeEntry)
+        })
+      })
+      const first = slots[0]
+      const groups = first ? peopleGroupsForSlot(first.dk, first.ti) : emptySummaryGroups()
+      const yesCount = groups.yes.length
+      const maybeCount = groups.maybe.length
+      const noCount = groups.no.length
+
+      rows.push({
+        key: intersection.key,
+        groups,
+        yesCount,
+        maybeCount,
+        noCount,
+        kind: intersection.kind,
+        slots,
+      })
+    })
+
+    return rows
+  })
+  const visibleSummarySplitRows = createMemo(() => {
+    const all = summarySplitRows()
 
     if (showAllSummaryRows()) {
       return all
     }
 
-    return all.slice(0, 3)
+    return all.slice(0, SPLIT_ROWS_PREVIEW_COUNT)
   })
 
   const participantsWithAvailability = createMemo(() => {
@@ -533,95 +577,93 @@ export default function Grid(props: Props) {
     schedulePersist()
   }
 
-  function summaryLegendGroups(groups: SummaryGroups) {
-    const sortNames = (names: string[]) =>
-      [...names].sort((a, b) => {
-        if (a === 'You') {
-          return -1
-        }
-
-        if (b === 'You') {
-          return 1
-        }
-
-        return a.localeCompare(b)
-      })
-
-    const sections: Array<{ value: SlotValue; names: string[] }> = [
-      { value: 1, names: sortNames(groups.yes) },
-      { value: 2, names: sortNames(groups.maybe) },
-      { value: 0, names: sortNames(groups.no) },
-    ]
-
-    return sections.filter((section) => section.names.length > 0)
+  function emptySummaryGroups(): SummaryGroups {
+    return {
+      yes: [],
+      maybe: [],
+      no: [],
+    }
   }
 
-  function summaryLegendStats(groups: SummaryGroups) {
-    return [
-      { value: 1 as SlotValue, label: 'yes', count: groups.yes.length },
-      { value: 2 as SlotValue, label: 'maybe', count: groups.maybe.length },
-      { value: 0 as SlotValue, label: 'no', count: groups.no.length },
-    ]
-  }
+  function peopleGroupsForSlot(dayKey: string, timeIndex: number): SummaryGroups {
+    const ev = event()
 
-  function summaryOutcomeLabel(kind: SummaryIntersection['kind'], index: number) {
-    if (index === 0) {
-      return 'Top options'
+    if (!ev) {
+      return emptySummaryGroups()
     }
 
-    if (kind === 'partial') {
-      return 'Fallback options'
-    }
-
-    if (kind === 'almost' || kind === 'best') {
-      return 'Other options'
-    }
-
-    return 'Fallback options'
-  }
-
-  function areSummaryNamesExpanded(intersectionKey: string) {
-    return expandedSummaryNames[intersectionKey] === true
-  }
-
-  function toggleSummaryNames(intersectionKey: string) {
-    const nextValue = !areSummaryNamesExpanded(intersectionKey)
-    setExpandedSummaryNames(intersectionKey, nextValue)
-  }
-
-  function shouldTruncateSummaryNames(names: string[]) {
-    const text = names.join(', ')
-
-    if (names.length > 5) {
-      return true
-    }
-
-    return text.length > 42
-  }
-
-  function formatSummaryNames(names: string[], expanded: boolean) {
-    if (expanded || !shouldTruncateSummaryNames(names)) {
-      return names.join(', ')
-    }
-
-    const maxChars = 42
-    let current = ''
-
-    for (const name of names) {
-      const next = current ? `${current}, ${name}` : name
-
-      if (next.length > maxChars) {
-        return `${current || name}…`
+    const participantNames = [...ev.participants.map((p) => p.name)].sort((a, b) => {
+      if (a === currentName()) {
+        return -1
       }
 
-      current = next
-    }
+      if (b === currentName()) {
+        return 1
+      }
 
-    return `${current}…`
+      return a.localeCompare(b)
+    })
+
+    const groups = emptySummaryGroups()
+
+    participantNames.forEach((name) => {
+      const value =
+        name === currentName()
+          ? ((myState[dayKey]?.[timeIndex] ?? 0) as SlotValue)
+          : ((others()[name]?.[dayKey]?.[timeIndex] ?? 0) as SlotValue)
+      const displayName = name === currentName() ? 'You' : name
+
+      if (value === 1) {
+        groups.yes.push(displayName)
+
+        return
+      }
+
+      if (value === 2) {
+        groups.maybe.push(displayName)
+
+        return
+      }
+
+      groups.no.push(displayName)
+    })
+
+    return groups
   }
 
-  function confirmSummaryTime(day: string, time: string) {
-    openConfirm(day, time)
+  function statusNameGroups(groups: SummaryGroups) {
+    return [
+      { value: 1 as SlotValue, names: groups.yes },
+      { value: 2 as SlotValue, names: groups.maybe },
+      { value: 0 as SlotValue, names: groups.no },
+    ].filter((group) => group.names.length > 0)
+  }
+
+  function timesByDayEntries(slots: SummaryIntersectionTime[]) {
+    const timesByDay = new Map<string, string[]>()
+
+    slots.forEach((slot) => {
+      const existing = timesByDay.get(slot.day)
+
+      if (existing) {
+        existing.push(slot.time)
+
+        return
+      }
+
+      timesByDay.set(slot.day, [slot.time])
+    })
+
+    return [...timesByDay.entries()]
+  }
+
+  function openConfirmFromSplitRow(row: SummarySplitRow) {
+    const first = row.slots[0]
+
+    setConfirmCandidates(row.slots)
+    setConfirmDay(first?.day ?? days()[0]?.label ?? '')
+    setConfirmTime(first?.time ?? times()[0]?.label ?? '')
+    setActiveModal('confirm')
   }
 
   function renderAvailabilityCell(
@@ -663,6 +705,7 @@ export default function Grid(props: Props) {
   }
 
   function openConfirm(day: string | null, time: string | null) {
+    setConfirmCandidates(null)
     setConfirmDay(day ?? days()[0]?.label ?? '')
     setConfirmTime(time ?? times()[0]?.label ?? '')
     setActiveModal('confirm')
@@ -751,83 +794,15 @@ export default function Grid(props: Props) {
 
   const createdByName = createMemo(() => event()?.participants[0]?.name ?? 'Unknown')
   const currentTimezone = createMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
-  const confirmSlotPreview = createMemo(() => {
-    const ev = event()
-
-    if (!ev) {
-      return {
-        yes: [] as string[],
-        maybe: [] as string[],
-        no: [] as string[],
-      }
-    }
-
+  const confirmSlotPreview = createMemo<SummaryGroups>(() => {
     const day = days().find((entry) => entry.label === confirmDay())
     const timeIndex = times().findIndex((entry) => entry.label === confirmTime())
-    const spd = slotsPerDay(ev)
 
     if (!day || timeIndex < 0) {
-      return {
-        yes: [] as string[],
-        maybe: [] as string[],
-        no: [] as string[],
-      }
+      return emptySummaryGroups()
     }
 
-    const dayIndex = ev.dates.findIndex((dateKey) => dateKey === day.key)
-
-    if (dayIndex < 0) {
-      return {
-        yes: [] as string[],
-        maybe: [] as string[],
-        no: [] as string[],
-      }
-    }
-
-    const slotIndex = dayIndex * spd + timeIndex
-    const yes: string[] = []
-    const maybe: string[] = []
-    const no: string[] = []
-
-    ev.participants.forEach((participant) => {
-      const value =
-        participant.name === currentName()
-          ? ((myState[day.key]?.[timeIndex] ?? 0) as SlotValue)
-          : ((participant.slots[slotIndex] ?? 0) as SlotValue)
-
-      if (value === 1) {
-        yes.push(participant.name)
-
-        return
-      }
-
-      if (value === 2) {
-        maybe.push(participant.name)
-
-        return
-      }
-
-      no.push(participant.name)
-    })
-
-    const sortNames = (names: string[]) =>
-      [...names].sort((a, b) => {
-        if (a === currentName()) {
-          return -1
-        }
-
-        if (b === currentName()) {
-          return 1
-        }
-
-        return a.localeCompare(b)
-      })
-
-    return {
-      yes: sortNames(yes),
-      maybe: sortNames(maybe),
-      no: sortNames(no),
-    }
+    return peopleGroupsForSlot(day.key, timeIndex)
   })
   const pageTitle = createMemo(() => {
     const ev = event()
@@ -1049,12 +1024,41 @@ export default function Grid(props: Props) {
   }
 
   const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
-  const confirmDayOptions = createMemo(() =>
-    days().map((d) => ({ value: d.label, label: d.label })),
-  )
-  const confirmTimeOptions = createMemo(() =>
-    times().map((t) => ({ value: t.label, label: t.label })),
-  )
+  const confirmDateTimeOptions = createMemo(() => {
+    const candidates = confirmCandidates()
+
+    if (!candidates || candidates.length === 0) {
+      const options: Array<{ value: string; label: string }> = []
+
+      days().forEach((day) => {
+        times().forEach((time) => {
+          options.push({
+            value: `${day.label}||${time.label}`,
+            label: `${day.label} ${time.label}`,
+          })
+        })
+      })
+
+      return options
+    }
+
+    return candidates.map((candidate) => ({
+      value: `${candidate.day}||${candidate.time}`,
+      label: `${candidate.day} ${candidate.time}`,
+    }))
+  })
+  const confirmDateTimeValue = createMemo(() => `${confirmDay()}||${confirmTime()}`)
+
+  function onConfirmDateTimeChange(next: string) {
+    const [nextDay, nextTime] = next.split('||')
+
+    if (!nextDay || !nextTime) {
+      return
+    }
+
+    setConfirmDay(nextDay)
+    setConfirmTime(nextTime)
+  }
   const useParticipantSelect = createMemo(() => {
     const count = event()?.participants.length ?? 0
 
@@ -1083,6 +1087,19 @@ export default function Grid(props: Props) {
     } catch {
     }
   }
+
+  createEffect(() => {
+    const options = confirmDateTimeOptions()
+    const current = confirmDateTimeValue()
+
+    if (options.length === 0) {
+      return
+    }
+
+    if (!options.some((option) => option.value === current)) {
+      onConfirmDateTimeChange(options[0].value)
+    }
+  })
 
   createEffect(() => {
     if (!isConfirmed() && !activeModal()) {
@@ -1499,7 +1516,7 @@ export default function Grid(props: Props) {
                       }
                     >
                       <Show
-                        when={summaryIntersections().length > 0}
+                        when={summarySplitRows().length > 0}
                         fallback={
                           <div class="empty-text grid-view__panel-content--title-aligned">
                             No candidate times yet
@@ -1507,121 +1524,144 @@ export default function Grid(props: Props) {
                         }
                       >
                         <div class="summary-table-wrap grid-view__panel-content--title-aligned">
-                          <div class="summary-list summary-list--scrollable">
-                            <For each={visibleSummaryIntersections()}>
-                              {(intersection, intersectionIndex) => {
-                                const legendGroups = summaryLegendGroups(intersection.allGroups)
-                                const legendStats = summaryLegendStats(intersection.allGroups)
-                                const canExpandNames = legendGroups.some((group) =>
-                                  shouldTruncateSummaryNames(group.names),
-                                )
-                                const namesExpanded = areSummaryNamesExpanded(intersection.key)
-
-                                return (
-                                  <article class="summary-list__item">
-                                    <div class="summary-list__header">
-                                      <div class="summary-list__title">
-                                        {summaryOutcomeLabel(intersection.kind, intersectionIndex())}
+                          <Show
+                            when={isDesktop()}
+                            fallback={
+                              <div class="summary-slots-mobile-list">
+                                <For each={visibleSummarySplitRows()}>
+                                  {(splitRow) => (
+                                    <button
+                                      type="button"
+                                      class="summary-slots-mobile-card"
+                                      onClick={() => openConfirmFromSplitRow(splitRow)}
+                                    >
+                                      <div class="summary-slots-mobile-card__head">
+                                        <div>
+                                          <div class="summary-slots-mobile-card__label">
+                                            Availability split
+                                          </div>
+                                          <div class="summary-slots-mobile-card__counts">
+                                            {splitRow.yesCount} yes · {splitRow.maybeCount} maybe ·{' '}
+                                            {splitRow.noCount} no
+                                          </div>
+                                        </div>
                                       </div>
-                                      <span class="summary-list__header-stats">
-                                        <span>(</span>
-                                        <For each={legendStats}>
-                                          {(stat, statIndex) => (
-                                            <>
-                                              <Show when={statIndex() > 0}>
-                                                ,{' '}
-                                              </Show>
-                                              {stat.count} {stat.label}
-                                            </>
+                                      <div class="summary-slots-mobile-card__section">
+                                        <div class="summary-slots-mobile-card__label">People</div>
+                                        <div class="summary-slots-table__people-main">
+                                          <For each={statusNameGroups(splitRow.groups)}>
+                                            {(group) => (
+                                              <div class="summary-slots-table__people-row">
+                                                <StatusMiniCell value={group.value} />
+                                                <span>{group.names.join(', ')}</span>
+                                              </div>
+                                            )}
+                                          </For>
+                                        </div>
+                                      </div>
+                                      <div class="summary-slots-mobile-card__section">
+                                        <div class="summary-slots-mobile-card__label">Times</div>
+                                        <For each={timesByDayEntries(splitRow.slots)}>
+                                          {(dayGroup) => (
+                                            <div class="summary-slots-table__times-row">
+                                              <span class="summary-slots-table__times-day">
+                                                {dayGroup[0]}:
+                                              </span>{' '}
+                                              <span class="summary-slots-table__times-list">
+                                                {dayGroup[1].join(', ')}
+                                              </span>
+                                            </div>
                                           )}
                                         </For>
-                                        <span>)</span>
-                                      </span>
-                                    </div>
-                                    <div class="summary-list__body">
-                                      <section class="summary-list__who-block">
-                                        <div class="summary-list__who-label">Names</div>
-                                        <div class="summary-list__names">
-                                          <For each={legendGroups}>
-                                            {(group) => (
-                                              <div class="summary-table__stack-row">
-                                                <StatusMiniCell value={group.value} />
-                                                <span class="summary-table__stack-names">
-                                                  {formatSummaryNames(group.names, namesExpanded)}
+                                      </div>
+                                    </button>
+                                  )}
+                                </For>
+                              </div>
+                            }
+                          >
+                            <div class="summary-slots-wrap">
+                              <table class="summary-slots-table">
+                                <thead>
+                                <tr>
+                                  <th>People</th>
+                                  <th class="summary-slots-table__num">Yes</th>
+                                  <th class="summary-slots-table__num">Maybe</th>
+                                  <th class="summary-slots-table__num">No</th>
+                                  <th>Times</th>
+                                  <th class="summary-slots-table__action-col">Action</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                  <For each={visibleSummarySplitRows()}>
+                                    {(splitRow) => (
+                                      <tr
+                                        classList={{
+                                          'summary-slots-table__row--best': splitRow.kind === 'best',
+                                          'summary-slots-table__row--almost': splitRow.kind === 'almost',
+                                          'summary-slots-table__row--partial': splitRow.kind === 'partial',
+                                        }}
+                                      >
+                                        <td class="summary-slots-table__people-cell">
+                                          <div class="summary-slots-table__people-main">
+                                            <For each={statusNameGroups(splitRow.groups)}>
+                                              {(group) => (
+                                                <div class="summary-slots-table__people-row">
+                                                  <StatusMiniCell value={group.value} />
+                                                  <span>{group.names.join(', ')}</span>
+                                                </div>
+                                              )}
+                                            </For>
+                                          </div>
+                                        </td>
+                                        <td class="summary-slots-table__num">{splitRow.yesCount}</td>
+                                        <td class="summary-slots-table__num">{splitRow.maybeCount}</td>
+                                        <td class="summary-slots-table__num">{splitRow.noCount}</td>
+                                        <td class="summary-slots-table__times-cell">
+                                          <For each={timesByDayEntries(splitRow.slots)}>
+                                            {(dayGroup) => (
+                                              <div class="summary-slots-table__times-row">
+                                                <span class="summary-slots-table__times-day">
+                                                  {dayGroup[0]}:
+                                                </span>{' '}
+                                                <span class="summary-slots-table__times-list">
+                                                  {dayGroup[1].join(', ')}
                                                 </span>
                                               </div>
                                             )}
                                           </For>
-                                        </div>
-                                        <Show when={canExpandNames}>
-                                          <button
-                                            type="button"
-                                            class="summary-list__names-link"
-                                            onClick={() => toggleSummaryNames(intersection.key)}
+                                        </td>
+                                        <td class="summary-slots-table__action-cell">
+                                          <Win95Button
+                                            size="small"
+                                            variant="toolbar"
+                                            onClick={() => openConfirmFromSplitRow(splitRow)}
                                           >
-                                            <Show when={namesExpanded} fallback="Show all">
-                                              Show less
-                                            </Show>
-                                          </button>
-                                        </Show>
-                                      </section>
-                                      <section class="summary-list__times-block">
-                                        <div class="summary-list__times-label">Time variants</div>
-                                        <div class="summary-table__date-list">
-                                          <For each={intersection.dates}>
-                                            {(dateGroup) => (
-                                              <div class="summary-table__date-row summary-table__date-row--grouped">
-                                                <div class="summary-table__date-inline">
-                                                  <span class="summary-table__date-title">{dateGroup.day}:</span>
-                                                  <span class="summary-table__time-list">
-                                                    <For each={dateGroup.times}>
-                                                      {(timeEntry) => (
-                                                        <Win95Button
-                                                          size="small"
-                                                          class="summary-table__time-option"
-                                                          onClick={() =>
-                                                            confirmSummaryTime(
-                                                              timeEntry.day,
-                                                              timeEntry.time,
-                                                            )
-                                                          }
-                                                        >
-                                                          <span class="summary-table__time-label">
-                                                            {timeEntry.time}
-                                                          </span>
-                                                        </Win95Button>
-                                                      )}
-                                                    </For>
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </For>
-                                        </div>
-                                      </section>
-                                    </div>
-                                  </article>
-                                )
-                              }}
-                            </For>
-                          </div>
-                          <Show when={summaryIntersections().length > 3}>
+                                            Review
+                                          </Win95Button>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </For>
+                                </tbody>
+                              </table>
+                            </div>
+                          </Show>
+                          <Show when={summarySplitRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
                             <div class="summary-list__meta-row">
-                              <Show when={summaryIntersections().length > 3}>
-                                <div class="summary-list__toggle-row">
-                                  <Win95Button
-                                    size="small"
-                                    onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
+                              <div class="summary-list__toggle-row">
+                                <Win95Button
+                                  size="small"
+                                  onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
+                                >
+                                  <Show
+                                    when={showAllSummaryRows()}
+                                    fallback={`Show all ${summarySplitRows().length} groups`}
                                   >
-                                    <Show
-                                      when={showAllSummaryRows()}
-                                      fallback={`Show all ${summaryIntersections().length} variants`}
-                                    >
-                                      Show fewer variants
-                                    </Show>
-                                  </Win95Button>
-                                </div>
-                              </Show>
+                                    Show fewer groups
+                                  </Show>
+                                </Win95Button>
+                              </div>
                             </div>
                           </Show>
                         </div>
@@ -1805,64 +1845,33 @@ export default function Grid(props: Props) {
             onClose={() => setActiveModal(null)}
           >
             <p class="confirm__lead">Confirm this time for everyone?</p>
-            <label class="confirm__label" for="confirm-day">
-              Day:
+            <Show when={(confirmCandidates()?.length ?? 0) > 1}>
+              <p class="confirm__scope-note">
+                Choose one of {(confirmCandidates()?.length ?? 0)} matching time variants.
+              </p>
+            </Show>
+            <label class="confirm__label" for="confirm-date-time">
+              Date and time:
             </label>
             <Win95Field
               kind="select"
-              id="confirm-day"
-              name="confirmDay"
+              id="confirm-date-time"
+              name="confirmDateTime"
               size="small"
-              value={confirmDay()}
-              options={confirmDayOptions()}
-              wrapperClass="confirm__field confirm__field--day"
-              onChange={setConfirmDay}
-            />
-            <label class="confirm__label" for="confirm-time">
-              Time:
-            </label>
-            <Win95Field
-              kind="select"
-              id="confirm-time"
-              name="confirmTime"
-              size="small"
-              value={confirmTime()}
-              options={confirmTimeOptions()}
-              wrapperClass="confirm__field confirm__field--time"
-              onChange={setConfirmTime}
+              value={confirmDateTimeValue()}
+              options={confirmDateTimeOptions()}
+              wrapperClass="confirm__field confirm__field--date-time"
+              onChange={onConfirmDateTimeChange}
             />
             <div class="confirm__preview s">
-              <div class="confirm__preview-counts">
-                <span class="confirm__preview-stat">
-                  {confirmSlotPreview().yes.length} yes
-                </span>
-                <span> · </span>
-                <span class="confirm__preview-stat">
-                  {confirmSlotPreview().maybe.length} maybe
-                </span>
-                <span> · </span>
-                <span class="confirm__preview-stat">
-                  {confirmSlotPreview().no.length} no
-                </span>
-              </div>
-              <Show when={confirmSlotPreview().yes.length > 0}>
-                <div class="confirm__preview-row">
-                  <StatusMiniCell value={1} />
-                  <span>{confirmSlotPreview().yes.join(', ')}</span>
-                </div>
-              </Show>
-              <Show when={confirmSlotPreview().maybe.length > 0}>
-                <div class="confirm__preview-row">
-                  <StatusMiniCell value={2} />
-                  <span>{confirmSlotPreview().maybe.join(', ')}</span>
-                </div>
-              </Show>
-              <Show when={confirmSlotPreview().no.length > 0}>
-                <div class="confirm__preview-row">
-                  <StatusMiniCell value={0} />
-                  <span>{confirmSlotPreview().no.join(', ')}</span>
-                </div>
-              </Show>
+              <For each={statusNameGroups(confirmSlotPreview())}>
+                {(group) => (
+                  <div class="confirm__preview-row">
+                    <StatusMiniCell value={group.value} />
+                    <span>{group.names.join(', ')}</span>
+                  </div>
+                )}
+              </For>
             </div>
             <p class="confirm__note">
               Everyone will see the confirmed time.
