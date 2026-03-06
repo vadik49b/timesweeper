@@ -564,6 +564,22 @@ export default function Grid(props: Props) {
     ]
   }
 
+  function summaryOutcomeLabel(kind: SummaryIntersection['kind'], index: number) {
+    if (index === 0) {
+      return 'Top options'
+    }
+
+    if (kind === 'partial') {
+      return 'Fallback options'
+    }
+
+    if (kind === 'almost' || kind === 'best') {
+      return 'Other options'
+    }
+
+    return 'Fallback options'
+  }
+
   function areSummaryNamesExpanded(intersectionKey: string) {
     return expandedSummaryNames[intersectionKey] === true
   }
@@ -571,6 +587,37 @@ export default function Grid(props: Props) {
   function toggleSummaryNames(intersectionKey: string) {
     const nextValue = !areSummaryNamesExpanded(intersectionKey)
     setExpandedSummaryNames(intersectionKey, nextValue)
+  }
+
+  function shouldTruncateSummaryNames(names: string[]) {
+    const text = names.join(', ')
+
+    if (names.length > 5) {
+      return true
+    }
+
+    return text.length > 42
+  }
+
+  function formatSummaryNames(names: string[], expanded: boolean) {
+    if (expanded || !shouldTruncateSummaryNames(names)) {
+      return names.join(', ')
+    }
+
+    const maxChars = 42
+    let current = ''
+
+    for (const name of names) {
+      const next = current ? `${current}, ${name}` : name
+
+      if (next.length > maxChars) {
+        return `${current || name}…`
+      }
+
+      current = next
+    }
+
+    return `${current}…`
   }
 
   function confirmSummaryTime(day: string, time: string) {
@@ -1459,99 +1506,106 @@ export default function Grid(props: Props) {
                           </div>
                         }
                       >
-                        <div class="summary-table-wrap">
+                        <div class="summary-table-wrap grid-view__panel-content--title-aligned">
                           <div class="summary-list summary-list--scrollable">
                             <For each={visibleSummaryIntersections()}>
-                              {(intersection) => {
+                              {(intersection, intersectionIndex) => {
                                 const legendGroups = summaryLegendGroups(intersection.allGroups)
                                 const legendStats = summaryLegendStats(intersection.allGroups)
+                                const canExpandNames = legendGroups.some((group) =>
+                                  shouldTruncateSummaryNames(group.names),
+                                )
+                                const namesExpanded = areSummaryNamesExpanded(intersection.key)
 
                                 return (
-                                  <fieldset class="summary-list__item">
-                                    <legend class="summary-list__legend">
-                                      <span class="summary-list__stats">
+                                  <article class="summary-list__item">
+                                    <div class="summary-list__header">
+                                      <div class="summary-list__title">
+                                        {summaryOutcomeLabel(intersection.kind, intersectionIndex())}
+                                      </div>
+                                      <span class="summary-list__header-stats">
+                                        <span>(</span>
                                         <For each={legendStats}>
                                           {(stat, statIndex) => (
                                             <>
                                               <Show when={statIndex() > 0}>
-                                                <span class="summary-list__legend-separator"> · </span>
+                                                ,{' '}
                                               </Show>
-                                              <span class="summary-list__stat">
-                                                <span>{stat.count}</span>
-                                                <span>{stat.label}</span>
-                                              </span>
+                                              {stat.count} {stat.label}
                                             </>
                                           )}
                                         </For>
+                                        <span>)</span>
                                       </span>
-                                    </legend>
+                                    </div>
                                     <div class="summary-list__body">
-                                      <div class="summary-table__date-list">
-                                        <For each={intersection.dates}>
-                                          {(dateGroup) => (
-                                            <div class="summary-table__date-row">
-                                              <div class="summary-table__date-inline">
-                                                <span class="summary-table__date-title">{dateGroup.day}:</span>
-                                                <span class="summary-table__time-list">
-                                                  <For each={dateGroup.times}>
-                                                    {(timeEntry) => (
-                                                      <Win95Button
-                                                        size="small"
-                                                        class="summary-table__time-option"
-                                                        onClick={() =>
-                                                          confirmSummaryTime(
-                                                            timeEntry.day,
-                                                            timeEntry.time,
-                                                          )
-                                                        }
-                                                      >
-                                                        <span class="summary-table__time-label">{timeEntry.time}</span>
-                                                      </Win95Button>
-                                                    )}
-                                                  </For>
-                                                </span>
-                                              </div>
-                                            </div>
-                                          )}
-                                        </For>
-                                      </div>
-                                      <div class="summary-list__names-toggle-row">
-                                        <Win95Button
-                                          size="small"
-                                          variant="toolbar"
-                                          onClick={() => toggleSummaryNames(intersection.key)}
-                                        >
-                                          <Show
-                                            when={areSummaryNamesExpanded(intersection.key)}
-                                            fallback="Show names"
-                                          >
-                                            Hide names
-                                          </Show>
-                                        </Win95Button>
-                                      </div>
-                                      <Show when={areSummaryNamesExpanded(intersection.key)}>
+                                      <section class="summary-list__who-block">
+                                        <div class="summary-list__who-label">Names</div>
                                         <div class="summary-list__names">
                                           <For each={legendGroups}>
                                             {(group) => (
                                               <div class="summary-table__stack-row">
                                                 <StatusMiniCell value={group.value} />
                                                 <span class="summary-table__stack-names">
-                                                  {group.names.join(', ')}
+                                                  {formatSummaryNames(group.names, namesExpanded)}
                                                 </span>
                                               </div>
                                             )}
                                           </For>
                                         </div>
-                                      </Show>
+                                        <Show when={canExpandNames}>
+                                          <button
+                                            type="button"
+                                            class="summary-list__names-link"
+                                            onClick={() => toggleSummaryNames(intersection.key)}
+                                          >
+                                            <Show when={namesExpanded} fallback="Show all">
+                                              Show less
+                                            </Show>
+                                          </button>
+                                        </Show>
+                                      </section>
+                                      <section class="summary-list__times-block">
+                                        <div class="summary-list__times-label">Time variants</div>
+                                        <div class="summary-table__date-list">
+                                          <For each={intersection.dates}>
+                                            {(dateGroup) => (
+                                              <div class="summary-table__date-row summary-table__date-row--grouped">
+                                                <div class="summary-table__date-inline">
+                                                  <span class="summary-table__date-title">{dateGroup.day}:</span>
+                                                  <span class="summary-table__time-list">
+                                                    <For each={dateGroup.times}>
+                                                      {(timeEntry) => (
+                                                        <Win95Button
+                                                          size="small"
+                                                          class="summary-table__time-option"
+                                                          onClick={() =>
+                                                            confirmSummaryTime(
+                                                              timeEntry.day,
+                                                              timeEntry.time,
+                                                            )
+                                                          }
+                                                        >
+                                                          <span class="summary-table__time-label">
+                                                            {timeEntry.time}
+                                                          </span>
+                                                        </Win95Button>
+                                                      )}
+                                                    </For>
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </For>
+                                        </div>
+                                      </section>
                                     </div>
-                                  </fieldset>
+                                  </article>
                                 )
                               }}
                             </For>
                           </div>
-                          <Show
-                            when={summaryIntersections().length > 3}
-                          >
+                          <Show when={summaryIntersections().length > 3}>
                             <div class="summary-list__meta-row">
                               <Show when={summaryIntersections().length > 3}>
                                 <div class="summary-list__toggle-row">
@@ -1625,8 +1679,6 @@ export default function Grid(props: Props) {
           {/* /grid-view__content */}
         </div>
         {/* /grid-view__shell */}
-
-        {/* === DIALOGS === */}
 
         <Show when={activeModal() === 'name-picker'}>
           <Win95Dialog
