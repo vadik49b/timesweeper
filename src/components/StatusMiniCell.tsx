@@ -2,6 +2,7 @@ import type { SlotValue } from '../types'
 
 interface Props {
   value: SlotValue
+  class?: string
 }
 
 function statusMark(value: SlotValue) {
@@ -25,6 +26,7 @@ export default function StatusMiniCell(props: Props) {
         'summary-table__cell--yes': props.value === 1,
         'summary-table__cell--maybe': props.value === 2,
         'summary-table__cell--no': props.value === 0,
+        [props.class ?? '']: !!props.class,
       }}
     >
       {statusMark(props.value)}

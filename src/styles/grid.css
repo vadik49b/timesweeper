@@ -744,10 +744,17 @@
   padding: 0 8px;
 }
 .summary-table__cell--mini {
+  width: 12px;
+  height: 12px;
+  font-size: var(--fs-xxs);
+  flex: 0 0 12px;
+  line-height: 1;
+}
+.status-mini-cell--aligned {
   width: 14px;
   height: 14px;
-  font-size: var(--fs-xxs);
   flex: 0 0 14px;
+  margin-top: 2px;
 }
 .summary-table__num {
   text-align: right;
@@ -932,14 +939,15 @@
   background: var(--bg);
 }
 .confirm__preview-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
   font-size: var(--fs-xs);
   line-height: 1.2;
 }
+.confirm__preview-row span {
+  font-size: var(--fs-xs);
+}
 .confirm__note {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
   color: var(--text-muted);
   margin-bottom: 10px;
 }

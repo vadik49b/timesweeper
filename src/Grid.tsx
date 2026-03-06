@@ -1607,7 +1607,10 @@ export default function Grid(props: Props) {
                                             <For each={statusNameGroups(splitRow.groups)}>
                                               {(group) => (
                                                 <div class="summary-slots-table__people-row">
-                                                  <StatusMiniCell value={group.value} />
+                                                  <StatusMiniCell
+                                                    value={group.value}
+                                                    class="status-mini-cell--aligned"
+                                                  />
                                                   <span>{group.names.join(', ')}</span>
                                                 </div>
                                               )}
@@ -1866,8 +1869,8 @@ export default function Grid(props: Props) {
             <div class="confirm__preview s">
               <For each={statusNameGroups(confirmSlotPreview())}>
                 {(group) => (
-                  <div class="confirm__preview-row">
-                    <StatusMiniCell value={group.value} />
+                  <div class="confirm__preview-row summary-slots-table__people-row">
+                    <StatusMiniCell value={group.value} class="status-mini-cell--aligned" />
                     <span>{group.names.join(', ')}</span>
                   </div>
                 )}
