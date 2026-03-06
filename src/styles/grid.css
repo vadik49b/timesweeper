@@ -98,8 +98,8 @@
   text-shadow: var(--title-shadow-soft);
 }
 .grid-view__pane-title--steps {
-  margin-top: var(--space-350);
-  margin-bottom: var(--space-075);
+  margin-top: var(--space-500);
+  margin-bottom: var(--space-250);
 }
 
 .grid-view__intro-text {

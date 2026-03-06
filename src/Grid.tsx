@@ -1341,7 +1341,7 @@ export default function Grid(props: Props) {
 
           <div class="grid-view__content">
             <Show when={event()}>
-              {(loadedEvent) => <h2 class="grid-view__pane-title">{loadedEvent().name}</h2>}
+              {(loadedEvent) => <h2 class="grid-view__pane-title">Event name: {loadedEvent().name}</h2>}
             </Show>
             <section class="grid-view__intro-panel r">
               <p class="grid-view__intro-text">
@@ -1368,7 +1368,7 @@ export default function Grid(props: Props) {
             </section>
 
             {/* Single-column layout */}
-            <h2 class="grid-view__pane-title grid-view__pane-title--steps">Pick Event Time Together</h2>
+            <h2 class="grid-view__pane-title grid-view__pane-title--steps">Pick a Time Together</h2>
             <section class="grid-view__steps-panel r">
               <div class="grid-view__panels">
                 <div class="grid-view__panel-frame">
@@ -1380,7 +1380,7 @@ export default function Grid(props: Props) {
                   </div>
                   <div class="grid-view__section-body grid-view__section-body--title">
                     <label for="share-link" class="share-panel__label">
-                      Share this link:
+                      Event link:
                     </label>
                     <div class="share-panel__link-row row">
                       <Win95Field
