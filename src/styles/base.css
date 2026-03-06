@@ -79,11 +79,6 @@ body {
   border: 2px solid;
   border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
 }
-.st {
-  border: 1px solid;
-  border-color: var(--blo) var(--bhi) var(--bhi) var(--blo);
-}
-
 /* Shared window title chrome (used by dialogs and window-like shells). */
 .win95-window__title-bar {
   background: var(--title-bar);
