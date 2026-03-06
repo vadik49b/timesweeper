@@ -6,29 +6,29 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 12px;
+  padding: var(--space-600) var(--space-300);
   min-height: 100vh;
 }
 
 .hero {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-500);
   max-width: var(--landing-max);
 }
 .hero h1 {
   font-family: var(--ui);
   font-size: var(--fs-hero);
-  color: var(--text-inverse);
-  text-shadow: 2px 2px 0 var(--navy);
-  margin-bottom: 6px;
-  letter-spacing: 1px;
+  color: var(--white);
+  text-shadow: var(--title-shadow-strong);
+  margin-bottom: var(--space-150);
+  letter-spacing: var(--space-025);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-200);
 }
 .mine-ico {
-  filter: drop-shadow(2px 2px 0 var(--navy));
+  filter: drop-shadow(var(--title-shadow-strong));
   flex-shrink: 0;
 }
 .hero p {
@@ -41,27 +41,27 @@
   background: var(--bg);
   width: 100%;
   max-width: var(--landing-max);
-  padding: 14px 12px 28px;
-  margin-bottom: 16px;
+  padding: var(--space-350) var(--space-300) var(--space-700);
+  margin-bottom: var(--space-400);
 }
 .landing label {
   display: block;
   font-size: var(--fs-xs);
-  margin-bottom: 2px;
+  margin-bottom: var(--space-050);
   font-weight: var(--fw-bold);
 }
 .field {
-  margin-bottom: 10px;
+  margin-bottom: var(--space-250);
 }
 .landing__group {
   border: 0;
   padding: 0;
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-250);
   min-width: 0;
 }
 .landing__group > legend {
   font-size: var(--fs-xs);
-  margin-bottom: 2px;
+  margin-bottom: var(--space-050);
   font-weight: var(--fw-bold);
 }
 .landing__event-name {
@@ -70,18 +70,18 @@
 .landing__text-input-control {
   font-family: var(--ui);
   font-size: var(--fs-xs);
-  padding: 3px 4px;
+  padding: var(--space-075) var(--space-100);
 }
 .landing__calendar {
-  padding: 4px;
+  padding: var(--space-100);
   touch-action: manipulation;
 }
 .landing__date-summary {
   font-size: var(--fs-xxs);
-  color: var(--text-subtle);
-  margin-top: 4px;
+  color: var(--blo);
+  margin-top: var(--space-100);
   text-align: center;
-  padding: 2px 4px;
+  padding: var(--space-050) var(--space-100);
 }
 .landing__time-select {
   flex: 1;
@@ -94,7 +94,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-300);
 }
 .cal-header span {
   font-size: var(--fs-xs);
@@ -110,8 +110,8 @@
 .cal-dow {
   text-align: center;
   font-size: var(--fs-xxs);
-  color: var(--text-muted);
-  padding: 2px 0;
+  color: var(--bdk);
+  padding: var(--space-050) 0;
   font-weight: var(--fw-bold);
 }
 .cal-day {
@@ -120,12 +120,12 @@
   border: none;
   text-align: center;
   font-family: var(--ui);
-  color: var(--text-primary);
+  color: var(--black);
   -webkit-text-fill-color: currentColor;
   font-size: var(--fs-xs);
-  padding: 3px 0;
+  padding: var(--space-075) 0;
   cursor: pointer;
-  height: 30px;
+  height: calc(var(--space-900) - var(--space-250));
   width: 100%;
   display: flex;
   align-items: center;
@@ -138,7 +138,7 @@
 }
 .cal-day.selected {
   background: var(--navy);
-  color: var(--text-inverse);
+  color: var(--white);
 }
 .cal-day.past {
   color: var(--text-disabled);
@@ -154,34 +154,34 @@
 /* Apply hover feedback only on pointer/hover-capable devices. */
 @media (hover: hover) and (pointer: fine) {
   .cal-day:hover:not(.empty):not(.past) {
-    outline: 1px dotted #000;
-    outline-offset: -3px;
+    outline: var(--space-025) dotted var(--black);
+    outline-offset: var(--space-n075);
   }
 }
 
 /* Mobile: make day cells easier to tap (touch target best practice). */
 @media (max-width: 700px) {
   .cal-day {
-    height: 44px;
+    height: var(--size-cell);
     font-size: var(--fs-sm);
     padding: 0;
   }
   .cal-dow {
     font-size: var(--fs-xs);
-    padding: 4px 0;
+    padding: var(--space-100) 0;
   }
 }
 
 .time-range {
-  gap: var(--space-2);
+  gap: var(--space-150);
 }
 .time-range span {
   font-size: var(--fs-xs);
 }
 
 .participant-row {
-  gap: var(--space-1);
-  margin-bottom: 4px;
+  gap: var(--space-100);
+  margin-bottom: var(--space-100);
 }
 .p-rm {
   background: var(--bg);
@@ -197,21 +197,21 @@
   }
 
   .win95-window__title-button {
-    width: 22px;
-    height: 22px;
+    width: var(--size-control);
+    height: var(--size-control);
     font-size: var(--fs-xs);
   }
   .cal-nav {
     font-size: var(--fs-xs);
-    padding: 2px 9px;
+    padding: var(--space-050) var(--space-225);
   }
   .win95-field__arrow {
-    width: 22px;
+    width: var(--size-control);
     font-size: var(--fs-xxs);
   }
   .p-rm {
     font-size: var(--fs-xs);
-    padding: 2px 7px;
+    padding: var(--space-050) calc(var(--space-200) - var(--space-025));
   }
 
   .win95-window__title-button::before,
@@ -220,17 +220,17 @@
   .p-rm::before {
     content: '';
     position: absolute;
-    inset: -9px;
+    inset: var(--space-n225);
   }
 
   /* Keep select-arrow slop slightly tighter to avoid stealing adjacent select taps. */
   .win95-field__arrow::before {
-    inset: -9px -6px;
+    inset: var(--space-n225) var(--space-n150);
   }
 }
 .add-btn {
   background: var(--bg);
-  margin-top: 4px;
+  margin-top: var(--space-100);
 }
 
 .create-btn {
@@ -242,35 +242,35 @@
 .how-section {
   width: 100%;
   max-width: var(--landing-max);
-  margin-top: 28px;
-  margin-bottom: 16px;
+  margin-top: var(--space-700);
+  margin-bottom: var(--space-400);
 }
 .how-title {
   font-family: var(--ui);
   font-size: var(--fs-xl);
-  color: var(--text-inverse);
-  text-shadow: 1px 1px 0 var(--navy);
-  margin-bottom: 10px;
+  color: var(--white);
+  text-shadow: var(--title-shadow-soft);
+  margin-bottom: var(--space-250);
   text-align: center;
 }
 .how-steps {
   background: var(--bg);
-  padding: 14px 12px 28px;
+  padding: var(--space-350) var(--space-300) var(--space-700);
 }
 .how-step {
-  gap: var(--space-3);
-  padding: 6px 4px;
+  gap: var(--space-250);
+  padding: var(--space-150) var(--space-100);
   font-size: var(--fs-xs);
-  border-bottom: 1px solid var(--blo);
+  border-bottom: var(--border-thin) solid var(--blo);
 }
 .how-step:last-child {
   border-bottom: none;
 }
 .how-num {
   background: var(--navy);
-  color: var(--text-inverse);
-  width: 20px;
-  height: 20px;
+  color: var(--white);
+  width: var(--size-chip);
+  height: var(--size-chip);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -285,24 +285,24 @@
 .recent-section {
   width: 100%;
   max-width: var(--landing-max);
-  margin-top: 32px;
+  margin-top: var(--space-800);
 }
 .recent-panel {
   background: var(--bg);
-  padding: 14px 12px 28px;
+  padding: var(--space-350) var(--space-300) var(--space-700);
 }
 .recent-title {
   font-size: var(--fs-xs);
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  color: var(--bdk);
+  margin-bottom: var(--space-150);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-150);
 }
 .recent-title hr {
   flex: 1;
   border: none;
-  border-top: 1px solid var(--blo);
+  border-top: var(--border-thin) solid var(--blo);
 }
 .recent-empty {
   font-size: var(--fs-xs);
@@ -318,18 +318,18 @@
   color: inherit;
   text-decoration: none;
   font-size: var(--fs-xs);
-  padding: 4px 6px;
+  padding: var(--space-100) var(--space-150);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-150);
 }
 .recent-item:hover {
   background: var(--navy);
-  color: var(--text-inverse);
+  color: var(--white);
 }
 .recent-date {
-  color: var(--text-subtle);
+  color: var(--blo);
   font-size: var(--fs-xs);
 }
 .recent-item:hover .recent-date {
@@ -337,15 +337,15 @@
 }
 .flag-ico {
   display: inline-flex;
-  width: 16px;
-  height: 16px;
+  width: var(--size-flag);
+  height: var(--size-flag);
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
 .footer {
-  margin-top: 40px;
+  margin-top: var(--space-900);
   font-size: var(--fs-xxs);
   color: var(--text-footer);
   text-align: center;
@@ -355,13 +355,13 @@
   color: var(--text-footer-link);
 }
 .footer-links {
-  margin-top: 4px;
+  margin-top: var(--space-100);
   display: inline-block;
 }
 
 .dialog--landing-error {
-  width: min(340px, calc(100vw - 16px));
-  max-width: 340px;
+  width: min(var(--max-dialog-confirm), calc(100vw - var(--space-400)));
+  max-width: var(--max-dialog-confirm);
 }
 .dialog-body--landing-error {
   font-size: var(--fs-sm);
@@ -369,15 +369,15 @@
 .landing-error__row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--space-250);
 }
 .landing-error__icon {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: var(--size-control);
+  height: var(--size-control);
+  flex: 0 0 var(--size-control);
   border-radius: 50%;
-  background: #c00000;
-  color: var(--text-inverse);
+  background: var(--accent-danger-bg);
+  color: var(--white);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -386,10 +386,10 @@
   line-height: 1;
 }
 .landing-error__text {
-  margin: 1px 0 0;
+  margin: var(--space-025) 0 0;
   line-height: 1.35;
 }
 .landing-error__actions {
   justify-content: center;
-  margin-top: 12px;
+  margin-top: var(--space-300);
 }

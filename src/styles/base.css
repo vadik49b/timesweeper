@@ -10,60 +10,97 @@
 
 :root {
   --bg: #c0c0c0;
-  --bhi: #ffffff;
+  --white: #ffffff;
   --blo: #808080;
   --bdk: #404040;
+  --black: #000000;
   --ui: 'VT323', monospace;
   --teal: #008080;
   --navy: #000080;
   --title-bar: linear-gradient(90deg, #000080, #1084d0);
   --cell-open: #a8d4a8;
+  --accent-success: #006800;
+  --accent-danger: #ff0000;
+  --accent-danger-bg: #c00000;
   --num-1: #0000ff;
   --num-2: #008000;
-  --num-3: #ff0000;
-  --num-4: #000080;
   --num-5: #800000;
-  --cell: 44px;
-  --hm-cell: 44px;
-  --hm-col: 44px;
-  --control-small-height: 22px;
+  --size-cell: 44px;
+  --size-control: 22px;
+  --size-control-title: 18px;
+  --size-flag: 16px;
+  --size-chip: 20px;
+  --size-dialog-min: 300px;
+  --size-dialog-btn-min: 75px;
   --landing-max: 420px;
-  --text-primary: #000;
-  --text-inverse: #fff;
-  --text-muted: #404040;
-  --text-subtle: #808080;
+  --max-grid-shell: 1100px;
+  --max-dialog-help: 380px;
+  --max-dialog-confirm: 340px;
+  --max-dialog-name-picker: 360px;
+  --max-dialog-confirmed: 460px;
+  --max-field-share: 312px;
+  --min-summary-table: 560px;
+  --min-summary-column: 220px;
+  --summary-num-width: 72px;
+  --title-shadow-strong: 2px 2px 0 var(--navy);
+  --title-shadow-soft: 1px 1px 0 var(--navy);
+  --window-shadow: 2px 2px 0 var(--black);
+  --overlay-dialog: rgba(192, 192, 192, 0.35);
+  --overlay-confirmed: rgba(192, 192, 192, 0.88);
   --text-disabled: #a0a0a0;
   --text-link-hover: #a0a0ff;
   --text-footer: #a0c0c0;
   --text-footer-link: #e0e0e0;
-  --fs-base: 18px;
+  --fs-sm: 18px;
   --fs-xxs: 12px;
   --fs-xs: 16px;
-  --fs-sm: 18px;
   --fs-lg: 22px;
   --fs-xl: 26px;
   --fs-hero: 42px;
   --fw-regular: 400;
   --fw-bold: 700;
-  --space-1: 4px;
-  --space-2: 6px;
-  --space-3: 10px;
+  --space-0: 0;
+  --space-025: 1px;
+  --space-050: 2px;
+  --space-075: 3px;
+  --space-100: 4px;
+  --space-150: 6px;
+  --space-200: 8px;
+  --space-225: 9px;
+  --space-250: 10px;
+  --space-300: 12px;
+  --space-350: 14px;
+  --space-400: 16px;
+  --space-450: 18px;
+  --space-500: 20px;
+  --space-550: 22px;
+  --space-600: 24px;
+  --space-700: 28px;
+  --space-800: 32px;
+  --space-900: 40px;
+  --space-1100: 44px;
+  --space-n025: -1px;
+  --space-n075: -3px;
+  --space-n225: -9px;
+  --space-n150: -6px;
+  --border-thin: var(--space-025);
+  --border-thick: var(--space-050);
 }
 
 body {
   background: var(--teal);
   font-family: var(--ui);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   min-height: 100vh;
   user-select: none;
 }
 
 .sr-only {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: var(--space-025);
+  height: var(--space-025);
   padding: 0;
-  margin: -1px;
+  margin: var(--space-n025);
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
@@ -72,18 +109,18 @@ body {
 
 /* === BEVELS === */
 .r {
-  border: 2px solid;
-  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
+  border: var(--border-thick) solid;
+  border-color: var(--white) var(--bdk) var(--bdk) var(--white);
 }
 .s {
-  border: 2px solid;
-  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+  border: var(--border-thick) solid;
+  border-color: var(--bdk) var(--white) var(--white) var(--bdk);
 }
 /* Shared window title chrome (used by dialogs and window-like shells). */
 .win95-window__title-bar {
   background: var(--title-bar);
-  color: var(--text-inverse);
-  padding: 3px 4px;
+  color: var(--white);
+  padding: var(--space-075) var(--space-100);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -92,11 +129,11 @@ body {
 }
 .win95-window__title-buttons {
   display: flex;
-  gap: 2px;
+  gap: var(--space-050);
 }
 .win95-window__title-button {
-  width: 18px;
-  height: 18px;
+  width: var(--size-control-title);
+  height: var(--size-control-title);
   padding: 0;
   background: var(--bg);
   font-size: var(--fs-xs);
@@ -112,12 +149,12 @@ body {
 .win95-button {
   appearance: none;
   -webkit-appearance: none;
-  border: 2px solid;
-  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
+  border: var(--border-thick) solid;
+  border-color: var(--white) var(--bdk) var(--bdk) var(--white);
   font-family: var(--ui);
   cursor: pointer;
   background: var(--bg);
-  color: var(--text-primary);
+  color: var(--black);
   text-align: center;
   white-space: nowrap;
   user-select: none;
@@ -126,28 +163,28 @@ body {
 }
 .win95-button--normal {
   font-size: var(--fs-xs);
-  padding: 3px 8px;
+  padding: var(--space-075) var(--space-200);
 }
 .win95-button--small {
   font-size: var(--fs-xs);
-  padding: 0 6px;
-  height: var(--control-small-height);
+  padding: 0 var(--space-150);
+  height: var(--size-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .win95-button--small.win95-window__title-button {
-  width: 18px;
-  height: 18px;
+  width: var(--size-control-title);
+  height: var(--size-control-title);
   padding: 0;
 }
 .win95-button--variant-toolbar {
-  padding: 2px 8px;
+  padding: var(--space-050) var(--space-200);
 }
 .win95-button--variant-icon {
-  width: var(--control-small-height);
-  min-width: var(--control-small-height);
-  height: var(--control-small-height);
+  width: var(--size-control);
+  min-width: var(--size-control);
+  height: var(--size-control);
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -155,34 +192,34 @@ body {
 }
 .win95-button--variant-cta {
   font-size: var(--fs-sm);
-  padding: 6px 20px;
+  padding: var(--space-150) var(--space-500);
 }
 .win95-button--full-width {
   width: 100%;
   display: block;
 }
 .win95-button:active {
-  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+  border-color: var(--bdk) var(--white) var(--white) var(--bdk);
 }
 .win95-field__arrow:active {
-  border-color: var(--bdk) var(--bhi) var(--bhi) var(--bdk);
+  border-color: var(--bdk) var(--white) var(--white) var(--bdk);
 }
 
 /* === SHARED: WIN95 FIELD === */
 .win95-field__frame {
   width: 100%;
-  background: white;
+  background: var(--white);
   overflow: hidden;
 }
 .win95-field__select-wrap {
   display: flex;
   height: 100%;
-  background: white;
+  background: var(--white);
   overflow: hidden;
 }
 .win95-field__input-wrap {
   width: 100%;
-  background: white;
+  background: var(--white);
 }
 .win95-field__control {
   width: 100%;
@@ -190,11 +227,11 @@ body {
   display: block;
   font-family: var(--ui);
   font-size: var(--fs-sm);
-  padding: 2px 4px;
+  padding: var(--space-050) var(--space-100);
   border: none;
-  background: white;
-  color: var(--text-primary);
-  -webkit-text-fill-color: var(--text-primary);
+  background: var(--white);
+  color: var(--black);
+  -webkit-text-fill-color: var(--black);
   appearance: none;
   -webkit-appearance: none;
   outline: none;
@@ -206,8 +243,8 @@ body {
   opacity: 1;
 }
 .win95-field__control option {
-  color: var(--text-primary);
-  background: #fff;
+  color: var(--black);
+  background: var(--white);
 }
 .win95-field__frame--input .win95-field__control {
   cursor: text;
@@ -218,7 +255,7 @@ body {
 .win95-field__arrow {
   appearance: none;
   -webkit-appearance: none;
-  width: var(--control-small-height);
+  width: var(--size-control);
   padding: 0;
   line-height: 1;
   height: 100%;
@@ -226,18 +263,18 @@ body {
   align-items: center;
   justify-content: center;
   background: var(--bg);
-  color: var(--text-primary);
+  color: var(--black);
   font-size: var(--fs-xxs);
   cursor: pointer;
   flex-shrink: 0;
-  border: 2px solid;
-  border-color: var(--bhi) var(--bdk) var(--bdk) var(--bhi);
+  border: var(--border-thick) solid;
+  border-color: var(--white) var(--bdk) var(--bdk) var(--white);
 }
 .win95-field--small .win95-field__control {
   font-size: var(--fs-xs);
   height: 100%;
   line-height: 1.2;
-  padding: 1px 3px 0;
+  padding: var(--space-025) var(--space-075) 0;
 }
 
 /* === SHARED: LAYOUT UTILS === */
@@ -254,44 +291,44 @@ body {
   align-items: flex-start;
 }
 .row--gap-xs {
-  gap: var(--space-1);
+  gap: var(--space-100);
 }
 .row--gap-sm {
-  gap: var(--space-2);
+  gap: var(--space-150);
 }
 .row--gap-md {
-  gap: 10px;
+  gap: var(--space-250);
 }
 
 /* === SHARED: EMPTY STATES === */
 .empty-text {
   font-size: var(--fs-sm);
-  color: var(--text-subtle);
-  padding: var(--space-1) 2px;
+  color: var(--blo);
+  padding: var(--space-100) var(--space-050);
 }
 .win95-field--small .win95-field__arrow {
   font-size: var(--fs-xxs);
 }
 .win95-field--small .win95-field__frame {
-  height: var(--control-small-height);
+  height: var(--size-control);
 }
 
 @media (pointer: coarse) {
   /* Small touch-only comfort bump without changing Win95 frame proportions. */
   .win95-field__control {
-    font-size: 16px;
+    font-size: var(--fs-xs);
     line-height: 1.35;
-    padding-top: 3px;
-    padding-bottom: 3px;
+    padding-top: var(--space-075);
+    padding-bottom: var(--space-075);
   }
 }
 
 /* iOS Safari: prevent focus zoom and forced select text tinting. */
 @supports (-webkit-touch-callout: none) {
   .win95-field__control {
-    font-size: 16px;
-    color: var(--text-primary);
-    -webkit-text-fill-color: var(--text-primary);
+    font-size: var(--fs-xs);
+    color: var(--black);
+    -webkit-text-fill-color: var(--black);
   }
 }
 
@@ -302,7 +339,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(192, 192, 192, 0.35);
+  background: var(--overlay-dialog);
   z-index: 100;
   display: flex;
   justify-content: center;
@@ -310,41 +347,41 @@ body {
 }
 .dialog {
   background: var(--bg);
-  min-width: 300px;
+  min-width: var(--size-dialog-min);
   max-width: 90vw;
-  box-shadow: 2px 2px 0 #000;
+  box-shadow: var(--window-shadow);
 }
 .dialog .win95-window__title-bar {
   font-size: var(--fs-xs);
-  padding: 2px 4px;
+  padding: var(--space-050) var(--space-100);
   cursor: default;
 }
 .dialog-body {
-  padding: 12px;
+  padding: var(--space-300);
 }
 .dialog-body label {
   font-size: var(--fs-sm);
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-100);
 }
 .dialog__field {
-  margin-bottom: 10px;
+  margin-bottom: var(--space-250);
 }
 .dialog-buttons {
   display: flex;
-  gap: 6px;
+  gap: var(--space-150);
   justify-content: flex-end;
 }
 .dialog-btn {
   font-family: var(--ui);
   font-size: var(--fs-sm);
-  padding: 4px 20px;
+  padding: var(--space-100) var(--space-500);
   background: var(--bg);
-  min-width: 75px;
+  min-width: var(--size-dialog-btn-min);
 }
 .copy-status {
   font-size: var(--fs-xs);
-  color: var(--text-muted);
-  margin-top: 6px;
-  min-height: 14px;
+  color: var(--bdk);
+  margin-top: var(--space-150);
+  min-height: var(--space-350);
 }
