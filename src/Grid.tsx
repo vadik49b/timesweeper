@@ -21,6 +21,7 @@ import Win95Dialog from './components/Win95Dialog'
 import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import AvailabilityGrid from './components/AvailabilityGrid'
+import ConfirmationTable from './components/ConfirmationTable'
 import StatusMiniCell from './components/StatusMiniCell'
 import MineIcon from './icons/MineIcon'
 import {
@@ -132,7 +133,6 @@ export default function Grid(props: Props) {
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
-  const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
 
   let persistTimer: ReturnType<typeof setTimeout> | undefined
@@ -1230,14 +1230,6 @@ export default function Grid(props: Props) {
 
   // Global event listeners + initial load
   onMount(() => {
-    const desktopQuery = window.matchMedia('(min-width: 700px)')
-    const onDesktopChange = () => {
-      setIsDesktop(desktopQuery.matches)
-    }
-
-    onDesktopChange()
-    desktopQuery.addEventListener('change', onDesktopChange)
-
     let wsConnected = false
     let fallbackPollTimer: number | undefined
     let fallbackPollDelay = 3000
@@ -1363,7 +1355,6 @@ export default function Grid(props: Props) {
     makeEventListener(document, 'keydown', onKeyDown)
 
     onCleanup(() => {
-      desktopQuery.removeEventListener('change', onDesktopChange)
       disconnectSocket()
       clearFallbackPoll()
     })
@@ -1536,12 +1527,7 @@ export default function Grid(props: Props) {
                     <hr />
                   </div>
                   <div class="grid-view__section-body">
-                    <div
-                      classList={{
-                        'grid-view__legend': true,
-                        'grid-view__legend--horizontal': isDesktop(),
-                      }}
-                    >
+                    <div class="grid-view__legend">
                       <AvailabilityLegend withLabels />
                     </div>
                     <div class="availability-grid-wrap">
@@ -1583,132 +1569,12 @@ export default function Grid(props: Props) {
                         }
                       >
                         <div class="summary-table-wrap grid-view__panel-content--title-aligned">
-                          <Show
-                            when={isDesktop()}
-                            fallback={
-                              <div class="summary-slots-mobile-list">
-                                <For each={visibleSummarySplitRows()}>
-                                  {(splitRow) => (
-                                    <button
-                                      type="button"
-                                      class="summary-slots-mobile-card"
-                                      onClick={() => openConfirmFromSplitRow(splitRow)}
-                                    >
-                                      <div class="summary-slots-mobile-card__head">
-                                        <div>
-                                          <div class="summary-slots-mobile-card__label">
-                                            Availability split
-                                          </div>
-                                          <div class="summary-slots-mobile-card__counts">
-                                            {splitRow.yesCount} yes · {splitRow.maybeCount} maybe ·{' '}
-                                            {splitRow.noCount} no
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div class="summary-slots-mobile-card__section">
-                                        <div class="summary-slots-mobile-card__label">People</div>
-                                        <div class="summary-slots-table__people-main">
-                                          <For each={statusNameGroups(splitRow.groups)}>
-                                            {(group) => (
-                                              <div class="summary-slots-table__people-row">
-                                                <StatusMiniCell value={group.value} />
-                                                <span>{group.names.join(', ')}</span>
-                                              </div>
-                                            )}
-                                          </For>
-                                        </div>
-                                      </div>
-                                      <div class="summary-slots-mobile-card__section">
-                                        <div class="summary-slots-mobile-card__label">Times</div>
-                                        <For each={timesByDayEntries(splitRow.slots)}>
-                                          {(dayGroup) => (
-                                            <div class="summary-slots-table__times-row">
-                                              <span class="summary-slots-table__times-day">
-                                                {dayGroup[0]}:
-                                              </span>{' '}
-                                              <span class="summary-slots-table__times-list">
-                                                {dayGroup[1].join(', ')}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </For>
-                                      </div>
-                                    </button>
-                                  )}
-                                </For>
-                              </div>
-                            }
-                          >
-                            <div class="summary-slots-wrap">
-                              <table class="summary-slots-table">
-                                <thead>
-                                <tr>
-                                  <th>People</th>
-                                  <th class="summary-slots-table__num">Yes</th>
-                                  <th class="summary-slots-table__num">Maybe</th>
-                                  <th class="summary-slots-table__num">No</th>
-                                  <th>Times</th>
-                                  <th class="summary-slots-table__action-col">Action</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                  <For each={visibleSummarySplitRows()}>
-                                    {(splitRow) => (
-                                      <tr
-                                        classList={{
-                                          'summary-slots-table__row--best': splitRow.kind === 'best',
-                                          'summary-slots-table__row--almost': splitRow.kind === 'almost',
-                                          'summary-slots-table__row--partial': splitRow.kind === 'partial',
-                                        }}
-                                      >
-                                        <td class="summary-slots-table__people-cell">
-                                          <div class="summary-slots-table__people-main">
-                                            <For each={statusNameGroups(splitRow.groups)}>
-                                              {(group) => (
-                                                <div class="summary-slots-table__people-row">
-                                                  <StatusMiniCell
-                                                    value={group.value}
-                                                    class="status-mini-cell--aligned"
-                                                  />
-                                                  <span>{group.names.join(', ')}</span>
-                                                </div>
-                                              )}
-                                            </For>
-                                          </div>
-                                        </td>
-                                        <td class="summary-slots-table__num">{splitRow.yesCount}</td>
-                                        <td class="summary-slots-table__num">{splitRow.maybeCount}</td>
-                                        <td class="summary-slots-table__num">{splitRow.noCount}</td>
-                                        <td class="summary-slots-table__times-cell">
-                                          <For each={timesByDayEntries(splitRow.slots)}>
-                                            {(dayGroup) => (
-                                              <div class="summary-slots-table__times-row">
-                                                <span class="summary-slots-table__times-day">
-                                                  {dayGroup[0]}:
-                                                </span>{' '}
-                                                <span class="summary-slots-table__times-list">
-                                                  {dayGroup[1].join(', ')}
-                                                </span>
-                                              </div>
-                                            )}
-                                          </For>
-                                        </td>
-                                        <td class="summary-slots-table__action-cell">
-                                          <Win95Button
-                                            size="small"
-                                            variant="toolbar"
-                                            onClick={() => openConfirmFromSplitRow(splitRow)}
-                                          >
-                                            Review
-                                          </Win95Button>
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </For>
-                                </tbody>
-                              </table>
-                            </div>
-                          </Show>
+                          <ConfirmationTable
+                            rows={visibleSummarySplitRows()}
+                            onReview={openConfirmFromSplitRow}
+                            statusNameGroups={statusNameGroups}
+                            timesByDayEntries={timesByDayEntries}
+                          />
                           <Show when={summarySplitRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
                             <div class="summary-list__meta-row">
                               <div class="summary-list__toggle-row">
