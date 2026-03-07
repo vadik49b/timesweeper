@@ -151,9 +151,6 @@ export default function Landing(props: Props) {
   }
 
   function addParticipant() {
-    if (participants().length >= 5) {
-      return
-    }
     const nextIndex = participants().length
     setParticipants([...participants(), ''])
     setPendingParticipantFocus(nextIndex)
@@ -213,15 +210,22 @@ export default function Landing(props: Props) {
 
       return
     }
-    const participantNames = participants()
-      .map((p) => p.trim())
-      .filter(Boolean)
+    const trimmedParticipants = participants().map((p) => p.trim())
+    const participantNames = trimmedParticipants.filter(Boolean)
 
-    if (participantNames.length === 0) {
-      setValidationError('Please add at least one participant.')
+    if (!trimmedParticipants[0]) {
+      setValidationError('Enter your name')
 
       return
     }
+
+    if (participantNames.length < 2) {
+      setValidationError('Please add at least one other participant.')
+
+      return
+    }
+
+    setParticipants(participantNames)
     setValidationError('')
     const timeRange = { start: timeStart(), end: timeEnd() }
     const spd = computeTimeSlots(timeRange).length
@@ -230,7 +234,7 @@ export default function Landing(props: Props) {
       name: eventName().trim(),
       created: Date.now(),
       status: 'open',
-      maxParticipants: 5,
+      maxParticipants: Number.MAX_SAFE_INTEGER,
       dates,
       timeRange,
       participants: participantNames.map((name) => ({
@@ -384,23 +388,25 @@ export default function Landing(props: Props) {
           <legend>Who's in?</legend>
           <Index each={participants()}>
             {(p, i) => (
-              <div class="participant-row row row--center row--gap-xs">
-                <label class="sr-only" for={`participant-${i}`}>
-                  Participant {i + 1} name
-                </label>
-                <Win95Field
-                  kind="input"
-                  id={`participant-${i}`}
-                  name={`participant-${i}`}
-                  value={p()}
-                  placeholder={i === 0 ? 'You' : `Person ${i + 1}`}
-                  wrapperClass="landing__participant-field"
-                  controlClass="landing__text-input-control"
-                  inputRef={(el) => {
-                    participantInputRefs[i] = el
-                  }}
-                  onInput={(value) => updateParticipant(i, value)}
-                />
+              <div class="participant-row">
+                <div class="participant-row__field">
+                  <label class="participant-row__label" for={`participant-${i}`}>
+                    {i === 0 ? 'You' : `Person ${i + 1}`}
+                  </label>
+                  <Win95Field
+                    kind="input"
+                    id={`participant-${i}`}
+                    name={`participant-${i}`}
+                    value={p()}
+                    placeholder="Name"
+                    wrapperClass="landing__participant-field"
+                    controlClass="landing__text-input-control"
+                    inputRef={(el) => {
+                      participantInputRefs[i] = el
+                    }}
+                    onInput={(value) => updateParticipant(i, value)}
+                  />
+                </div>
                 {i > 0 && (
                   <Win95Button
                     size="small"
@@ -415,7 +421,7 @@ export default function Landing(props: Props) {
             )}
           </Index>
           <Win95Button size="small" variant="toolbar" class="add-btn" onClick={addParticipant}>
-            + <span class="hk">A</span>dd person
+            <span class="hk">A</span>dd person
           </Win95Button>
         </fieldset>
         <Win95Button fullWidth variant="cta" class="create-btn" onClick={create}>

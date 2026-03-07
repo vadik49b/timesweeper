@@ -46,7 +46,7 @@
   --title-shadow-soft: 1px 1px 0 var(--navy);
   --window-shadow: 2px 2px 0 var(--black);
   --overlay-dialog: rgba(192, 192, 192, 0.35);
-  --overlay-confirmed: rgba(192, 192, 192, 0.88);
+  --overlay-confirmed: rgba(192, 192, 192, 0.72);
   --text-disabled: #a0a0a0;
   --text-link-hover: #a0a0ff;
   --text-footer: #a0c0c0;
@@ -339,7 +339,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--overlay-dialog);
+  background: var(--overlay-confirmed);
   z-index: 100;
   display: flex;
   justify-content: center;

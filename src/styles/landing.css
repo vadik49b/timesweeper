@@ -180,9 +180,23 @@
 }
 
 .participant-row {
+  display: flex;
+  align-items: flex-end;
   gap: var(--space-100);
   margin-bottom: var(--space-100);
 }
+
+.participant-row__field {
+  flex: 1;
+}
+
+.participant-row__label {
+  display: block;
+  font-size: var(--fs-xs);
+  margin-bottom: var(--space-050);
+  font-weight: var(--fw-bold);
+}
+
 .p-rm {
   background: var(--bg);
 }

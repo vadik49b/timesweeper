@@ -548,30 +548,19 @@
   flex: 0 0 var(--space-350);
   margin-top: var(--space-050);
 }
-.grid-view__confirmed-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  background: var(--overlay-confirmed);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-500);
-}
-.grid-view__confirmed-box {
+.dialog--confirmed {
   max-width: var(--max-dialog-confirmed);
   width: min(var(--max-dialog-confirmed), calc(100vw - var(--space-400)));
   max-height: calc(100dvh - var(--space-400));
   overflow-y: auto;
-  padding: var(--space-700);
-  box-shadow: var(--window-shadow);
   background: var(--bg);
+  box-shadow: var(--window-shadow);
 }
-.grid-view__confirmed-title {
-  font-size: var(--fs-lg);
-  font-weight: var(--fw-bold);
-  margin-bottom: var(--space-350);
+
+.dialog--confirmed .dialog-body--confirmed-overlay {
+  padding: var(--space-700);
 }
+
 .grid-view__confirmed-details {
   font-size: var(--fs-sm);
   line-height: 1.5;
@@ -613,12 +602,12 @@
 }
 
 @media (max-width: 700px) {
-  .grid-view__confirmed-overlay {
-    padding: var(--space-200);
-  }
-  .grid-view__confirmed-box {
+  .dialog--confirmed {
     width: calc(100vw - var(--space-300));
     max-height: calc(100dvh - var(--space-300));
+  }
+
+  .dialog--confirmed .dialog-body--confirmed-overlay {
     padding: var(--space-450);
   }
 }

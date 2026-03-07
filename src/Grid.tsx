@@ -956,7 +956,7 @@ export default function Grid(props: Props) {
 
     const ev = event()
 
-    if (!ev || ev.participants.length >= ev.maxParticipants) {
+    if (!ev) {
       return
     }
 
@@ -1101,18 +1101,6 @@ export default function Grid(props: Props) {
     }
   })
 
-  createEffect(() => {
-    if (!isConfirmed() && !activeModal()) {
-      return
-    }
-
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    onCleanup(() => {
-      document.body.style.overflow = prevOverflow
-    })
-  })
-
   // Global event listeners + initial load
   onMount(() => {
     const desktopQuery = window.matchMedia('(min-width: 700px)')
@@ -1222,6 +1210,10 @@ export default function Grid(props: Props) {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isConfirmed()) {
+          return
+        }
+
         e.preventDefault()
         closeOpenDialog()
 
@@ -1678,45 +1670,48 @@ export default function Grid(props: Props) {
             {/* /panels */}
 
             <Show when={isConfirmed()}>
-              <div class="grid-view__confirmed-overlay">
-                <div class="grid-view__confirmed-box r">
-                  <div class="grid-view__confirmed-title">Time confirmed</div>
-                  <div class="grid-view__confirmed-details">
-                    <div>
-                      <b>Event:</b> {event()!.name}
-                    </div>
-                    <div>
-                      <b>Created by:</b> {createdByName()}
-                    </div>
-                    <div>
-                      <b>When:</b> {confirmedPickedLine()}
-                    </div>
-                    <div>
-                      <b>Participants:</b> {participantsLine()}
-                    </div>
+              <Win95Dialog
+                title="Time confirmed"
+                class="dialog--confirmed"
+                bodyClass="dialog-body--confirmed-overlay"
+
+                showCloseButton={false}
+              >
+                <div class="grid-view__confirmed-details">
+                  <div>
+                    <b>Event:</b> {event()!.name}
                   </div>
-                  <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
-                    <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
-                    <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
+                  <div>
+                    <b>Created by:</b> {createdByName()}
                   </div>
-                  <div class="grid-view__confirmed-separator" />
-                  <div class="grid-view__confirmed-secondary">
-                    <div class="grid-view__confirmed-undo-row">
-                      <div class="grid-view__confirmed-undo-help">
-                        Availability is locked because a time was picked.
-                        <br />
-                        Need changes? Undo confirmation first.
-                      </div>
-                      <Win95Button
-                        class="grid-view__confirmed-undo-btn"
-                        onClick={undoConfirmedTime}
-                      >
-                        Undo confirmation
-                      </Win95Button>
-                    </div>
+                  <div>
+                    <b>When:</b> {confirmedPickedLine()}
+                  </div>
+                  <div>
+                    <b>Participants:</b> {participantsLine()}
                   </div>
                 </div>
-              </div>
+                <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
+                  <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
+                  <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
+                </div>
+                <div class="grid-view__confirmed-separator" />
+                <div class="grid-view__confirmed-secondary">
+                  <div class="grid-view__confirmed-undo-row">
+                    <div class="grid-view__confirmed-undo-help">
+                      Availability is locked because a time was picked.
+                      <br />
+                      Need changes? Undo confirmation first.
+                    </div>
+                    <Win95Button
+                      class="grid-view__confirmed-undo-btn"
+                      onClick={undoConfirmedTime}
+                    >
+                      Undo confirmation
+                    </Win95Button>
+                  </div>
+                </div>
+              </Win95Dialog>
             </Show>
           </div>
           {/* /grid-view__content */}
@@ -1777,25 +1772,23 @@ export default function Grid(props: Props) {
                   onChange={onParticipantPickerChange}
                 />
               </Show>
-              <Show when={(event()?.participants.length ?? 0) < (event()?.maxParticipants ?? 5)}>
-                <label class="participant-picker__label" for="new-participant-name">
-                  Not on the list?
-                </label>
-                <Win95Field
-                  kind="input"
-                  id="new-participant-name"
-                  name="newParticipantName"
-                  value={newParticipantName()}
-                  placeholder="Enter your name"
-                  wrapperClass="dialog__field"
-                  onInput={setNewParticipantName}
-                />
-                <div class="dialog-buttons">
-                  <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
-                    Join
-                  </Win95Button>
-                </div>
-              </Show>
+              <label class="participant-picker__label" for="new-participant-name">
+                Not on the list?
+              </label>
+              <Win95Field
+                kind="input"
+                id="new-participant-name"
+                name="newParticipantName"
+                value={newParticipantName()}
+                placeholder="Enter your name"
+                wrapperClass="dialog__field"
+                onInput={setNewParticipantName}
+              />
+              <div class="dialog-buttons">
+                <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
+                  Join
+                </Win95Button>
+              </div>
             </Show>
           </Win95Dialog>
         </Show>
