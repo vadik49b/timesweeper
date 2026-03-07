@@ -395,6 +395,47 @@ body {
   background: var(--bg);
   min-width: var(--size-dialog-btn-min);
 }
+
+.dialog--error {
+  width: min(var(--max-dialog-confirm), calc(100vw - var(--space-400)));
+  max-width: var(--max-dialog-confirm);
+}
+
+.dialog-body--error {
+  font-size: var(--fs-sm);
+}
+
+.error-dialog__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-250);
+}
+
+.error-dialog__icon {
+  width: var(--size-control);
+  height: var(--size-control);
+  flex: 0 0 var(--size-control);
+  border-radius: 50%;
+  background: var(--accent-danger-bg);
+  color: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+
+.error-dialog__text {
+  margin: var(--space-025) 0 0;
+  line-height: 1.35;
+}
+
+.error-dialog__actions {
+  justify-content: center;
+  margin-top: var(--space-400);
+}
+
 .copy-status {
   font-size: var(--fs-xs);
   color: var(--bdk);

@@ -82,11 +82,6 @@
   outline-offset: var(--space-025);
 }
 
-.grid-view__intro-panel {
-  padding: var(--space-350) var(--space-300) var(--space-700);
-  margin-bottom: 0;
-  background: var(--bg);
-}
 .grid-view__pane-title {
   margin: 0 0 var(--space-250);
   font-family: var(--ui);
@@ -102,25 +97,27 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-200);
-  margin-bottom: var(--space-250);
+  margin-bottom: var(--space-400);
 }
 .grid-view__pane-title--event {
   margin: 0;
   min-width: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--black);
+  text-shadow: none;
 }
 .grid-view__title-settings {
   flex-shrink: 0;
 }
-.grid-view__pane-title--steps {
-  margin-top: var(--space-500);
-  margin-bottom: var(--space-250);
-}
-
 .grid-view__intro-text {
   font-size: var(--fs-sm);
   font-weight: var(--fw-regular);
   color: var(--black);
   line-height: 1.35;
+}
+.grid-view__panel-frame > .grid-view__title-row + .grid-view__intro-text {
+  margin: 0 0 var(--space-500);
 }
 
 .grid-view__steps-panel {
@@ -230,9 +227,6 @@
   }
   .grid-view__hero-actions {
     margin-left: 0;
-  }
-  .grid-view__intro-panel {
-    padding: var(--space-300) var(--space-250) var(--space-600);
   }
   .grid-view__steps-panel {
     margin-top: 0;
@@ -778,11 +772,10 @@
   font-weight: var(--fw-bold);
 }
 
-.settings__note {
-  margin-bottom: var(--space-300);
-  font-size: var(--fs-xs);
-  line-height: 1.2;
-  color: var(--bdk);
+.settings__organizer {
+  margin: 0 0 var(--space-300);
+  font-size: var(--fs-sm);
+  color: var(--black);
 }
 
 .settings__participants-list {
@@ -790,6 +783,12 @@
   display: grid;
   grid-template-columns: 1fr;
   row-gap: var(--space-100);
+}
+
+.settings__note {
+  margin: 0 0 var(--space-200);
+  font-size: var(--fs-xs);
+  color: var(--accent-danger);
 }
 
 .settings__participants-toggle {
@@ -822,10 +821,4 @@
 .settings__add-field {
   flex: 1;
   margin-bottom: 0;
-}
-
-.settings__error {
-  margin-bottom: var(--space-250);
-  color: var(--accent-danger);
-  font-size: var(--fs-xs);
 }

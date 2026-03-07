@@ -19,6 +19,7 @@ import {
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
+import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import StatusMiniCell from './components/StatusMiniCell'
 import MineIcon from './icons/MineIcon'
@@ -129,7 +130,7 @@ export default function Grid(props: Props) {
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
   const [settingsNewParticipantName, setSettingsNewParticipantName] = createSignal('')
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
-  const [settingsError, setSettingsError] = createSignal('')
+  const [dialogError, setDialogError] = createSignal('')
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
   const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
@@ -760,16 +761,6 @@ export default function Grid(props: Props) {
     setEvent(updated)
   }
 
-  function closeOpenDialog() {
-    if (activeModal() === 'name-picker' && !event()) {
-      goToLanding()
-
-      return
-    }
-
-    if (activeModal()) setActiveModal(null)
-  }
-
   function revealSharePanel() {
     setCopyStatus('')
     queueMicrotask(() => {
@@ -786,46 +777,41 @@ export default function Grid(props: Props) {
     }
 
     setSettingsEventName(ev.name)
-    setSettingsParticipantNames(ev.participants.map((participant) => participant.name))
+    setSettingsParticipantNames(ev.participants.slice(1).map((participant) => participant.name))
     setSettingsNewParticipantName('')
     setShowAllSettingsParticipants(false)
-    setSettingsError('')
+    setDialogError('')
     setActiveModal('settings')
   }
 
   function removeSettingsParticipant(index: number) {
-    if (settingsParticipantNames().length <= 2) {
-      setSettingsError('At least 2 participants are required.')
-
-      return
-    }
-
     setSettingsParticipantNames((prev) => prev.filter((_, i) => i !== index))
-    setSettingsError('')
   }
 
   function addSettingsParticipant() {
     const trimmed = settingsNewParticipantName().trim()
 
     if (!trimmed) {
-      setSettingsError('Enter a participant name.')
+      setDialogError('Enter a participant name.')
 
       return
     }
 
-    const exists = settingsParticipantNames().some(
+    const organizer = createdByName()
+    const exists =
+      organizer.trim().toLowerCase() === trimmed.toLowerCase() ||
+      settingsParticipantNames().some(
       (name) => name.trim().toLowerCase() === trimmed.toLowerCase(),
-    )
+      )
 
     if (exists) {
-      setSettingsError(`Duplicate name: "${trimmed}". Use a unique name.`)
+      setDialogError(`Duplicate name: "${trimmed}". Use a unique name.`)
 
       return
     }
 
     setSettingsParticipantNames((prev) => [...prev, trimmed])
     setSettingsNewParticipantName('')
-    setSettingsError('')
   }
 
   const visibleSettingsParticipantNames = createMemo(() => {
@@ -848,7 +834,16 @@ export default function Grid(props: Props) {
     const nextEventName = settingsEventName().trim()
 
     if (!nextEventName) {
-      setSettingsError('Event name is required.')
+      setDialogError('Event name is required.')
+
+      return
+    }
+
+    const organizer = createdByName()
+    const organizerParticipant = ev.participants[0]
+
+    if (!organizerParticipant) {
+      setDialogError('Organizer is missing from this event.')
 
       return
     }
@@ -857,19 +852,18 @@ export default function Grid(props: Props) {
       .map((name) => name.trim())
       .filter(Boolean)
 
-    if (nextParticipantNames.length < 2) {
-      setSettingsError('At least 2 participants are required.')
-
+    if (nextParticipantNames.length < 1) {
       return
     }
 
     const uniqueNameKeys = new Set<string>()
+    uniqueNameKeys.add(organizer.trim().toLowerCase())
 
     for (const name of nextParticipantNames) {
       const key = name.toLowerCase()
 
       if (uniqueNameKeys.has(key)) {
-        setSettingsError(`Duplicate name: "${name}". Use unique participant names.`)
+        setDialogError(`Duplicate name: "${name}". Use unique participant names.`)
 
         return
       }
@@ -879,7 +873,9 @@ export default function Grid(props: Props) {
 
     const existingByKey = new Map(ev.participants.map((participant) => [participant.name.toLowerCase(), participant]))
     const spd = slotsPerDay(ev)
-    const updatedParticipants = nextParticipantNames.map((name) => {
+    const updatedParticipants = [
+      organizerParticipant,
+      ...nextParticipantNames.map((name) => {
       const existing = existingByKey.get(name.toLowerCase())
 
       if (existing) {
@@ -895,7 +891,8 @@ export default function Grid(props: Props) {
       }
 
       return newParticipant
-    })
+      }),
+    ]
 
     const updated: AppEvent = {
       ...ev,
@@ -909,7 +906,7 @@ export default function Grid(props: Props) {
       ''
 
     if (!nextSelected) {
-      setSettingsError('At least 2 participants are required.')
+      setDialogError('At least 2 participants are required.')
 
       return
     }
@@ -922,7 +919,6 @@ export default function Grid(props: Props) {
     setEvent(updated)
     setCurrentName(nextSelected)
     loadParticipantSlots(updated, nextSelected)
-    setSettingsError('')
     setActiveModal(null)
   }
 
@@ -946,6 +942,22 @@ export default function Grid(props: Props) {
   }
 
   const createdByName = createMemo(() => event()?.participants[0]?.name ?? 'Unknown')
+  const greetingContext = createMemo(() => {
+    const ev = event()
+
+    if (!ev) {
+      return 'Share the event link with anyone who needs to respond.'
+    }
+
+    const organizer = createdByName()
+    const current = currentName().trim().toLowerCase()
+
+    if (current && current === organizer.toLowerCase()) {
+      return `You are organizing "${ev.name}".`
+    }
+
+    return `${organizer} is organizing "${ev.name}".`
+  })
   const currentTimezone = createMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const confirmSlotPreview = createMemo<SummaryGroups>(() => {
     const day = days().find((entry) => entry.label === confirmDay())
@@ -1362,17 +1374,6 @@ export default function Grid(props: Props) {
     makeEventListener(document, 'visibilitychange', onVisibilityChange)
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (isConfirmed()) {
-          return
-        }
-
-        e.preventDefault()
-        closeOpenDialog()
-
-        return
-      }
-
       if (
         (e.target as HTMLElement).tagName === 'INPUT' ||
         (e.target as HTMLElement).tagName === 'SELECT'
@@ -1485,52 +1486,47 @@ export default function Grid(props: Props) {
           </div>
 
           <div class="grid-view__content">
-            <Show when={event()}>
-              {(loadedEvent) => (
-                <div class="grid-view__title-row">
-                  <h2 class="grid-view__pane-title grid-view__pane-title--event">
-                    Event name: {loadedEvent().name}
-                  </h2>
-                  <Win95Button
-                    size="small"
-                    variant="toolbar"
-                    class="grid-view__title-settings"
-                    onClick={openSettingsModal}
-                  >
-                    Settings
-                  </Win95Button>
-                </div>
-              )}
-            </Show>
-            <section class="grid-view__intro-panel r">
-              <p class="grid-view__intro-text">
-                Hi{' '}
-                <Show
-                  when={!isConfirmed()}
-                  fallback={<span class="grid-controls__name">{currentName() || 'there'}</span>}
-                >
-                  <a
-                    href="#"
-                    class="grid-controls__name-link"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      setActiveModal('name-picker')
-                    }}
-                    aria-label="Switch participant name"
-                  >
-                    <span class="grid-controls__name">{currentName() || 'there'}</span>
-                  </a>
-                </Show>
-                ! Share the event link with anyone who needs to respond, fill your availability,
-                then choose and confirm the best suggested time.
-              </p>
-            </section>
-
-            {/* Single-column layout */}
-            <h2 class="grid-view__pane-title grid-view__pane-title--steps">Pick a Time Together</h2>
             <section class="grid-view__steps-panel r">
               <div class="grid-view__panels">
                 <div class="grid-view__panel-frame">
+                <Show when={event()}>
+                  {(loadedEvent) => (
+                    <div class="grid-view__title-row">
+                      <h2 class="grid-view__pane-title grid-view__pane-title--event">
+                        {loadedEvent().name}
+                      </h2>
+                      <Win95Button
+                        size="small"
+                        variant="toolbar"
+                        class="grid-view__title-settings"
+                        onClick={openSettingsModal}
+                      >
+                        Settings
+                      </Win95Button>
+                    </div>
+                  )}
+                </Show>
+                <p class="grid-view__intro-text">
+                  Hi{' '}
+                  <Show
+                    when={!isConfirmed()}
+                    fallback={<span class="grid-controls__name">{currentName() || 'there'}</span>}
+                  >
+                    <a
+                      href="#"
+                      class="grid-controls__name-link"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        setActiveModal('name-picker')
+                      }}
+                      aria-label="Switch participant name"
+                    >
+                      <span class="grid-controls__name">{currentName() || 'there'}</span>
+                    </a>
+                  </Show>
+                  ! {greetingContext()} Share this link with anyone who needs to respond. Fill your availability. The app will suggest the
+                  best times. Once a good option exists, anyone can confirm the event time.
+                </p>
                 <section class="grid-view__section">
                   <div class="grid-view__section-header">
                     <span class="grid-view__section-number">1.</span>
@@ -2018,8 +2014,16 @@ export default function Grid(props: Props) {
               wrapperClass="dialog__field"
               onInput={setSettingsEventName}
             />
-            <p class="settings__note">Dates and time range cannot be changed after event creation.</p>
+            <label class="settings__label" for="settings-organizer-name">
+              Organizer:
+            </label>
+            <p class="settings__organizer">{createdByName()}</p>
+            <p class="settings__label">Dates:</p>
+            <p class="settings__organizer">Locked after event creation to keep everyone aligned.</p>
             <p class="settings__label">Participants:</p>
+            <Show when={settingsParticipantNames().length === 0}>
+              <p class="settings__note">Add at least one participant before saving.</p>
+            </Show>
             <div class="settings__participants-list">
               <For each={visibleSettingsParticipantNames()}>
                 {(participantName, index) => (
@@ -2029,7 +2033,6 @@ export default function Grid(props: Props) {
                       size="small"
                       variant="icon"
                       class="settings__participant-remove"
-                      disabled={settingsParticipantNames().length <= 2}
                       onClick={() => removeSettingsParticipant(index())}
                     >
                       ×
@@ -2071,9 +2074,6 @@ export default function Grid(props: Props) {
                 Add
               </Win95Button>
             </div>
-            <Show when={!!settingsError()}>
-              <p class="settings__error">{settingsError()}</p>
-            </Show>
             <div class="dialog-buttons">
               <Win95Button class="dialog-btn" onClick={saveSettings}>
                 Save
@@ -2083,6 +2083,10 @@ export default function Grid(props: Props) {
               </Win95Button>
             </div>
           </Win95Dialog>
+        </Show>
+
+        <Show when={!!dialogError()}>
+          <ErrorDialog message={dialogError()} onClose={() => setDialogError('')} />
         </Show>
 
         <Show when={activeModal() === 'confirm'}>

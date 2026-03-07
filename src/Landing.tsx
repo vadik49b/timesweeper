@@ -5,7 +5,7 @@ import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from '.
 import { publishEventNow, queueEventSync, flushPendingSync } from './sync'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
-import Win95Dialog from './components/Win95Dialog'
+import ErrorDialog from './components/ErrorDialog'
 import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
 
@@ -511,24 +511,7 @@ export default function Landing(props: Props) {
       </div>
 
       <Show when={!!validationError()}>
-        <Win95Dialog
-          title="Validation Error"
-          class="dialog--landing-error"
-          bodyClass="dialog-body--landing-error"
-          onClose={() => setValidationError('')}
-        >
-          <div class="landing-error__row">
-            <span class="landing-error__icon" aria-hidden="true">
-              ✖
-            </span>
-            <p class="landing-error__text">{validationError()}</p>
-          </div>
-          <div class="dialog-buttons landing-error__actions">
-            <Win95Button class="dialog-btn" onClick={() => setValidationError('')}>
-              OK
-            </Win95Button>
-          </div>
-        </Win95Dialog>
+        <ErrorDialog message={validationError()} onClose={() => setValidationError('')} />
       </Show>
     </div>
   )

@@ -4,6 +4,8 @@ import Win95Button from './Win95Button'
 
 let openDialogCount = 0
 let previousBodyOverflow = ''
+let nextDialogId = 1
+const dialogStack: number[] = []
 
 interface Props {
   title: string
@@ -15,11 +17,49 @@ interface Props {
 }
 
 export default function Win95Dialog(props: Props) {
+  const dialogId = nextDialogId++
   const dialogClass = () => ['dialog', 'r', props.class].filter(Boolean).join(' ')
   const dialogBodyClass = () => ['dialog-body', props.bodyClass].filter(Boolean).join(' ')
   const dialogTitleId = () =>
     `dialog-title-${props.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const showCloseButton = () => props.showCloseButton ?? true
+
+  createEffect(() => {
+    dialogStack.push(dialogId)
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return
+      }
+
+      const topDialogId = dialogStack[dialogStack.length - 1]
+
+      if (topDialogId !== dialogId) {
+        return
+      }
+
+      if (!props.onClose) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      props.onClose()
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKeyDown)
+      const index = dialogStack.lastIndexOf(dialogId)
+
+      if (index === -1) {
+        return
+      }
+
+      dialogStack.splice(index, 1)
+    })
+  })
 
   createEffect(() => {
     if (openDialogCount === 0) {
