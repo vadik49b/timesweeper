@@ -10,12 +10,11 @@ import {
   updateParticipantSlots,
 } from './db'
 import {
-  connectEventSocket,
-  flushPendingSync,
-  pullRemoteEvent,
   queueEventSync,
   queueParticipantSync,
-} from './sync'
+  requestSyncFlush,
+} from './sync-write'
+import { connectEventSocket, pullRemoteEvent } from './sync-live'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
@@ -557,7 +556,7 @@ export default function Grid(props: Props) {
       ),
     })
     await queueParticipantSync(ev.id, currentName(), flat, prevVersion, updatedAt)
-    await flushPendingSync()
+    requestSyncFlush()
   }
 
   function schedulePersist() {
@@ -742,7 +741,7 @@ export default function Grid(props: Props) {
     }
     void saveEvent(updated)
     void queueEventSync(updated)
-    void flushPendingSync()
+    requestSyncFlush()
     setEvent(updated)
     setActiveModal(null)
   }
@@ -757,7 +756,7 @@ export default function Grid(props: Props) {
     const updated: AppEvent = { ...ev, status: 'open', confirmedSlot: undefined }
     void saveEvent(updated)
     void queueEventSync(updated)
-    void flushPendingSync()
+    requestSyncFlush()
     setEvent(updated)
   }
 
@@ -913,7 +912,7 @@ export default function Grid(props: Props) {
 
     await saveEvent(updated)
     await queueEventSync(updated)
-    await flushPendingSync()
+    requestSyncFlush()
     await setSelectedParticipant(updated.id, nextSelected)
 
     setEvent(updated)
@@ -1144,7 +1143,7 @@ export default function Grid(props: Props) {
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
     await queueEventSync(updated)
-    await flushPendingSync()
+    requestSyncFlush()
     await setSelectedParticipant(updated.id, trimmed)
     setEvent(updated)
     loadParticipantSlots(updated, trimmed)
@@ -1317,7 +1316,7 @@ export default function Grid(props: Props) {
             fallbackPollDelay = Math.min(fallbackPollDelay * 2, fallbackPollMax)
           })
           .finally(() => {
-            void flushPendingSync()
+            requestSyncFlush()
             scheduleFallbackPoll()
           })
       }, fallbackPollDelay)
@@ -1346,7 +1345,7 @@ export default function Grid(props: Props) {
     )
 
     const onOnline = () => {
-      void flushPendingSync()
+      requestSyncFlush()
 
       if (!event()) {
         void retryLoadFromWorker()
@@ -1358,7 +1357,7 @@ export default function Grid(props: Props) {
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        void flushPendingSync()
+        requestSyncFlush()
         void pullRemoteEvent(props.eventId)
           .then((remote) => {
             if (remote) void applyRemoteEvent(remote)
@@ -1428,12 +1427,12 @@ export default function Grid(props: Props) {
         if (!event() && localEvent) {
           // Event exists locally but not on server yet: seed remote once.
           await queueEventSync(localEvent)
-          await flushPendingSync()
+          requestSyncFlush()
         }
       } catch {
         // Keep local-only mode when backend is unavailable.
       }
-      await flushPendingSync().catch(() => {})
+      requestSyncFlush()
     })()
   })
 

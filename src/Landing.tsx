@@ -2,7 +2,7 @@ import { createSignal, createMemo, createEffect, onMount, For, Index, Show } fro
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
 import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from './db'
-import { publishEventNow, queueEventSync, flushPendingSync } from './sync'
+import { publishEventNow, queueEventSync, requestSyncFlush } from './sync-write'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import ErrorDialog from './components/ErrorDialog'
@@ -271,7 +271,7 @@ export default function Landing(props: Props) {
         return
       }
       await queueEventSync(event)
-      await flushPendingSync()
+      requestSyncFlush()
     })().catch(() => {
       // Keep create flow local-first; sync retries in background.
     })
