@@ -20,6 +20,7 @@ import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
 import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
+import AvailabilityGrid from './components/AvailabilityGrid'
 import StatusMiniCell from './components/StatusMiniCell'
 import MineIcon from './icons/MineIcon'
 import {
@@ -669,44 +670,6 @@ export default function Grid(props: Props) {
     setConfirmDay(first?.day ?? days()[0]?.label ?? '')
     setConfirmTime(first?.time ?? times()[0]?.label ?? '')
     setActiveModal('confirm')
-  }
-
-  function renderAvailabilityCell(
-    dayKey: string,
-    dayLabel: string,
-    timeLabel: string,
-    timeIndex: number,
-    rowIndex: number,
-    colIndex: number,
-  ) {
-    return (
-      <button
-        type="button"
-        classList={{
-          'availability-grid__cell': true,
-          'availability-grid__cell--yes': myState[dayKey]?.[timeIndex] === 1,
-          'availability-grid__cell--maybe': myState[dayKey]?.[timeIndex] === 2,
-          'availability-grid__cell--first-row': rowIndex === 0,
-          'availability-grid__cell--first-col': colIndex === 0,
-        }}
-        aria-label={`${dayLabel} at ${timeLabel}. Current status: ${
-          myState[dayKey]?.[timeIndex] === 1
-            ? 'yes'
-            : myState[dayKey]?.[timeIndex] === 2
-              ? 'maybe'
-              : 'no'
-        }. Activate to cycle.`}
-        disabled={isConfirmed()}
-        onClick={() => cycleCell(dayKey, timeIndex)}
-      >
-        <Show when={myState[dayKey]?.[timeIndex] === 1}>
-          <span class="availability-grid__icon">✔</span>
-        </Show>
-        <Show when={myState[dayKey]?.[timeIndex] === 2}>
-          <span class="availability-grid__icon">?</span>
-        </Show>
-      </button>
-    )
   }
 
   function openConfirm(day: string | null, time: string | null) {
@@ -1582,71 +1545,14 @@ export default function Grid(props: Props) {
                       <AvailabilityLegend withLabels />
                     </div>
                     <div class="availability-grid-wrap">
-                      <div
-                        classList={{
-                          'availability-grid': true,
-                          'availability-grid--horizontal': isDesktop(),
-                        }}
-                        style={{
-                          '--days': String(Math.min(Math.max(days().length, 1), 7)),
-                          '--times': String(Math.max(times().length, 1)),
-                        }}
-                      >
-                        <Show
-                          when={isDesktop()}
-                          fallback={
-                            <>
-                              <div class="availability-grid__corner" />
-                              <For each={days()}>
-                                {(d) => <div class="availability-grid__day">{d.label}</div>}
-                              </For>
-                              <For each={times()}>
-                                {(t, ti) => (
-                                  <>
-                                    <div class="availability-grid__time">{t.label}</div>
-                                    <For each={days()}>
-                                      {(d, di) =>
-                                        renderAvailabilityCell(
-                                          d.key,
-                                          d.label,
-                                          t.label,
-                                          ti(),
-                                          ti(),
-                                          di(),
-                                        )}
-                                    </For>
-                                  </>
-                                )}
-                              </For>
-                            </>
-                          }
-                        >
-                          <div class="availability-grid__corner" />
-                          <For each={times()}>
-                            {(t) => <div class="availability-grid__day availability-grid__day--time-head">{t.label}</div>}
-                          </For>
-                          <For each={days()}>
-                            {(d, di) => (
-                              <>
-                                <div class="availability-grid__time availability-grid__time--day-head">
-                                  {d.label}
-                                </div>
-                                <For each={times()}>
-                                  {(t, ti) =>
-                                    renderAvailabilityCell(
-                                      d.key,
-                                      d.label,
-                                      t.label,
-                                      ti(),
-                                      di(),
-                                      ti(),
-                                    )}
-                                </For>
-                              </>
-                            )}
-                          </For>
-                        </Show>
-                      </div>
+                      <AvailabilityGrid
+                        days={days()}
+                        times={times()}
+                        myState={myState}
+                        isDesktop={isDesktop()}
+                        isConfirmed={isConfirmed()}
+                        onCycle={cycleCell}
+                      />
                     </div>
                   </div>
                 </section>
