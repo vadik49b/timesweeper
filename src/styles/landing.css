@@ -186,9 +186,14 @@
   margin-bottom: var(--space-100);
 }
 
+.participant-row button {
+  margin-bottom: var(--space-050);
+}
+
 .participant-row__field {
   flex: 1;
 }
+
 
 .participant-row__label {
   display: block;
