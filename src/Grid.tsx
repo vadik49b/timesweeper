@@ -1549,7 +1549,6 @@ export default function Grid(props: Props) {
                         days={days()}
                         times={times()}
                         myState={myState}
-                        isDesktop={isDesktop()}
                         isConfirmed={isConfirmed()}
                         onCycle={cycleCell}
                       />

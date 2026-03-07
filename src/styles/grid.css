@@ -245,23 +245,23 @@
   --days: 1;
   --times: 1;
   --time-col-width: calc(var(--space-900) - var(--space-050));
+  --day-col-width: var(--size-cell);
   grid-template-columns: var(--time-col-width) repeat(var(--days), var(--size-cell));
+  grid-template-rows: var(--size-control) repeat(var(--times), var(--size-cell));
 }
 .availability-grid-wrap {
   overflow-x: auto;
   padding-bottom: var(--space-050);
 }
-.availability-grid--horizontal {
-  --day-col-width: var(--size-cell);
-  grid-template-columns: var(--day-col-width) repeat(var(--times), var(--size-cell));
-  width: max-content;
-  min-width: 100%;
-}
 .availability-grid__corner {
   height: var(--size-control);
+  grid-column: 1;
+  grid-row: 1;
 }
 .availability-grid__day {
   height: var(--size-control);
+  grid-column: calc(var(--di) + 2);
+  grid-row: 1;
 }
 .availability-grid__cell {
   appearance: none;
@@ -276,6 +276,8 @@
   background: var(--bg);
   border: var(--border-thick) solid;
   border-color: var(--white) var(--bdk) var(--bdk) var(--white);
+  grid-column: calc(var(--di) + 2);
+  grid-row: calc(var(--ti) + 2);
 }
 .availability-grid__cell:active:not(.availability-grid__cell--yes):not(
     .availability-grid__cell--maybe
@@ -306,12 +308,12 @@
   font-size: var(--fs-xs);
   pointer-events: none;
 }
-.availability-grid__cell.availability-grid__cell--first-row.availability-grid__cell--yes,
-.availability-grid__cell.availability-grid__cell--first-row.availability-grid__cell--maybe {
+.availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--yes,
+.availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--maybe {
   border-top-width: var(--border-thin);
 }
-.availability-grid__cell.availability-grid__cell--first-col.availability-grid__cell--yes,
-.availability-grid__cell.availability-grid__cell--first-col.availability-grid__cell--maybe {
+.availability-grid__cell.availability-grid__cell--first-day.availability-grid__cell--yes,
+.availability-grid__cell.availability-grid__cell--first-day.availability-grid__cell--maybe {
   border-left-width: var(--border-thin);
 }
 
@@ -376,10 +378,6 @@
   white-space: nowrap;
   overflow: hidden;
 }
-.availability-grid--horizontal .availability-grid__day--time-head {
-  font-size: var(--fs-xxs);
-  padding: var(--space-075) var(--space-025);
-}
 .availability-grid__time {
   display: flex;
   align-items: center;
@@ -387,14 +385,59 @@
   padding-right: var(--space-075);
   font-size: var(--fs-xxs);
   color: var(--blo);
-}
-.availability-grid--horizontal .availability-grid__time--day-head {
-  justify-content: flex-end;
-  padding-right: var(--space-150);
-  font-size: var(--fs-xxs);
+  grid-column: 1;
+  grid-row: calc(var(--ti) + 2);
 }
 .availability-grid__time {
   height: var(--size-cell);
+}
+@media (min-width: 700px) {
+  .availability-grid {
+    grid-template-columns: var(--day-col-width) repeat(var(--times), var(--size-cell));
+    grid-template-rows: var(--size-control) repeat(var(--days), var(--size-cell));
+    width: max-content;
+    min-width: 100%;
+  }
+  .availability-grid__day {
+    grid-column: 1;
+    grid-row: calc(var(--di) + 2);
+    height: var(--size-cell);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    text-align: right;
+    padding-right: var(--space-150);
+    font-size: var(--fs-xxs);
+  }
+  .availability-grid__time {
+    grid-column: calc(var(--ti) + 2);
+    grid-row: 1;
+    height: var(--size-control);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-right: 0;
+    font-size: var(--fs-xxs);
+  }
+  .availability-grid__cell {
+    grid-column: calc(var(--ti) + 2);
+    grid-row: calc(var(--di) + 2);
+  }
+  .availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--yes,
+  .availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--maybe {
+    border-top-width: 0;
+    border-left-width: var(--border-thin);
+  }
+  .availability-grid__cell.availability-grid__cell--first-day.availability-grid__cell--yes,
+  .availability-grid__cell.availability-grid__cell--first-day.availability-grid__cell--maybe {
+    border-left-width: 0;
+    border-top-width: var(--border-thin);
+  }
+  .availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--first-day.availability-grid__cell--yes,
+  .availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--first-day.availability-grid__cell--maybe {
+    border-left-width: var(--border-thin);
+    border-top-width: var(--border-thin);
+  }
 }
 .summary-table-wrap {
   padding-top: var(--space-100);
