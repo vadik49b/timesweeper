@@ -220,7 +220,7 @@ export default function Landing(props: Props) {
     }
 
     if (participantNames.length < 2) {
-      setValidationError('Please add at least one other participant.')
+      setValidationError('Please add at least one other person.')
 
       return
     }
@@ -231,7 +231,7 @@ export default function Landing(props: Props) {
       const key = name.toLowerCase()
 
       if (participantNameKeys.has(key)) {
-        setValidationError(`Duplicate name: "${name}". Use unique participant names.`)
+        setValidationError(`Duplicate name: "${name}". Use unique names.`)
 
         return
       }
@@ -428,7 +428,7 @@ export default function Landing(props: Props) {
                     class="p-rm"
                     onClick={() => removeParticipant(i)}
                   >
-                    x <span class="sr-only">Remove participant {i + 1}</span>
+                    x <span class="sr-only">Remove person {i + 1}</span>
                   </Win95Button>
                 )}
               </div>
@@ -448,7 +448,7 @@ export default function Landing(props: Props) {
         <div class="how-steps r">
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">1</div>
-            <div class="how-text">Create an event and share the link with your group</div>
+            <div class="how-text">Create an event and share the link with everyone</div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">2</div>
@@ -458,7 +458,7 @@ export default function Landing(props: Props) {
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">3</div>
-            <div class="how-text">See the group heatmap — the best times light up instantly</div>
+            <div class="how-text">See the availability heatmap — the best times light up instantly</div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>

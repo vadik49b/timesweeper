@@ -792,7 +792,7 @@ export default function Grid(props: Props) {
     const trimmed = settingsNewParticipantName().trim()
 
     if (!trimmed) {
-      setDialogError('Enter a participant name.')
+      setDialogError('Enter a name.')
 
       return
     }
@@ -863,7 +863,7 @@ export default function Grid(props: Props) {
       const key = name.toLowerCase()
 
       if (uniqueNameKeys.has(key)) {
-        setDialogError(`Duplicate name: "${name}". Use unique participant names.`)
+        setDialogError(`Duplicate name: "${name}". Use unique names.`)
 
         return
       }
@@ -906,7 +906,7 @@ export default function Grid(props: Props) {
       ''
 
     if (!nextSelected) {
-      setDialogError('At least 2 participants are required.')
+      setDialogError('At least 2 people are required.')
 
       return
     }
@@ -1033,7 +1033,7 @@ export default function Grid(props: Props) {
       `Event: ${ev.name}`,
       `Created by: ${createdByName()}`,
       `When: ${info.dayLabel} ${info.start}-${end} (${currentTimezone()})`,
-      `Participants: ${participantsLine()}`,
+      `People: ${participantsLine()}`,
     ].join('\n')
   })
 
@@ -1066,7 +1066,7 @@ export default function Grid(props: Props) {
       `Link: ${eventLink()}`,
       `Created by: ${createdByName()}`,
       `When: ${info.dayLabel} ${info.start} (${currentTimezone()})`,
-      `Participants (${ev.participants.length}): ${participantsLine()}`,
+      `People (${ev.participants.length}): ${participantsLine()}`,
     ].join('\n')
     const payload = [
       'BEGIN:VCALENDAR',
@@ -1446,7 +1446,7 @@ export default function Grid(props: Props) {
       return 'Event not found in local cache or on server.'
     }
 
-    return 'Loading participant list...'
+    return 'Loading people...'
   })
 
   return (
@@ -1519,7 +1519,7 @@ export default function Grid(props: Props) {
                         event.preventDefault()
                         setActiveModal('name-picker')
                       }}
-                      aria-label="Switch participant name"
+                      aria-label="Switch name"
                     >
                       <span class="grid-controls__name">{currentName() || 'there'}</span>
                     </a>
@@ -1530,7 +1530,7 @@ export default function Grid(props: Props) {
                 <section class="grid-view__section">
                   <div class="grid-view__section-header">
                     <span class="grid-view__section-number">1.</span>
-                    <span>Share the link with your group</span>
+                    <span>Share the link with everyone</span>
                     <hr />
                   </div>
                   <div class="grid-view__section-body grid-view__section-body--title">
@@ -1666,7 +1666,7 @@ export default function Grid(props: Props) {
                       when={canShowSuggestions()}
                       fallback={
                         <div class="empty-text grid-view__panel-content--title-aligned">
-                          Not enough participants yet to suggest times.
+                          Not enough people yet to suggest times.
                         </div>
                       }
                     >
@@ -1851,7 +1851,7 @@ export default function Grid(props: Props) {
                     <b>When:</b> {confirmedPickedLine()}
                   </div>
                   <div>
-                    <b>Participants:</b> {participantsLine()}
+                    <b>People:</b> {participantsLine()}
                   </div>
                 </div>
                 <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
@@ -1967,7 +1967,7 @@ export default function Grid(props: Props) {
               <b>How to use TimeSweeper:</b>
             </p>
             <p class="help__step">
-              <b>1.</b> Click your <b>name</b> and pick your participant name
+              <b>1.</b> Click your <b>name</b> and pick your name
             </p>
             <p class="help__step">
               <b>2.</b> Click a cell to mark availability:
@@ -1978,10 +1978,10 @@ export default function Grid(props: Props) {
               <b>3.</b> Check "Summary" to compare best and near-match slots
             </p>
             <p class="help__step">
-              <b>4.</b> Open "Share this link with participants" and send the link to others
+              <b>4.</b> Open "Share this event link" and send it to others
             </p>
             <p class="help__step">
-              <b>5.</b> When the group agrees, click <b>Confirm</b>
+              <b>5.</b> When everyone agrees, click <b>Confirm</b>
             </p>
             <p class="help__keys">
               <b>Keyboard shortcuts:</b>
@@ -2020,9 +2020,9 @@ export default function Grid(props: Props) {
             <p class="settings__organizer">{createdByName()}</p>
             <p class="settings__label">Dates:</p>
             <p class="settings__organizer">Locked after event creation to keep everyone aligned.</p>
-            <p class="settings__label">Participants:</p>
+            <p class="settings__label">People:</p>
             <Show when={settingsParticipantNames().length === 0}>
-              <p class="settings__note">Add at least one participant before saving.</p>
+              <p class="settings__note">Add at least one person before saving.</p>
             </Show>
             <div class="settings__participants-list">
               <For each={visibleSettingsParticipantNames()}>
@@ -2058,7 +2058,7 @@ export default function Grid(props: Props) {
               </div>
             </Show>
             <label class="settings__label" for="settings-new-participant-name">
-              Add participant:
+              Add person:
             </label>
             <div class="settings__add-row">
               <Win95Field
