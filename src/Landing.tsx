@@ -225,6 +225,20 @@ export default function Landing(props: Props) {
       return
     }
 
+    const participantNameKeys = new Set<string>()
+
+    for (const name of participantNames) {
+      const key = name.toLowerCase()
+
+      if (participantNameKeys.has(key)) {
+        setValidationError(`Duplicate name: "${name}". Use unique participant names.`)
+
+        return
+      }
+
+      participantNameKeys.add(key)
+    }
+
     setParticipants(participantNames)
     setValidationError('')
     const timeRange = { start: timeStart(), end: timeEnd() }

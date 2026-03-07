@@ -30,6 +30,16 @@ interface Env {
   EVENT_ROOMS: DurableObjectNamespace<EventRoom>
 }
 
+function hasDuplicateParticipantNames(participants: Participant[]): boolean {
+  const normalizedNames = participants.map((participant) =>
+    participant.name
+      .trim()
+      .toLowerCase(),
+  )
+
+  return new Set(normalizedNames).size !== normalizedNames.length
+}
+
 const ALLOWED_ORIGINS = new Set([
   'https://timesweeper.pages.dev',
   'https://timesweeper.app',
@@ -207,6 +217,11 @@ export class EventRoom {
         if (event.id !== route.eventId) {
           return json({ error: 'event_id_mismatch' }, request, 400)
         }
+
+        if (hasDuplicateParticipantNames(event.participants)) {
+          return json({ error: 'duplicate_participant_names' }, request, 400)
+        }
+
         const normalized: AppEvent = {
           ...event,
           participants: event.participants.map((p) => ({ ...p, version: p.version ?? 0 })),
