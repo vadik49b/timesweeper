@@ -118,13 +118,18 @@ export default function Grid(props: Props) {
     return result
   })
 
-  type ActiveModal = null | 'name-picker' | 'help' | 'confirm'
+  type ActiveModal = null | 'name-picker' | 'help' | 'confirm' | 'settings'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
   const [confirmCandidates, setConfirmCandidates] = createSignal<SummaryIntersectionTime[] | null>(
     null,
   )
+  const [settingsEventName, setSettingsEventName] = createSignal('')
+  const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
+  const [settingsNewParticipantName, setSettingsNewParticipantName] = createSignal('')
+  const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
+  const [settingsError, setSettingsError] = createSignal('')
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
   const [isDesktop, setIsDesktop] = createSignal(false)
   const [copyStatus, setCopyStatus] = createSignal('')
@@ -773,6 +778,154 @@ export default function Grid(props: Props) {
     })
   }
 
+  function openSettingsModal() {
+    const ev = event()
+
+    if (!ev) {
+      return
+    }
+
+    setSettingsEventName(ev.name)
+    setSettingsParticipantNames(ev.participants.map((participant) => participant.name))
+    setSettingsNewParticipantName('')
+    setShowAllSettingsParticipants(false)
+    setSettingsError('')
+    setActiveModal('settings')
+  }
+
+  function removeSettingsParticipant(index: number) {
+    if (settingsParticipantNames().length <= 2) {
+      setSettingsError('At least 2 participants are required.')
+
+      return
+    }
+
+    setSettingsParticipantNames((prev) => prev.filter((_, i) => i !== index))
+    setSettingsError('')
+  }
+
+  function addSettingsParticipant() {
+    const trimmed = settingsNewParticipantName().trim()
+
+    if (!trimmed) {
+      setSettingsError('Enter a participant name.')
+
+      return
+    }
+
+    const exists = settingsParticipantNames().some(
+      (name) => name.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+
+    if (exists) {
+      setSettingsError(`Duplicate name: "${trimmed}". Use a unique name.`)
+
+      return
+    }
+
+    setSettingsParticipantNames((prev) => [...prev, trimmed])
+    setSettingsNewParticipantName('')
+    setSettingsError('')
+  }
+
+  const visibleSettingsParticipantNames = createMemo(() => {
+    const all = settingsParticipantNames()
+
+    if (showAllSettingsParticipants()) {
+      return all
+    }
+
+    return all.slice(0, 5)
+  })
+
+  async function saveSettings() {
+    const ev = event()
+
+    if (!ev) {
+      return
+    }
+
+    const nextEventName = settingsEventName().trim()
+
+    if (!nextEventName) {
+      setSettingsError('Event name is required.')
+
+      return
+    }
+
+    const nextParticipantNames = settingsParticipantNames()
+      .map((name) => name.trim())
+      .filter(Boolean)
+
+    if (nextParticipantNames.length < 2) {
+      setSettingsError('At least 2 participants are required.')
+
+      return
+    }
+
+    const uniqueNameKeys = new Set<string>()
+
+    for (const name of nextParticipantNames) {
+      const key = name.toLowerCase()
+
+      if (uniqueNameKeys.has(key)) {
+        setSettingsError(`Duplicate name: "${name}". Use unique participant names.`)
+
+        return
+      }
+
+      uniqueNameKeys.add(key)
+    }
+
+    const existingByKey = new Map(ev.participants.map((participant) => [participant.name.toLowerCase(), participant]))
+    const spd = slotsPerDay(ev)
+    const updatedParticipants = nextParticipantNames.map((name) => {
+      const existing = existingByKey.get(name.toLowerCase())
+
+      if (existing) {
+        return { ...existing, name }
+      }
+
+      const newParticipant: Participant = {
+        name,
+        timezone: '',
+        slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
+        updatedAt: null,
+        version: 0,
+      }
+
+      return newParticipant
+    })
+
+    const updated: AppEvent = {
+      ...ev,
+      name: nextEventName,
+      participants: updatedParticipants,
+    }
+    const selected = currentName()
+    const nextSelected =
+      updatedParticipants.find((participant) => participant.name === selected)?.name ??
+      updatedParticipants[0]?.name ??
+      ''
+
+    if (!nextSelected) {
+      setSettingsError('At least 2 participants are required.')
+
+      return
+    }
+
+    await saveEvent(updated)
+    await queueEventSync(updated)
+    await flushPendingSync()
+    await setSelectedParticipant(updated.id, nextSelected)
+
+    setEvent(updated)
+    setCurrentName(nextSelected)
+    loadParticipantSlots(updated, nextSelected)
+    setSettingsError('')
+    setActiveModal(null)
+  }
+
   async function copyLink(url: string) {
     let copied = false
     try {
@@ -1333,7 +1486,21 @@ export default function Grid(props: Props) {
 
           <div class="grid-view__content">
             <Show when={event()}>
-              {(loadedEvent) => <h2 class="grid-view__pane-title">Event name: {loadedEvent().name}</h2>}
+              {(loadedEvent) => (
+                <div class="grid-view__title-row">
+                  <h2 class="grid-view__pane-title grid-view__pane-title--event">
+                    Event name: {loadedEvent().name}
+                  </h2>
+                  <Win95Button
+                    size="small"
+                    variant="toolbar"
+                    class="grid-view__title-settings"
+                    onClick={openSettingsModal}
+                  >
+                    Settings
+                  </Win95Button>
+                </div>
+              )}
             </Show>
             <section class="grid-view__intro-panel r">
               <p class="grid-view__intro-text">
@@ -1828,6 +1995,91 @@ export default function Grid(props: Props) {
             <div class="dialog-buttons">
               <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
                 OK
+              </Win95Button>
+            </div>
+          </Win95Dialog>
+        </Show>
+
+        <Show when={activeModal() === 'settings'}>
+          <Win95Dialog
+            title="Event settings"
+            class="dialog--settings"
+            bodyClass="dialog-body--settings"
+            onClose={() => setActiveModal(null)}
+          >
+            <label class="settings__label" for="settings-event-name">
+              Event name:
+            </label>
+            <Win95Field
+              kind="input"
+              id="settings-event-name"
+              name="settingsEventName"
+              value={settingsEventName()}
+              wrapperClass="dialog__field"
+              onInput={setSettingsEventName}
+            />
+            <p class="settings__note">Dates and time range cannot be changed after event creation.</p>
+            <p class="settings__label">Participants:</p>
+            <div class="settings__participants-list">
+              <For each={visibleSettingsParticipantNames()}>
+                {(participantName, index) => (
+                  <div class="settings__participant-row">
+                    <span class="settings__participant-name">{participantName}</span>
+                    <Win95Button
+                      size="small"
+                      variant="icon"
+                      class="settings__participant-remove"
+                      disabled={settingsParticipantNames().length <= 2}
+                      onClick={() => removeSettingsParticipant(index())}
+                    >
+                      ×
+                    </Win95Button>
+                  </div>
+                )}
+              </For>
+            </div>
+            <Show when={settingsParticipantNames().length > 5}>
+              <div class="settings__participants-toggle">
+                <Win95Button
+                  size="small"
+                  variant="toolbar"
+                  onClick={() => setShowAllSettingsParticipants(!showAllSettingsParticipants())}
+                >
+                  <Show
+                    when={showAllSettingsParticipants()}
+                    fallback={`Show all ${settingsParticipantNames().length} people`}
+                  >
+                    Show fewer people
+                  </Show>
+                </Win95Button>
+              </div>
+            </Show>
+            <label class="settings__label" for="settings-new-participant-name">
+              Add participant:
+            </label>
+            <div class="settings__add-row">
+              <Win95Field
+                kind="input"
+                id="settings-new-participant-name"
+                name="settingsNewParticipantName"
+                value={settingsNewParticipantName()}
+                placeholder="Name"
+                wrapperClass="dialog__field settings__add-field"
+                onInput={setSettingsNewParticipantName}
+              />
+              <Win95Button size="small" variant="toolbar" onClick={addSettingsParticipant}>
+                Add
+              </Win95Button>
+            </div>
+            <Show when={!!settingsError()}>
+              <p class="settings__error">{settingsError()}</p>
+            </Show>
+            <div class="dialog-buttons">
+              <Win95Button class="dialog-btn" onClick={saveSettings}>
+                Save
+              </Win95Button>
+              <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
+                Cancel
               </Win95Button>
             </div>
           </Win95Dialog>

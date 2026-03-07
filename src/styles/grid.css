@@ -97,6 +97,20 @@
   color: var(--white);
   text-shadow: var(--title-shadow-soft);
 }
+.grid-view__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-200);
+  margin-bottom: var(--space-250);
+}
+.grid-view__pane-title--event {
+  margin: 0;
+  min-width: 0;
+}
+.grid-view__title-settings {
+  flex-shrink: 0;
+}
 .grid-view__pane-title--steps {
   margin-top: var(--space-500);
   margin-bottom: var(--space-250);
@@ -617,6 +631,10 @@
 .dialog--confirm {
   max-width: var(--max-dialog-confirm);
 }
+.dialog--settings {
+  width: min(440px, calc(100vw - var(--space-300)));
+  max-width: 440px;
+}
 .dialog--name-picker {
   width: min(var(--max-dialog-name-picker), calc(100vw - var(--space-300)));
   max-width: var(--max-dialog-name-picker);
@@ -747,4 +765,67 @@
 }
 .participant-picker__select-field {
   margin-bottom: var(--space-250);
+}
+
+.dialog-body--settings {
+  font-size: var(--fs-sm);
+}
+
+.settings__label {
+  display: block;
+  margin-bottom: var(--space-050);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.settings__note {
+  margin-bottom: var(--space-300);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  color: var(--bdk);
+}
+
+.settings__participants-list {
+  margin-bottom: var(--space-300);
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: var(--space-100);
+}
+
+.settings__participants-toggle {
+  margin-bottom: var(--space-300);
+}
+
+.settings__participant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-200);
+}
+
+.settings__participant-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings__participant-remove {
+  flex-shrink: 0;
+}
+
+.settings__add-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-150);
+  margin-bottom: var(--space-250);
+}
+
+.settings__add-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.settings__error {
+  margin-bottom: var(--space-250);
+  color: var(--accent-danger);
+  font-size: var(--fs-xs);
 }

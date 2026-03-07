@@ -349,15 +349,23 @@ body {
   background: var(--bg);
   min-width: var(--size-dialog-min);
   max-width: 90vw;
+  max-height: calc(100dvh - var(--space-300));
   box-shadow: var(--window-shadow);
+  display: flex;
+  flex-direction: column;
 }
 .dialog .win95-window__title-bar {
   font-size: var(--fs-xs);
   padding: var(--space-050) var(--space-100);
   cursor: default;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .dialog-body {
   padding: var(--space-300);
+  overflow-y: auto;
+  min-height: 0;
 }
 .dialog-body label {
   font-size: var(--fs-sm);
@@ -371,6 +379,14 @@ body {
   display: flex;
   gap: var(--space-150);
   justify-content: flex-end;
+}
+.dialog-body > .dialog-buttons:last-child {
+  position: sticky;
+  bottom: calc(var(--space-300) * -1);
+  margin: 0 calc(var(--space-300) * -1) calc(var(--space-300) * -1);
+  padding: var(--space-100) var(--space-300) var(--space-300);
+  background: var(--bg);
+  z-index: 2;
 }
 .dialog-btn {
   font-family: var(--ui);
