@@ -1,9 +1,39 @@
-const CACHE_NAME = 'timesweeper-v2'
+const CACHE_NAME = 'timesweeper-v3'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/anti-tank-mine-logo.png']
+
+function extractAssetUrlsFromHtml(html) {
+  const matches = html.match(/\/assets\/[^"'`<>\s)]+/g)
+
+  if (!matches) {
+    return []
+  }
+
+  return Array.from(new Set(matches))
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()),
+    (async () => {
+      const cache = await caches.open(CACHE_NAME)
+      await cache.addAll(PRECACHE)
+
+      try {
+        const indexResp = await fetch('/index.html', { cache: 'no-cache' })
+
+        if (indexResp.ok) {
+          const indexHtml = await indexResp.text()
+          const assetUrls = extractAssetUrlsFromHtml(indexHtml)
+
+          if (assetUrls.length > 0) {
+            await cache.addAll(assetUrls)
+          }
+        }
+      } catch {
+        // Continue install with base precache when network is unavailable.
+      }
+
+      await self.skipWaiting()
+    })(),
   )
 })
 
