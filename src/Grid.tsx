@@ -105,7 +105,9 @@ export default function Grid(props: Props) {
   const others = createMemo(() => {
     const ev = event()
 
-    if (!ev) return {}
+    if (!ev) {
+      return {}
+    }
     const cur = currentName()
     const spd = slotsPerDay(ev)
     const result: Record<string, Record<string, number[]>> = {}
@@ -579,7 +581,9 @@ export default function Grid(props: Props) {
 
     setMyState(dk, ti, next)
 
-    if (navigator.vibrate) navigator.vibrate(10)
+    if (navigator.vibrate) {
+      navigator.vibrate(10)
+    }
     schedulePersist()
   }
 
@@ -893,7 +897,9 @@ export default function Grid(props: Props) {
       shareInputRef.focus()
       shareInputRef.select()
 
-      if (document.execCommand) copied = document.execCommand('copy')
+      if (document.execCommand) {
+        copied = document.execCommand('copy')
+      }
     }
 
     if (copied) {
@@ -1315,7 +1321,9 @@ export default function Grid(props: Props) {
         requestSyncFlush()
         void pullRemoteEvent(props.eventId)
           .then((remote) => {
-            if (remote) void applyRemoteEvent(remote)
+            if (remote) {
+              void applyRemoteEvent(remote)
+            }
           })
           .catch(() => {})
 

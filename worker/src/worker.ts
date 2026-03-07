@@ -57,7 +57,9 @@ function isAllowedOrigin(origin: string | null): boolean {
 function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get('Origin')
 
-  if (!origin || !ALLOWED_ORIGINS.has(origin)) return {}
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+    return {}
+  }
 
   return {
     'Access-Control-Allow-Origin': origin,
@@ -99,7 +101,9 @@ function matchEventPath(
   | null {
   const ws = pathname.match(/^\/api\/events\/([^/]+)\/ws$/)
 
-  if (ws) return { kind: 'ws', eventId: decodeURIComponent(ws[1]) }
+  if (ws) {
+    return { kind: 'ws', eventId: decodeURIComponent(ws[1]) }
+  }
   const participant = pathname.match(/^\/api\/events\/([^/]+)\/participants\/([^/]+)$/)
 
   if (participant) {
@@ -111,7 +115,9 @@ function matchEventPath(
   }
   const event = pathname.match(/^\/api\/events\/([^/]+)$/)
 
-  if (event) return { kind: 'event', eventId: decodeURIComponent(event[1]) }
+  if (event) {
+    return { kind: 'event', eventId: decodeURIComponent(event[1]) }
+  }
 
   return null
 }
@@ -122,11 +128,15 @@ export default {
       return json({ error: 'origin_not_allowed' }, request, 403)
     }
 
-    if (request.method === 'OPTIONS') return noContent(request)
+    if (request.method === 'OPTIONS') {
+      return noContent(request)
+    }
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
 
-    if (!route) return json({ error: 'not_found' }, request, 404)
+    if (!route) {
+      return json({ error: 'not_found' }, request, 404)
+    }
     const id = env.EVENT_ROOMS.idFromName(route.eventId)
     const stub = env.EVENT_ROOMS.get(id)
 
@@ -180,7 +190,9 @@ export class EventRoom {
     const url = new URL(request.url)
     const route = matchEventPath(url.pathname)
 
-    if (!route) return json({ error: 'not_found' }, request, 404)
+    if (!route) {
+      return json({ error: 'not_found' }, request, 404)
+    }
 
     if (route.kind === 'ws') {
       if (request.headers.get('Upgrade') !== 'websocket') {
@@ -202,7 +214,9 @@ export class EventRoom {
       if (request.method === 'GET') {
         const event = await this.getEvent()
 
-        if (!event) return json({ error: 'event_not_found' }, request, 404)
+        if (!event) {
+          return json({ error: 'event_not_found' }, request, 404)
+        }
 
         return json(event, request)
       }
@@ -235,7 +249,9 @@ export class EventRoom {
       return json({ error: 'method_not_allowed' }, request, 405)
     }
 
-    if (request.method !== 'PUT') return json({ error: 'method_not_allowed' }, request, 405)
+    if (request.method !== 'PUT') {
+      return json({ error: 'method_not_allowed' }, request, 405)
+    }
     const body = await readJson<{
       slots?: SlotValue[]
       baseVersion?: number
@@ -251,10 +267,15 @@ export class EventRoom {
 
     const event = await this.getEvent()
 
-    if (!event) return json({ error: 'event_not_found' }, request, 404)
+    if (!event) {
+      return json({ error: 'event_not_found' }, request, 404)
+    }
+
     const idx = event.participants.findIndex((p) => p.name === route.participantName)
 
-    if (idx === -1) return json({ error: 'participant_not_found' }, request, 404)
+    if (idx === -1) {
+      return json({ error: 'participant_not_found' }, request, 404)
+    }
 
     const participant = event.participants[idx]
     const currentVersion = participant.version ?? 0
