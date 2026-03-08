@@ -1,6 +1,6 @@
 import { createSignal, Show, Suspense, lazy, onMount } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
-import { touchEventRecent } from './db'
+import { touchRecentEvent } from './db'
 
 const Landing = lazy(() => import('./Landing'))
 const Grid = lazy(() => import('./Grid'))
@@ -22,7 +22,7 @@ export default function App() {
     }
 
     queueMicrotask(() => {
-      touchEventRecent(id).catch(() => {})
+      touchRecentEvent(id).catch(() => {})
     })
   }
 

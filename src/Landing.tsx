@@ -1,7 +1,13 @@
 import { createSignal, createMemo, createEffect, onMount, For, Index, Show } from 'solid-js'
 import { nanoid } from 'nanoid'
 import { computeTimeSlots, type AppEvent } from './types'
-import { saveEvent, listEvents, setPublishedAt, setSelectedParticipant } from './db'
+import {
+  listRecentEvents,
+  pushRecentEvent,
+  saveEvent,
+  setSelectedParticipant,
+  type RecentEventSummary,
+} from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import ErrorDialog from './components/ErrorDialog'
@@ -53,14 +59,14 @@ export default function Landing(props: Props) {
   const [eventName, setEventName] = createSignal('')
   const [timeStart, setTimeStart] = createSignal('10:00')
   const [timeEnd, setTimeEnd] = createSignal('18:00')
-  const [recentEvents, setRecentEvents] = createSignal<AppEvent[]>([])
+  const [recentEvents, setRecentEvents] = createSignal<RecentEventSummary[]>([])
   const [pendingParticipantFocus, setPendingParticipantFocus] = createSignal<number | null>(null)
   const [validationError, setValidationError] = createSignal('')
   const participantInputRefs: HTMLInputElement[] = []
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   onMount(async () => {
-    const events = await listEvents()
+    const events = await listRecentEvents()
     setRecentEvents(events.slice(0, 5))
   })
 
@@ -260,7 +266,7 @@ export default function Landing(props: Props) {
     }
     await saveEvent(event)
     await setSelectedParticipant(event.id, participantNames[0])
-    await setPublishedAt(event.id, Date.now())
+    await pushRecentEvent({ id: event.id, name: event.name, created: event.created })
     props.onOpenEvent(event.id)
   }
 
@@ -471,6 +477,7 @@ export default function Landing(props: Props) {
                 href={`/e/${e.id}`}
                 onClick={(event) => {
                   event.preventDefault()
+                  pushRecentEvent(e).catch(() => {})
                   props.onOpenEvent(e.id)
                 }}
               >
