@@ -1,5 +1,4 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
-import { createStore, reconcile } from 'solid-js/store'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
 import {
@@ -7,14 +6,9 @@ import {
   getSelectedParticipant,
   saveEvent,
   setSelectedParticipant,
+  subscribeEvent,
   updateParticipantSlots,
 } from './db'
-import {
-  queueEventSync,
-  queueParticipantSync,
-  requestSyncFlush,
-} from './sync-write'
-import { connectEventSocket, pullRemoteEvent } from './sync-live'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import Win95Dialog from './components/Win95Dialog'
@@ -32,7 +26,6 @@ import {
   computeTimeSlots,
   formatDateLabel,
   flatToRecord,
-  recordToFlat,
 } from './types'
 
 interface Props {
@@ -67,8 +60,24 @@ export default function Grid(props: Props) {
     return computeTimeSlots(ev.timeRange)
   })
 
-  const [myState, setMyState] = createStore<Record<string, number[]>>({})
   const [currentName, setCurrentName] = createSignal('')
+
+  const myState = createMemo<Record<string, number[]>>(() => {
+    const ev = event()
+    const name = currentName()
+
+    if (!ev || !name) {
+      return {}
+    }
+
+    const participant = ev.participants.find((entry) => entry.name === name)
+
+    if (!participant) {
+      return {}
+    }
+
+    return flatToRecord(participant.slots, ev.dates, slotsPerDay(ev))
+  })
 
   // Read-only slots for all other participants
   const others = createMemo(() => {
@@ -105,7 +114,6 @@ export default function Grid(props: Props) {
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
 
-  let persistTimer: ReturnType<typeof setTimeout> | undefined
   let shareInputRef!: HTMLInputElement
 
   function goToLanding() {
@@ -146,174 +154,79 @@ export default function Grid(props: Props) {
     return `${window.location.origin}/e/${props.eventId}`
   }
 
-  function loadParticipantSlots(ev: AppEvent, name: string) {
-    const spd = slotsPerDay(ev)
-    const p = ev.participants.find((pp) => pp.name === name)
+  function getSlotIndex(ev: AppEvent, dayKey: string, timeIndex: number): number {
+    const dayIndex = ev.dates.findIndex((date) => date === dayKey)
 
-    if (p) {
-      setMyState(reconcile(flatToRecord(p.slots, ev.dates, spd)))
-    } else {
-      const empty: Record<string, number[]> = {}
-      ev.dates.forEach((ds) => {
-        empty[ds] = new Array(spd).fill(0)
-      })
-      setMyState(reconcile(empty))
+    if (dayIndex < 0) {
+      return -1
     }
+
+    return dayIndex * slotsPerDay(ev) + timeIndex
   }
 
-  function mergeRemoteIntoLocal(local: AppEvent, remote: AppEvent): AppEvent {
-    const localByName = new Map(local.participants.map((p) => [p.name, p]))
-    const mergedParticipants = remote.participants.map((rp) => {
-      const lp = localByName.get(rp.name)
-
-      if (!lp) {
-        return rp
-      }
-
-      const lv = lp.version ?? 0
-      const rv = rp.version ?? 0
-
-      if (lv !== rv) {
-        return lv > rv ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
-      }
-      const lu = lp.updatedAt ?? 0
-      const ru = rp.updatedAt ?? 0
-
-      return lu > ru ? { ...rp, slots: lp.slots, updatedAt: lp.updatedAt, version: lv } : rp
-    })
-    const mergedRemote: AppEvent = { ...remote, participants: mergedParticipants }
-
-    return {
-      ...mergedRemote,
-      dates: local.dates,
-      timeRange: local.timeRange,
-      maxParticipants: local.maxParticipants,
-    }
-  }
-
-  async function applyRemoteEvent(remote: AppEvent) {
-    const local = event()
-
-    if (!local) {
-      setEvent(remote)
-      const selected = currentName()
-
-      if (selected && remote.participants.some((p) => p.name === selected)) {
-        loadParticipantSlots(remote, selected)
-      }
-      void saveEvent(remote).catch(() => {})
-
-      return
-    }
-    const next = mergeRemoteIntoLocal(local, remote)
-    setEvent(next)
-    const selected = currentName()
-
-    if (selected && next.participants.some((p) => p.name === selected)) {
-      loadParticipantSlots(next, selected)
-    }
-    void saveEvent(next).catch(() => {})
-  }
-
-  async function applyRemoteParticipantUpdate(
-    eventId: string,
-    participantName: string,
-    slots: SlotValue[],
-    updatedAt: number,
-    version: number,
-  ) {
-    const ev = event()
-
-    if (!ev || ev.id !== eventId) {
-      return
-    }
-
-    const idx = ev.participants.findIndex((p) => p.name === participantName)
-
-    if (idx === -1) {
-      return
-    }
-
-    const currentVersion = ev.participants[idx].version ?? 0
-
-    if (currentVersion > version) {
-      return
-    }
-
-    const currentUpdated = ev.participants[idx].updatedAt ?? 0
-
-    if (currentVersion === version && currentUpdated >= updatedAt) {
-      return
-    }
-
-    const updated: AppEvent = {
-      ...ev,
-      participants: ev.participants.map((p, i) =>
-        i === idx ? { ...p, slots, updatedAt, version } : p,
-      ),
-    }
-    await saveEvent(updated)
-    setEvent(updated)
-
-    if (participantName === currentName()) {
-      loadParticipantSlots(updated, participantName)
-    }
-  }
-
-  async function persistCurrentSlots() {
-    const ev = event()
-
-    if (!ev || !currentName()) {
-      return
-    }
-
-    const spd = slotsPerDay(ev)
-    const flat = recordToFlat(myState, ev.dates, spd)
-    const prevFlat = ev.participants.find((p) => p.name === currentName())?.slots ?? []
-
-    if (
-      prevFlat.length === flat.length &&
-      prevFlat.every((value, index) => value === (flat[index] ?? 0))
-    )
-
-      return
-    const updatedAt = Date.now()
-    const prevVersion = ev.participants.find((p) => p.name === currentName())?.version ?? 0
-    const nextVersion = prevVersion + 1
-    await updateParticipantSlots(ev.id, currentName(), flat, updatedAt, nextVersion)
-    setEvent({
-      ...ev,
-      participants: ev.participants.map((p) =>
-        p.name === currentName() ? { ...p, slots: flat, updatedAt, version: nextVersion } : p,
-      ),
-    })
-    await queueParticipantSync(ev.id, currentName(), flat, prevVersion, updatedAt)
-    requestSyncFlush()
-  }
-
-  function schedulePersist() {
-    clearTimeout(persistTimer)
-    persistTimer = setTimeout(() => persistCurrentSlots(), 50)
-  }
-
-  function cycleCell(dk: string, ti: number) {
+  async function cycleCell(dk: string, ti: number) {
     if (isConfirmed()) {
       return
     }
 
-    const prev = myState[dk]?.[ti] ?? 0
+    const ev = event()
+
+    if (!ev) {
+      return
+    }
+
+    const name = currentName()
+
+    if (!name) {
+      return
+    }
+
+    const participantIndex = ev.participants.findIndex((entry) => entry.name === name)
+
+    if (participantIndex < 0) {
+      return
+    }
+
+    const slotIndex = getSlotIndex(ev, dk, ti)
+
+    if (slotIndex < 0) {
+      return
+    }
+
+    const participant = ev.participants[participantIndex]
+    const prev = participant.slots[slotIndex] ?? 0
     const next = (prev + 1) % 3
 
     if (prev === next) {
       return
     }
 
-    setMyState(dk, ti, next)
+    const nextSlots = [...participant.slots]
+    nextSlots[slotIndex] = next as SlotValue
+
+    const updatedAt = Date.now()
+    const nextVersion = (participant.version ?? 0) + 1
+    await updateParticipantSlots(ev.id, name, nextSlots, updatedAt, nextVersion)
+
+    const nextEvent: AppEvent = {
+      ...ev,
+      participants: ev.participants.map((entry, index) =>
+        index === participantIndex
+          ? {
+              ...entry,
+              slots: nextSlots,
+              updatedAt,
+              version: nextVersion,
+            }
+          : entry,
+      ),
+    }
+
+    setEvent(nextEvent)
 
     if (navigator.vibrate) {
       navigator.vibrate(10)
     }
-    schedulePersist()
   }
 
   function emptySummaryGroups(): SummaryGroups {
@@ -348,7 +261,7 @@ export default function Grid(props: Props) {
     participantNames.forEach((name) => {
       const value =
         name === currentName()
-          ? ((myState[dayKey]?.[timeIndex] ?? 0) as SlotValue)
+          ? ((myState()[dayKey]?.[timeIndex] ?? 0) as SlotValue)
           : ((others()[name]?.[dayKey]?.[timeIndex] ?? 0) as SlotValue)
       const displayName = name === currentName() ? 'You' : name
 
@@ -385,7 +298,7 @@ export default function Grid(props: Props) {
     setActiveModal('confirm')
   }
 
-  function doConfirm() {
+  async function doConfirm() {
     const ev = event()
 
     if (!ev) {
@@ -408,14 +321,12 @@ export default function Grid(props: Props) {
         endTime: addMinutes(time.value, 30),
       },
     }
-    void saveEvent(updated)
-    void queueEventSync(updated)
-    requestSyncFlush()
+    await saveEvent(updated)
     setEvent(updated)
     setActiveModal(null)
   }
 
-  function undoConfirmedTime() {
+  async function undoConfirmedTime() {
     const ev = event()
 
     if (!ev) {
@@ -423,9 +334,7 @@ export default function Grid(props: Props) {
     }
 
     const updated: AppEvent = { ...ev, status: 'open', confirmedSlot: undefined }
-    void saveEvent(updated)
-    void queueEventSync(updated)
-    requestSyncFlush()
+    await saveEvent(updated)
     setEvent(updated)
   }
 
@@ -580,13 +489,10 @@ export default function Grid(props: Props) {
     }
 
     await saveEvent(updated)
-    await queueEventSync(updated)
-    requestSyncFlush()
     await setSelectedParticipant(updated.id, nextSelected)
 
     setEvent(updated)
     setCurrentName(nextSelected)
-    loadParticipantSlots(updated, nextSelected)
     setActiveModal(null)
   }
 
@@ -777,9 +683,13 @@ export default function Grid(props: Props) {
     }
 
     await setSelectedParticipant(ev.id, name)
-    loadParticipantSlots(ev, name)
     setCurrentName(name)
     setActiveModal(null)
+  }
+
+  function selectParticipantSafely(name: string): void {
+    selectParticipant(name).catch(() => {
+    })
   }
 
   async function addParticipantFromPicker() {
@@ -813,11 +723,8 @@ export default function Grid(props: Props) {
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
-    await queueEventSync(updated)
-    requestSyncFlush()
     await setSelectedParticipant(updated.id, trimmed)
     setEvent(updated)
-    loadParticipantSlots(updated, trimmed)
     setCurrentName(trimmed)
     setNewParticipantName('')
     setActiveModal(null)
@@ -828,34 +735,11 @@ export default function Grid(props: Props) {
     const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
 
     if (savedName && exists) {
-      loadParticipantSlots(ev, savedName)
       setCurrentName(savedName)
       setActiveModal(null)
     } else {
       setActiveModal('name-picker')
     }
-  }
-
-  async function loadFromWorkerInBackground() {
-    try {
-      const remote = await pullRemoteEvent(props.eventId)
-
-      if (remote) {
-        await applyRemoteEvent(remote)
-        void initializeSelectedParticipant(remote)
-        setLoadError('none')
-
-        return
-      }
-      setLoadError('not-found')
-    } catch {
-      setLoadError('network')
-    }
-  }
-
-  async function retryLoadFromWorker() {
-    setLoadError('none')
-    await loadFromWorkerInBackground()
   }
 
   const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
@@ -938,104 +822,7 @@ export default function Grid(props: Props) {
 
   // Global event listeners + initial load
   onMount(() => {
-    let wsConnected = false
-    let fallbackPollTimer: number | undefined
-    let fallbackPollDelay = 3000
-    const fallbackPollMin = 3000
-    const fallbackPollMax = 30000
-
-    function clearFallbackPoll() {
-      if (fallbackPollTimer === undefined) {
-        return
-      }
-
-      window.clearTimeout(fallbackPollTimer)
-      fallbackPollTimer = undefined
-    }
-
-    function scheduleFallbackPoll() {
-      if (wsConnected || fallbackPollTimer !== undefined) {
-        return
-      }
-
-      fallbackPollTimer = window.setTimeout(() => {
-        fallbackPollTimer = undefined
-
-        if (wsConnected || !navigator.onLine) {
-          scheduleFallbackPoll()
-
-          return
-        }
-
-        void pullRemoteEvent(props.eventId)
-          .then((remote) => {
-            if (remote) {
-              void applyRemoteEvent(remote)
-            }
-
-            fallbackPollDelay = fallbackPollMin
-          })
-          .catch(() => {
-            fallbackPollDelay = Math.min(fallbackPollDelay * 2, fallbackPollMax)
-          })
-          .finally(() => {
-            requestSyncFlush()
-            scheduleFallbackPoll()
-          })
-      }, fallbackPollDelay)
-    }
-
-    const disconnectSocket = connectEventSocket(
-      props.eventId,
-      (remote) => {
-        void applyRemoteEvent(remote)
-      },
-      (eventId, participantName, slots, updatedAt, version) => {
-        void applyRemoteParticipantUpdate(eventId, participantName, slots, updatedAt, version)
-      },
-      (connected) => {
-        wsConnected = connected
-
-        if (connected) {
-          fallbackPollDelay = fallbackPollMin
-          clearFallbackPoll()
-
-          return
-        }
-
-        scheduleFallbackPoll()
-      },
-    )
-
-    const onOnline = () => {
-      requestSyncFlush()
-
-      if (!event()) {
-        void retryLoadFromWorker()
-      }
-
-      if (!wsConnected) {
-        scheduleFallbackPoll()
-      }
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        requestSyncFlush()
-        void pullRemoteEvent(props.eventId)
-          .then((remote) => {
-            if (remote) {
-              void applyRemoteEvent(remote)
-            }
-          })
-          .catch(() => {})
-
-        if (!wsConnected) {
-          scheduleFallbackPoll()
-        }
-      }
-    }
-    makeEventListener(window, 'online', onOnline)
-    makeEventListener(document, 'visibilitychange', onVisibilityChange)
+    let unsubscribe: (() => void) | null = null
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -1065,39 +852,45 @@ export default function Grid(props: Props) {
     makeEventListener(document, 'keydown', onKeyDown)
 
     onCleanup(() => {
-      disconnectSocket()
-      clearFallbackPoll()
+      if (unsubscribe) {
+        unsubscribe()
+      }
     })
 
-    let localEvent: AppEvent | undefined
-    // Sync is background-only. Local event should render immediately if available.
-    void (async () => {
+    const initialize = async () => {
       try {
-        localEvent = await getEvent(props.eventId)
+        unsubscribe = await subscribeEvent(props.eventId, (next) => {
+          if (next) {
+            setEvent(next)
+            setLoadError('none')
 
-        if (localEvent) {
-          setEvent(localEvent)
-          await initializeSelectedParticipant(localEvent)
+            return
+          }
+
+          setLoadError('not-found')
+        })
+
+        const initial = await getEvent(props.eventId)
+
+        if (initial) {
+          setEvent(initial)
+          await initializeSelectedParticipant(initial)
+        } else {
+          setLoadError('not-found')
         }
       } catch {
-        // Never block local rendering when sync/indexeddb init fails.
+        setLoadError('network')
       } finally {
         setLocalReady(true)
       }
+    }
 
+    initialize().catch(() => {
       try {
-        await loadFromWorkerInBackground()
-
-        if (!event() && localEvent) {
-          // Event exists locally but not on server yet: seed remote once.
-          await queueEventSync(localEvent)
-          requestSyncFlush()
-        }
+        setLoadError('network')
       } catch {
-        // Keep local-only mode when backend is unavailable.
       }
-      requestSyncFlush()
-    })()
+    })
   })
 
   const loadingOverlayText = createMemo(() => {
@@ -1244,7 +1037,7 @@ export default function Grid(props: Props) {
                       <AvailabilityGrid
                         days={days()}
                         times={times()}
-                        myState={myState}
+                        myState={myState()}
                         isConfirmed={isConfirmed()}
                         onCycle={cycleCell}
                       />
@@ -1257,7 +1050,7 @@ export default function Grid(props: Props) {
                   days={days()}
                   times={times()}
                   currentName={currentName()}
-                  myState={myState}
+                  myState={myState()}
                   others={others()}
                   onReviewCandidates={(candidates) => {
                     const first = candidates[0]
@@ -1355,7 +1148,7 @@ export default function Grid(props: Props) {
                               : ''
                           }`}
                           onClick={() => {
-                            void selectParticipant(participant.name)
+                            selectParticipantSafely(participant.name)
                           }}
                         >
                           {participant.name}
