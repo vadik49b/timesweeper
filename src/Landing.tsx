@@ -475,9 +475,9 @@ export default function Landing(props: Props) {
               <a
                 class="recent-item"
                 href={`/e/${e.id}`}
-                onClick={(event) => {
+                onClick={async (event) => {
                   event.preventDefault()
-                  pushRecentEvent(e).catch(() => {})
+                  await pushRecentEvent(e)
                   props.onOpenEvent(e.id)
                 }}
               >

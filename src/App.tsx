@@ -21,9 +21,7 @@ export default function App() {
       return
     }
 
-    queueMicrotask(() => {
-      touchRecentEvent(id).catch(() => {})
-    })
+    touchRecentEvent(id)
   }
 
   function navigateToEvent(id: string) {

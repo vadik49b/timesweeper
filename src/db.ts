@@ -146,10 +146,13 @@ async function createEventRoomStore(eventId: string): Promise<Store> {
 
   if (navigator.onLine) {
     try {
-      const ws = new WebSocket(eventSyncUrl(eventId))
+      const synchronizer = await createWsSynchronizer(
+        eventRoomStore,
+        new WebSocket(eventSyncUrl(eventId)),
+      )
 
-      const synchronizer = await createWsSynchronizer(eventRoomStore, ws)
       await synchronizer.startSync()
+
       eventRoomSynchronizer = synchronizer
     } catch {
       eventRoomSynchronizer = null
@@ -165,10 +168,7 @@ async function getEventRoomStore(eventId: string): Promise<Store> {
   }
 
   if (eventRoomSynchronizer) {
-    try {
-      await eventRoomSynchronizer.stopSync()
-    } catch {
-    }
+    await eventRoomSynchronizer.stopSync()
 
     eventRoomSynchronizer = null
   }
