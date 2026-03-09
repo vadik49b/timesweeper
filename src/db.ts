@@ -139,12 +139,11 @@ async function createEventRoomStore(eventId: string): Promise<EventRoomStore> {
     },
   })
 
+  await startEventRoomSync(eventId, eventRoomStore)
+
   const persister = createIndexedDbPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
 
-  await persister.load([{}, {}])
   await persister.startAutoSave()
-
-  await startEventRoomSync(eventId, eventRoomStore)
 
   return eventRoomStore
 }
