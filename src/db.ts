@@ -6,6 +6,7 @@ import {
   createWsSynchronizer,
   type WsSynchronizer,
 } from 'tinybase/synchronizers/synchronizer-ws-client'
+import ReconnectingWebSocket from 'reconnecting-websocket'
 import type { AppEvent, SlotValue } from './types'
 
 const EVENT_TABLE = 'events'
@@ -13,7 +14,8 @@ const EVENT_CELL = 'event'
 const RECENT_QUEUE_VALUE = 'recentQueue'
 const MAX_RECENT_EVENTS = 5
 
-type EventSynchronizer = WsSynchronizer<WebSocket>
+type EventSynchronizer = WsSynchronizer<ReconnectingWebSocket>
+type EventRoomStore = ReturnType<typeof createMergeableStore>
 
 export interface RecentEventSummary {
   id: string
@@ -22,7 +24,7 @@ export interface RecentEventSummary {
 }
 
 let eventRoomId: string | null = null
-let eventRoomStorePromise: Promise<Store> | null = null
+let eventRoomStorePromise: Promise<EventRoomStore> | null = null
 let eventRoomSynchronizer: EventSynchronizer | null = null
 const recentMetaStorePromise = createRecentMetaStore()
 const selectionStorePromise = createSelectionStore()
@@ -128,7 +130,7 @@ async function pushRecentSummary(summary: RecentEventSummary): Promise<void> {
   store.setValue(RECENT_QUEUE_VALUE, nextQueue)
 }
 
-async function createEventRoomStore(eventId: string): Promise<Store> {
+async function createEventRoomStore(eventId: string): Promise<EventRoomStore> {
   const eventRoomStore = createMergeableStore(`sync-${eventId}`)
 
   eventRoomStore.setTablesSchema({
@@ -142,36 +144,48 @@ async function createEventRoomStore(eventId: string): Promise<Store> {
   await persister.load([{}, {}])
   await persister.startAutoSave()
 
-  eventRoomSynchronizer = null
-
-  if (navigator.onLine) {
-    try {
-      const synchronizer = await createWsSynchronizer(
-        eventRoomStore,
-        new WebSocket(eventSyncUrl(eventId)),
-      )
-
-      await synchronizer.startSync()
-
-      eventRoomSynchronizer = synchronizer
-    } catch {
-      eventRoomSynchronizer = null
-    }
-  }
+  await startEventRoomSync(eventId, eventRoomStore)
 
   return eventRoomStore
 }
 
-async function getEventRoomStore(eventId: string): Promise<Store> {
+async function stopEventRoomSync(): Promise<void> {
+  if (!eventRoomSynchronizer) {
+    return
+  }
+
+  try {
+    await eventRoomSynchronizer.stopSync()
+  } catch (error) {
+    console.error('Failed to stop event room sync', error)
+  }
+
+  eventRoomSynchronizer = null
+}
+
+async function startEventRoomSync(eventId: string, store: EventRoomStore): Promise<void> {
+  await stopEventRoomSync()
+
+  try {
+    const ws = new ReconnectingWebSocket(eventSyncUrl(eventId), [], {
+      maxRetries: Infinity,
+    })
+    const synchronizer = await createWsSynchronizer(store, ws)
+
+    await synchronizer.startSync()
+    eventRoomSynchronizer = synchronizer
+  } catch (error) {
+    eventRoomSynchronizer = null
+    console.error('Failed to start event room sync', error)
+  }
+}
+
+async function getEventRoomStore(eventId: string): Promise<EventRoomStore> {
   if (eventRoomStorePromise && eventRoomId === eventId) {
     return eventRoomStorePromise
   }
 
-  if (eventRoomSynchronizer) {
-    await eventRoomSynchronizer.stopSync()
-
-    eventRoomSynchronizer = null
-  }
+  await stopEventRoomSync()
 
   eventRoomId = eventId
   eventRoomStorePromise = createEventRoomStore(eventId)
@@ -179,20 +193,8 @@ async function getEventRoomStore(eventId: string): Promise<Store> {
   return eventRoomStorePromise
 }
 
-async function ensureEventRoomStore(eventId: string): Promise<Store | null> {
-  try {
-    return await getEventRoomStore(eventId)
-  } catch {
-    return null
-  }
-}
-
 async function pushEventToRoomStore(event: AppEvent): Promise<void> {
-  const store = await ensureEventRoomStore(event.id)
-
-  if (!store) {
-    return
-  }
+  const store = await getEventRoomStore(event.id)
 
   store.setRow(EVENT_TABLE, event.id, {
     [EVENT_CELL]: event as unknown as Record<string, unknown>,
@@ -238,11 +240,7 @@ export async function saveEvent(event: AppEvent): Promise<void> {
 }
 
 export async function getEvent(id: string): Promise<AppEvent | undefined> {
-  const store = await ensureEventRoomStore(id)
-
-  if (!store) {
-    return undefined
-  }
+  const store = await getEventRoomStore(id)
 
   return readEventFromStore(store, id)
 }
@@ -251,13 +249,7 @@ export async function subscribeEvent(
   eventId: string,
   onChange: (event: AppEvent | undefined) => void,
 ): Promise<() => void> {
-  const store = await ensureEventRoomStore(eventId)
-
-  if (!store) {
-    onChange(undefined)
-
-    return () => {}
-  }
+  const store = await getEventRoomStore(eventId)
 
   const listenerId = store.addTableListener(EVENT_TABLE, (_store, tableId) => {
     if (tableId !== EVENT_TABLE) {
