@@ -5,7 +5,7 @@ import {
   listRecentEvents,
   pushRecentEvent,
   saveEvent,
-  setSelectedParticipant,
+  setSelectedParticipantName,
   type RecentEventSummary,
 } from './db'
 import Win95Field from './components/Win95Field'
@@ -265,7 +265,7 @@ export default function Landing(props: Props) {
       })),
     }
     await saveEvent(event)
-    await setSelectedParticipant(event.id, participantNames[0])
+    await setSelectedParticipantName(event.id, participantNames[0])
     await pushRecentEvent({ id: event.id, name: event.name, created: event.created })
     props.onOpenEvent(event.id)
   }

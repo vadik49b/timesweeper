@@ -2,10 +2,12 @@ import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show }
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
 import {
+  closeEventStore,
   getEvent,
-  getSelectedParticipant,
+  getSelectedParticipantName,
+  openEventStore,
   saveEvent,
-  setSelectedParticipant,
+  setSelectedParticipantName,
   subscribeEvent,
   updateParticipantSlots,
 } from './db'
@@ -489,7 +491,7 @@ export default function Grid(props: Props) {
     }
 
     await saveEvent(updated)
-    await setSelectedParticipant(updated.id, nextSelected)
+    await setSelectedParticipantName(updated.id, nextSelected)
 
     setEvent(updated)
     setCurrentName(nextSelected)
@@ -682,7 +684,7 @@ export default function Grid(props: Props) {
       return
     }
 
-    await setSelectedParticipant(ev.id, name)
+    await setSelectedParticipantName(ev.id, name)
     setCurrentName(name)
     setActiveModal(null)
   }
@@ -723,7 +725,7 @@ export default function Grid(props: Props) {
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
-    await setSelectedParticipant(updated.id, trimmed)
+    await setSelectedParticipantName(updated.id, trimmed)
     setEvent(updated)
     setCurrentName(trimmed)
     setNewParticipantName('')
@@ -731,7 +733,7 @@ export default function Grid(props: Props) {
   }
 
   async function initializeSelectedParticipant(ev: AppEvent) {
-    const savedName = await getSelectedParticipant(ev.id)
+    const savedName = await getSelectedParticipantName(ev.id)
     const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
 
     if (savedName && exists) {
@@ -823,6 +825,7 @@ export default function Grid(props: Props) {
   // Global event listeners + initial load
   onMount(() => {
     let unsubscribe: (() => void) | null = null
+    let isDisposed = false
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -855,10 +858,22 @@ export default function Grid(props: Props) {
       if (unsubscribe) {
         unsubscribe()
       }
+
+      closeEventStore(props.eventId).catch((error) => {
+        console.error('Failed to close event store', error)
+      })
+
+      isDisposed = true
     })
 
     const initialize = async () => {
       try {
+        await openEventStore(props.eventId)
+
+        if (isDisposed) {
+          return
+        }
+
         unsubscribe = await subscribeEvent(props.eventId, (next) => {
           if (next) {
             setEvent(next)
@@ -871,6 +886,10 @@ export default function Grid(props: Props) {
         })
 
         const initial = await getEvent(props.eventId)
+
+        if (isDisposed) {
+          return
+        }
 
         if (initial) {
           setEvent(initial)

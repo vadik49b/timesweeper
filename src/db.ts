@@ -11,10 +11,11 @@ import type { AppEvent, SlotValue } from './types'
 
 const EVENT_TABLE = 'events'
 const EVENT_CELL = 'event'
-const RECENT_QUEUE_VALUE = 'recentQueue'
+const RECENTLY_OPENED_EVENTS_VALUE = 'recentlyOpenedEvents'
+const SELECTED_PARTICIPANTS_TABLE = 'selectedParticipants'
+const SELECTED_PARTICIPANT_NAME_CELL = 'name'
 const MAX_RECENT_EVENTS = 5
 
-type EventSynchronizer = WsSynchronizer<ReconnectingWebSocket>
 type EventRoomStore = ReturnType<typeof createMergeableStore>
 
 export interface RecentEventSummary {
@@ -25,9 +26,9 @@ export interface RecentEventSummary {
 
 let eventRoomId: string | null = null
 let eventRoomStorePromise: Promise<EventRoomStore> | null = null
-let eventRoomSynchronizer: EventSynchronizer | null = null
-const recentMetaStorePromise = createRecentMetaStore()
-const selectionStorePromise = createSelectionStore()
+let eventRoomSynchronizer: WsSynchronizer<ReconnectingWebSocket> | null = null
+let eventRoomSyncPromise: Promise<void> | null = null
+const localStorePromise = createLocalStore()
 
 function eventSyncUrl(eventId: string): string {
   const origin = window.location.origin
@@ -39,14 +40,20 @@ function eventSyncUrl(eventId: string): string {
   return url.toString()
 }
 
-async function createRecentMetaStore(): Promise<Store> {
+async function createLocalStore(): Promise<Store> {
   const store = createStore()
 
   store.setValuesSchema({
-    [RECENT_QUEUE_VALUE]: { type: 'array', default: [] },
+    [RECENTLY_OPENED_EVENTS_VALUE]: { type: 'array', default: [] },
   })
 
-  const persister = createLocalPersister(store, 'timesweeper-recent-events-meta')
+  store.setTablesSchema({
+    [SELECTED_PARTICIPANTS_TABLE]: {
+      [SELECTED_PARTICIPANT_NAME_CELL]: { type: 'string' },
+    },
+  })
+
+  const persister = createLocalPersister(store, 'timesweeper-local-meta')
 
   await persister.load()
   await persister.startAutoSave()
@@ -54,31 +61,29 @@ async function createRecentMetaStore(): Promise<Store> {
   return store
 }
 
-export async function createSelectionStore(): Promise<Store> {
-  const store = createStore()
-
-  const persister = createLocalPersister(store, 'timesweeper-event-selection')
-
-  await persister.load()
-  await persister.startAutoSave()
-
-  return store
-}
-
-export async function getSelectedParticipant(eventId: string): Promise<string | null> {
-  const selectionStore = await selectionStorePromise
-  const selected = selectionStore.getValues()[eventId]
+export async function getSelectedParticipantName(eventId: string): Promise<string | null> {
+  const localStore = await localStorePromise
+  const selected = localStore.getCell(
+    SELECTED_PARTICIPANTS_TABLE,
+    eventId,
+    SELECTED_PARTICIPANT_NAME_CELL,
+  )
 
   return typeof selected === 'string' ? selected : null
 }
 
-export async function setSelectedParticipant(
+export async function setSelectedParticipantName(
   eventId: string,
   participantName: string,
 ): Promise<void> {
-  const selectionStore = await selectionStorePromise
+  const localStore = await localStorePromise
 
-  selectionStore.setValue(eventId, participantName)
+  localStore.setCell(
+    SELECTED_PARTICIPANTS_TABLE,
+    eventId,
+    SELECTED_PARTICIPANT_NAME_CELL,
+    participantName,
+  )
 }
 
 function readEventFromStore(store: Store, eventId: string): AppEvent | undefined {
@@ -95,8 +100,8 @@ function readEventFromStore(store: Store, eventId: string): AppEvent | undefined
   return row[EVENT_CELL]
 }
 
-function getRecentQueue(store: Store): RecentEventSummary[] {
-  const raw = store.getValue(RECENT_QUEUE_VALUE)
+function getRecentlyOpenedEvents(store: Store): RecentEventSummary[] {
+  const raw = store.getValue(RECENTLY_OPENED_EVENTS_VALUE)
 
   if (!Array.isArray(raw)) {
     return []
@@ -120,35 +125,19 @@ function getRecentQueue(store: Store): RecentEventSummary[] {
 }
 
 async function pushRecentSummary(summary: RecentEventSummary): Promise<void> {
-  const store = await recentMetaStorePromise
-  const queue = getRecentQueue(store)
-  const nextQueue = [summary, ...queue.filter((entry) => entry.id !== summary.id)].slice(
-    0,
-    MAX_RECENT_EVENTS,
-  )
+  const localStore = await localStorePromise
+  const recentlyOpenedEvents = getRecentlyOpenedEvents(localStore)
+  const nextRecentlyOpenedEvents = [
+    summary,
+    ...recentlyOpenedEvents.filter((entry) => entry.id !== summary.id),
+  ].slice(0, MAX_RECENT_EVENTS)
 
-  store.setValue(RECENT_QUEUE_VALUE, nextQueue)
-}
-
-async function createEventRoomStore(eventId: string): Promise<EventRoomStore> {
-  const eventRoomStore = createMergeableStore(`sync-${eventId}`)
-
-  eventRoomStore.setTablesSchema({
-    [EVENT_TABLE]: {
-      [EVENT_CELL]: { type: 'object' },
-    },
-  })
-
-  await startEventRoomSync(eventId, eventRoomStore)
-
-  const persister = createIndexedDbPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
-
-  await persister.startAutoSave()
-
-  return eventRoomStore
+  localStore.setValue(RECENTLY_OPENED_EVENTS_VALUE, nextRecentlyOpenedEvents)
 }
 
 async function stopEventRoomSync(): Promise<void> {
+  eventRoomSyncPromise = null
+
   if (!eventRoomSynchronizer) {
     return
   }
@@ -179,21 +168,78 @@ async function startEventRoomSync(eventId: string, store: EventRoomStore): Promi
   }
 }
 
-async function getEventRoomStore(eventId: string): Promise<EventRoomStore> {
-  if (eventRoomStorePromise && eventRoomId === eventId) {
-    return eventRoomStorePromise
+function ensureEventRoomSync(eventId: string, store: EventRoomStore): void {
+  if (eventRoomId !== eventId) {
+    return
+  }
+
+  if (eventRoomSyncPromise) {
+    return
+  }
+
+  eventRoomSyncPromise = startEventRoomSync(eventId, store)
+    .catch((error) => {
+      console.error('Failed to initialize event room sync', error)
+    })
+    .finally(() => {
+      if (eventRoomId === eventId) {
+        eventRoomSyncPromise = null
+      }
+    })
+}
+
+async function loadEventRoomStore(eventId: string): Promise<EventRoomStore> {
+  const eventRoomStore = createMergeableStore(`sync-${eventId}`)
+
+  eventRoomStore.setTablesSchema({
+    [EVENT_TABLE]: {
+      [EVENT_CELL]: { type: 'object' },
+    },
+  })
+
+  const persister = createIndexedDbPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
+
+  await persister.load()
+  await persister.startAutoSave()
+
+  return eventRoomStore
+}
+
+async function requireOpenEventRoomStore(eventId: string): Promise<EventRoomStore> {
+  if (!eventRoomStorePromise || eventRoomId !== eventId) {
+    throw new Error(`Event store is not open for ${eventId}`)
+  }
+
+  const store = await eventRoomStorePromise
+  return store
+}
+
+export async function openEventStore(eventId: string): Promise<void> {
+  if (!eventRoomStorePromise || eventRoomId !== eventId) {
+    await stopEventRoomSync()
+
+    eventRoomId = eventId
+    eventRoomStorePromise = loadEventRoomStore(eventId)
+  }
+
+  const store = await eventRoomStorePromise
+
+  ensureEventRoomSync(eventId, store)
+}
+
+export async function closeEventStore(eventId?: string): Promise<void> {
+  if (eventId && eventRoomId !== eventId) {
+    return
   }
 
   await stopEventRoomSync()
 
-  eventRoomId = eventId
-  eventRoomStorePromise = createEventRoomStore(eventId)
-
-  return eventRoomStorePromise
+  eventRoomId = null
+  eventRoomStorePromise = null
 }
 
 async function pushEventToRoomStore(event: AppEvent): Promise<void> {
-  const store = await getEventRoomStore(event.id)
+  const store = await requireOpenEventRoomStore(event.id)
 
   store.setRow(EVENT_TABLE, event.id, {
     [EVENT_CELL]: event as unknown as Record<string, unknown>,
@@ -201,9 +247,9 @@ async function pushEventToRoomStore(event: AppEvent): Promise<void> {
 }
 
 export async function listRecentEvents(): Promise<RecentEventSummary[]> {
-  const store = await recentMetaStorePromise
+  const localStore = await localStorePromise
 
-  return getRecentQueue(store)
+  return getRecentlyOpenedEvents(localStore)
 }
 
 export async function pushRecentEvent(summary: RecentEventSummary): Promise<void> {
@@ -211,9 +257,9 @@ export async function pushRecentEvent(summary: RecentEventSummary): Promise<void
 }
 
 export async function touchRecentEvent(eventId: string): Promise<void> {
-  const store = await recentMetaStorePromise
-  const queue = getRecentQueue(store)
-  const existing = queue.find((entry) => entry.id === eventId)
+  const localStore = await localStorePromise
+  const recentlyOpenedEvents = getRecentlyOpenedEvents(localStore)
+  const existing = recentlyOpenedEvents.find((entry) => entry.id === eventId)
 
   if (existing) {
     await pushRecentSummary(existing)
@@ -221,7 +267,11 @@ export async function touchRecentEvent(eventId: string): Promise<void> {
     return
   }
 
-  const event = await getEvent(eventId)
+  const store =
+    eventRoomId === eventId && eventRoomStorePromise
+      ? await eventRoomStorePromise
+      : await loadEventRoomStore(eventId)
+  const event = readEventFromStore(store, eventId)
 
   if (!event) {
     return
@@ -239,7 +289,7 @@ export async function saveEvent(event: AppEvent): Promise<void> {
 }
 
 export async function getEvent(id: string): Promise<AppEvent | undefined> {
-  const store = await getEventRoomStore(id)
+  const store = await requireOpenEventRoomStore(id)
 
   return readEventFromStore(store, id)
 }
@@ -248,7 +298,7 @@ export async function subscribeEvent(
   eventId: string,
   onChange: (event: AppEvent | undefined) => void,
 ): Promise<() => void> {
-  const store = await getEventRoomStore(eventId)
+  const store = await requireOpenEventRoomStore(eventId)
 
   const listenerId = store.addTableListener(EVENT_TABLE, (_store, tableId) => {
     if (tableId !== EVENT_TABLE) {
