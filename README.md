@@ -139,7 +139,7 @@ This publishes the Worker using the custom domain declared in [`worker/wrangler.
 
 ## Deploy Frontend
 
-Set `VITE_WS_ORIGIN=https://api.timesweeper.app` in your Cloudflare Pages project environment variables before deploying the frontend.
+`npm run deploy:fe` builds the frontend locally with `VITE_WS_ORIGIN=https://api.timesweeper.app` and then uploads `dist/` to Cloudflare Pages.
 
 ## Deploy from Laptop (No GitHub Required)
 
