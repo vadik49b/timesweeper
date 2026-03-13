@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "VITE_WS_ORIGIN=http://127.0.0.1:8787 vite",
     "dev:api": "wrangler dev -c worker/wrangler.toml",
     "seed:local": "node scripts/seed-local-wrangler.mjs",
     "build": "tsc -b && vite build",

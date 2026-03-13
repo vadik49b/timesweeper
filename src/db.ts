@@ -31,7 +31,12 @@ let eventRoomSyncPromise: Promise<void> | null = null
 const localStorePromise = createLocalStore()
 
 function eventSyncUrl(eventId: string): string {
-  const origin = window.location.origin
+  const origin = import.meta.env.VITE_WS_ORIGIN
+
+  if (!origin) {
+    throw new Error('Missing VITE_WS_ORIGIN')
+  }
+
   const url = new URL(origin)
 
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
