@@ -451,7 +451,9 @@ export default function Landing(props: Props) {
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">3</div>
-            <div class="how-text">See the availability heatmap — the best times light up instantly</div>
+            <div class="how-text">
+              See suggested times as people keep filling in their availability
+            </div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>

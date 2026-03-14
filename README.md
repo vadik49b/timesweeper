@@ -26,7 +26,7 @@ TimeSweeper is a no-login group availability app with a Windows 95 Minesweeper v
 
 - `src/App.tsx`: path-based routing (`/` landing, `/e/:id` grid)
 - `src/Landing.tsx`: event creation and recent local events
-- `src/Grid.tsx`: availability editor, suggestions, heatmap, dialogs
+- `src/Grid.tsx`: availability editor, suggestions, dialogs
 - `src/components/Win95Button.tsx`: shared button component (`normal|small`, `fullWidth`)
 - `src/components/Win95Field.tsx`: shared input/select fields
 - `src/components/AvailabilityLegend.tsx`: cycle legend
@@ -63,7 +63,7 @@ Participant {
 
 - Win95 visual system with raised/sunken surfaces, status bar, and function bar
 - Landing page creates events with name, date picker, time range, and participant list
-- Grid page supports in-place availability editing, suggestions, heatmap, share/help dialogs, and confirmation flow
+- Grid page supports in-place availability editing, suggestions, share/help dialogs, and confirmation flow
 - Keyboard shortcuts: `F1` / `U` undo, `F3` / `S` share, `F5` confirm dialog, `Ctrl/Cmd+Z` undo
 
 ## Code Style

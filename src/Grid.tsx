@@ -1064,22 +1064,26 @@ export default function Grid(props: Props) {
                   </div>
                 </section>
 
-                <ConfirmationSection
-                  event={event()}
-                  days={days()}
-                  times={times()}
-                  currentName={currentName()}
-                  myState={myState()}
-                  others={others()}
-                  onReviewCandidates={(candidates) => {
-                    const first = candidates[0]
+                <Show when={event()}>
+                  {(loadedEvent) => (
+                    <ConfirmationSection
+                      event={loadedEvent()}
+                      days={days()}
+                      times={times()}
+                      currentName={currentName()}
+                      myState={myState()}
+                      others={others()}
+                      onReviewCandidates={(candidates) => {
+                        const first = candidates[0]
 
-                    setConfirmCandidates(candidates)
-                    setConfirmDay(first?.day ?? days()[0]?.label ?? '')
-                    setConfirmTime(first?.time ?? times()[0]?.label ?? '')
-                    setActiveModal('confirm')
-                  }}
-                />
+                        setConfirmCandidates(candidates)
+                        setConfirmDay(first?.day ?? days()[0]?.label ?? '')
+                        setConfirmTime(first?.time ?? times()[0]?.label ?? '')
+                        setActiveModal('confirm')
+                      }}
+                    />
+                  )}
+                </Show>
                 </div>
               </div>
             </section>

@@ -45,7 +45,7 @@ type Time = {
 }
 
 interface Props {
-  event: AppEvent | null
+  event: AppEvent
   days: Day[]
   times: Time[]
   currentName: string
@@ -69,10 +69,6 @@ export default function ConfirmationSection(props: Props) {
 
   function peopleGroupsForSlot(dayKey: string, timeIndex: number): SummaryGroups {
     const ev = props.event
-
-    if (!ev) {
-      return emptySummaryGroups()
-    }
 
     const participantNames = [...ev.participants.map((p) => p.name)].sort((a, b) => {
       if (a === props.currentName) {
@@ -144,7 +140,7 @@ export default function ConfirmationSection(props: Props) {
     const d = props.days
     const t = props.times
 
-    if (!ev || d.length === 0 || t.length === 0) {
+    if (d.length === 0 || t.length === 0) {
       return []
     }
 
@@ -336,10 +332,6 @@ export default function ConfirmationSection(props: Props) {
   const participantsWithAvailability = createMemo(() => {
     const ev = props.event
 
-    if (!ev) {
-      return 0
-    }
-
     return ev.participants.filter((participant) => {
       if (participant.name === props.currentName) {
         return Object.values(props.myState).some((daySlots) => daySlots.some((v) => v > 0))
@@ -351,11 +343,6 @@ export default function ConfirmationSection(props: Props) {
   const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
   const suggestionsHelperText = createMemo(() => {
     const ev = props.event
-    const base = 'Suggestions update as people continue filling availability.'
-
-    if (!ev) {
-      return base
-    }
 
     const pending = ev.participants
       .filter((participant) => {
@@ -370,11 +357,19 @@ export default function ConfirmationSection(props: Props) {
       })
       .map((participant) => participant.name)
 
-    if (pending.length === 0) {
-      return `${base} Everyone has seen the link you shared.`
+    if (summarySplitRows().length === 0) {
+      if (pending.length > 0) {
+        return `Still waiting on availability from ${pending.join(', ')}. Suggestions will show up once people start filling their availability.`
+      }
+
+      return 'Suggestions will show up once people start filling their availability.'
     }
 
-    return `${base} ${pending.join(', ')} haven't opened the link yet.`
+    if (pending.length === 0) {
+      return 'Suggestions update as people continue filling availability.'
+    }
+
+    return `Suggestions update as people continue filling availability. ${pending.join(', ')} haven't opened the link yet.`
   })
 
   return (
@@ -388,14 +383,7 @@ export default function ConfirmationSection(props: Props) {
         <p class="grid-view__suggestions-helper grid-view__panel-content--title-aligned">
           {suggestionsHelperText()}
         </p>
-        <Show
-          when={canShowSuggestions()}
-          fallback={
-            <div class="empty-text grid-view__panel-content--title-aligned">
-              Not enough people yet to suggest times.
-            </div>
-          }
-        >
+        <Show when={canShowSuggestions()} fallback={<></>}>
           <Show
             when={summarySplitRows().length > 0}
             fallback={
