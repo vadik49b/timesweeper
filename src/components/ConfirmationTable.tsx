@@ -51,26 +51,17 @@ export default function ConfirmationTable(props: Props) {
         <div class="summary-slots-mobile-list">
           <For each={props.rows}>
             {(splitRow) => (
-              <button
-                type="button"
-                class="summary-slots-mobile-card"
-                onClick={() => props.onReview(splitRow)}
-              >
-                <div class="summary-slots-mobile-card__head">
-                  <div>
-                    <div class="summary-slots-mobile-card__label">Availability split</div>
-                    <div class="summary-slots-mobile-card__counts">
-                      {splitRow.yesCount} yes · {splitRow.maybeCount} maybe · {splitRow.noCount} no
-                    </div>
-                  </div>
-                </div>
+              <div class="summary-slots-mobile-card">
                 <div class="summary-slots-mobile-card__section">
-                  <div class="summary-slots-mobile-card__label">People</div>
-                  <div class="summary-slots-table__people-main">
+                  <div class="summary-slots-mobile-card__label">
+                    People: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe, {splitRow.noCount}{' '}
+                    no
+                  </div>
+                  <div class="summary-slots-mobile-card__people-list">
                     <For each={props.statusNameGroups(splitRow.groups)}>
                       {(group) => (
-                        <div class="summary-slots-table__people-row">
-                          <StatusMiniCell value={group.value} />
+                        <div class="summary-slots-mobile-card__people-row">
+                          <StatusMiniCell value={group.value} class="summary-slots-mobile-card__icon" />
                           <span>{group.names.join(', ')}</span>
                         </div>
                       )}
@@ -88,7 +79,16 @@ export default function ConfirmationTable(props: Props) {
                     )}
                   </For>
                 </div>
-              </button>
+                <div class="summary-slots-mobile-card__footer">
+                  <Win95Button
+                    fullWidth
+                    class="summary-slots-mobile-card__action"
+                    onClick={() => props.onReview(splitRow)}
+                  >
+                    Review suggestion
+                  </Win95Button>
+                </div>
+              </div>
             )}
           </For>
         </div>

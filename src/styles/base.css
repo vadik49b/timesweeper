@@ -350,7 +350,6 @@ body {
   min-width: var(--size-dialog-min);
   max-width: 90vw;
   max-height: calc(100dvh - var(--space-300));
-  box-shadow: var(--window-shadow);
   display: flex;
   flex-direction: column;
 }
@@ -399,6 +398,19 @@ body {
 .dialog--error {
   width: min(var(--max-dialog-confirm), calc(100vw - var(--space-400)));
   max-width: var(--max-dialog-confirm);
+}
+
+@media (max-width: 700px) {
+  .dialog {
+    min-width: 0;
+    width: calc(100vw - var(--space-900));
+    max-width: calc(100vw - var(--space-900));
+  }
+
+  .dialog--error {
+    width: calc(100vw - var(--space-900));
+    max-width: calc(100vw - var(--space-900));
+  }
 }
 
 .dialog-body--error {

@@ -508,44 +508,49 @@
 .summary-slots-mobile-list {
   display: grid;
   grid-template-columns: 1fr;
-  row-gap: var(--space-250);
+  row-gap: var(--space-500);
 }
 .summary-slots-mobile-card {
-  appearance: none;
   width: 100%;
   text-align: left;
-  cursor: pointer;
-  border: var(--border-thick) solid;
-  border-color: var(--white) var(--bdk) var(--bdk) var(--white);
-  padding: var(--space-200);
-  background: var(--bg);
+  padding: var(--space-600) 0 var(--space-700);
+  background: transparent;
   font-family: var(--ui);
   font-size: var(--fs-sm);
   color: var(--black);
+  border-top: var(--border-thin) solid var(--blo);
 }
-.summary-slots-mobile-card:active {
-  border-color: var(--bdk) var(--white) var(--white) var(--bdk);
-}
-.summary-slots-mobile-card__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 0;
-  margin-bottom: var(--space-200);
-}
-.summary-slots-mobile-card__counts {
-  font-size: var(--fs-xs);
-  line-height: 1.2;
-  color: var(--bdk);
+.summary-slots-mobile-card:first-child {
+  border-top: none;
 }
 .summary-slots-mobile-card__section + .summary-slots-mobile-card__section {
-  margin-top: var(--space-200);
+  margin-top: var(--space-350);
 }
 .summary-slots-mobile-card__label {
   font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
   color: var(--black);
-  margin-bottom: var(--space-100);
+  margin-bottom: var(--space-150);
+}
+.summary-slots-mobile-card__people-list {
+  display: grid;
+  row-gap: var(--space-100);
+}
+.summary-slots-mobile-card__people-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-150);
+  min-width: 0;
+}
+.summary-slots-mobile-card__icon {
+  margin-top: 0;
+}
+.summary-slots-mobile-card__footer {
+  margin-top: var(--space-300);
+  padding-top: var(--space-200);
+}
+.summary-slots-mobile-card__action {
+  min-height: var(--space-1100);
 }
 .summary-list__meta-row {
   display: flex;
@@ -654,8 +659,9 @@
 
 @media (max-width: 700px) {
   .dialog--confirmed {
-    width: calc(100vw - var(--space-300));
-    max-height: calc(100dvh - var(--space-300));
+    width: calc(100vw - var(--space-900));
+    max-width: calc(100vw - var(--space-900));
+    max-height: calc(100dvh - var(--space-900));
   }
 
   .dialog--confirmed .dialog-body--confirmed-overlay {
@@ -746,16 +752,17 @@
 }
 
 @media (max-width: 700px) {
+  .dialog--settings,
   .dialog--name-picker,
   .dialog--help {
-    width: calc(100vw - var(--space-700));
-    max-width: var(--max-dialog-confirm);
+    width: calc(100vw - var(--space-900));
+    max-width: calc(100vw - var(--space-900));
   }
   .dialog--confirm {
-    width: calc(100vw - var(--space-300));
-    max-width: none;
-    max-height: calc(100dvh - var(--space-300));
-    margin: var(--space-150);
+    width: calc(100vw - var(--space-900));
+    max-width: calc(100vw - var(--space-900));
+    max-height: calc(100dvh - var(--space-900));
+    margin: var(--space-250);
     display: flex;
     flex-direction: column;
   }

@@ -91,7 +91,7 @@ export default function Win95Dialog(props: Props) {
                 ariaLabel={`Close ${props.title}`}
                 onClick={props.onClose ?? (() => {})}
               >
-                ×
+                X
               </Win95Button>
             )}
           </div>
