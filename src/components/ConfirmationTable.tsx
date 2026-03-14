@@ -50,12 +50,12 @@ export default function ConfirmationTable(props: Props) {
       fallback={
         <div class="summary-slots-mobile-list">
           <For each={props.rows}>
-            {(splitRow) => (
+            {(splitRow, index) => (
               <div class="summary-slots-mobile-card">
                 <div class="summary-slots-mobile-card__section">
                   <div class="summary-slots-mobile-card__label">
-                    People: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe, {splitRow.noCount}{' '}
-                    no
+                    Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
+                    {splitRow.noCount} no
                   </div>
                   <div class="summary-slots-mobile-card__people-list">
                     <For each={props.statusNameGroups(splitRow.groups)}>
