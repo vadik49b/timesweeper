@@ -258,11 +258,10 @@
   text-align: center;
 }
 
-.how-section {
+.landing-section {
   width: 100%;
   max-width: var(--landing-max);
   margin-top: var(--space-700);
-  margin-bottom: var(--space-400);
 }
 .how-title {
   font-family: var(--ui);
@@ -272,6 +271,16 @@
   margin-bottom: var(--space-250);
   text-align: center;
 }
+
+.section-title {
+  font-family: var(--ui);
+  font-size: var(--fs-xl);
+  color: var(--white);
+  text-shadow: var(--title-shadow-soft);
+  margin-bottom: var(--space-250);
+  text-align: center;
+}
+
 .how-steps {
   background: var(--bg);
   padding: var(--space-350) var(--space-300) var(--space-700);
@@ -301,27 +310,9 @@
   line-height: 1.2;
 }
 
-.recent-section {
-  width: 100%;
-  max-width: var(--landing-max);
-  margin-top: var(--space-800);
-}
 .recent-panel {
   background: var(--bg);
   padding: var(--space-350) var(--space-300) var(--space-700);
-}
-.recent-title {
-  font-size: var(--fs-xs);
-  color: var(--bdk);
-  margin-bottom: var(--space-150);
-  display: flex;
-  align-items: center;
-  gap: var(--space-150);
-}
-.recent-title hr {
-  flex: 1;
-  border: none;
-  border-top: var(--border-thin) solid var(--blo);
 }
 .recent-empty {
   font-size: var(--fs-xs);
@@ -363,6 +354,18 @@
   flex-shrink: 0;
 }
 
+.support-panel {
+  background: var(--bg);
+  padding: var(--space-350) var(--space-300);
+  text-align: center;
+}
+
+.support-copy {
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  margin: 0 0 var(--space-350);
+}
+
 .footer {
   margin-top: var(--space-900);
   font-size: var(--fs-xxs);
@@ -372,6 +375,9 @@
 }
 .footer a {
   color: var(--text-footer-link);
+}
+.footer a:hover {
+  color: var(--white);
 }
 .footer-links {
   margin-top: var(--space-100);

@@ -29,6 +29,7 @@ const MONTHS = [
   'December',
 ]
 const DOWS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+const BUY_ME_A_COFFEE_URL = 'https://buymeacoffee.com/vadik49b'
 
 const TIMES = (() => {
   const out: { label: string; value: string }[] = []
@@ -436,7 +437,7 @@ export default function Landing(props: Props) {
         </Win95Button>
       </div>
 
-      <div class="how-section">
+      <div class="landing-section">
         <div class="how-title">How it works</div>
         <div class="how-steps r">
           <div class="how-step row row--start row--gap-md">
@@ -464,12 +465,9 @@ export default function Landing(props: Props) {
         </div>
       </div>
 
-      <div class="recent-section">
+      <div class="landing-section">
+        <div class="section-title">Your recent events</div>
         <div class="recent-panel r">
-          <div class="recent-title">
-            <span>Your recent events</span>
-            <hr />
-          </div>
           {recentEvents().length === 0 ? (
             <div class="empty-text recent-empty">No recent events</div>
           ) : (
@@ -497,6 +495,22 @@ export default function Landing(props: Props) {
               </a>
             ))
           )}
+        </div>
+      </div>
+
+      <div class="landing-section">
+        <div class="section-title">Free forever</div>
+        <div class="support-panel r">
+          <p class="support-copy">
+            I will try to keep it free forever. If it saved you time, you can support it here.
+          </p>
+          <Win95Button
+            onClick={() => {
+              window.open(BUY_ME_A_COFFEE_URL, '_blank', 'noopener,noreferrer')
+            }}
+          >
+            ☕ Buy Me a Coffee
+          </Win95Button>
         </div>
       </div>
 
