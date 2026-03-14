@@ -234,6 +234,10 @@
   .grid-view__panel-frame {
     padding: var(--space-300) var(--space-250) var(--space-600);
   }
+  .grid-view__section-body--title,
+  .grid-view__panel-content--title-aligned {
+    padding-left: 0;
+  }
   .share-panel__link-row {
     flex-wrap: wrap;
   }
