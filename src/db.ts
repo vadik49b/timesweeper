@@ -244,6 +244,10 @@ export async function closeEventStore(eventId?: string): Promise<void> {
 }
 
 async function pushEventToRoomStore(event: AppEvent): Promise<void> {
+  if (!eventRoomStorePromise || eventRoomId !== event.id) {
+    await openEventStore(event.id)
+  }
+
   const store = await requireOpenEventRoomStore(event.id)
 
   store.setRow(EVENT_TABLE, event.id, {

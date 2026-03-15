@@ -438,6 +438,8 @@ export default function Grid(props: Props) {
       .filter(Boolean)
 
     if (nextParticipantNames.length < 1) {
+      setDialogError('Add at least one participant before saving.')
+
       return
     }
 
@@ -552,6 +554,15 @@ export default function Grid(props: Props) {
     }
 
     return `${organizer} is organizing "${ev.name}" event.`
+  })
+  const pageTitle = createMemo(() => {
+    const ev = event()
+
+    if (!ev) {
+      return 'TimeSweeper — Group scheduling, no login needed'
+    }
+
+    return `${ev.name} — TimeSweeper`
   })
   const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
   const pageImage = `${window.location.origin}/anti-tank-mine-logo.png`
@@ -711,7 +722,9 @@ export default function Grid(props: Props) {
     const existing = ev.participants.find((p) => p.name.toLowerCase() === trimmed.toLowerCase())
 
     if (existing) {
-      await selectParticipant(existing.name)
+      setDialogError(
+        `"${existing.name}" is already on the participant list. Choose a different name, or select "${existing.name}" from the list if that is you.`,
+      )
 
       return
     }
@@ -926,39 +939,21 @@ export default function Grid(props: Props) {
 
   return (
     <>
-      <Title>
-        {event()
-          ? `${event()!.name} — TimeSweeper`
-          : 'TimeSweeper — Group scheduling, no login needed'}
-      </Title>
+      <Title>{pageTitle()}</Title>
       <Meta
         name="description"
         content="Share your availability for this event to help find a time that works for all."
       />
       <Meta property="og:type" content="website" />
       <Meta property="og:url" content={pageUrl} />
-      <Meta
-        property="og:title"
-        content={
-          event()
-            ? `${event()!.name} — TimeSweeper`
-            : 'TimeSweeper — Group scheduling, no login needed'
-        }
-      />
+      <Meta property="og:title" content={pageTitle()} />
       <Meta
         property="og:description"
         content="Share your availability for this event to help find a time that works for all."
       />
       <Meta property="og:image" content={pageImage} />
       <Meta name="twitter:card" content="summary_large_image" />
-      <Meta
-        name="twitter:title"
-        content={
-          event()
-            ? `${event()!.name} — TimeSweeper`
-            : 'TimeSweeper — Group scheduling, no login needed'
-        }
-      />
+      <Meta name="twitter:title" content={pageTitle()} />
       <Meta
         name="twitter:description"
         content="Share your availability for this event to help find a time that works for all."
@@ -1015,7 +1010,7 @@ export default function Grid(props: Props) {
                           >
                             <span class="grid-controls__name">{currentName() || 'there'}</span>
                           </a>
-                          ! {introContext()} Share this link with anyone who needs to respond. Fill
+                          ! {introContext()} Share this page with anyone who needs to respond. Fill
                           your availability. The app will suggest the best times. Once a good option
                           exists, anyone can confirm the event time.
                         </p>
@@ -1326,27 +1321,40 @@ export default function Grid(props: Props) {
               <p class="settings__organizer">
                 Locked after event creation to keep everyone aligned.
               </p>
-              <p class="settings__label">Participants:</p>
-              <Show when={settingsParticipantNames().length === 0}>
-                <p class="settings__note">Add at least one participant before saving.</p>
+              <Show when={settingsParticipantNames().length > 0}>
+                <>
+                  <p class="settings__label">Participants:</p>
+                  <div class="settings__participants-list">
+                    <table class="settings__participants-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th class="settings__participants-action-col">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={visibleSettingsParticipantNames()}>
+                          {(participantName, index) => (
+                            <tr>
+                              <td class="settings__participant-name">{participantName}</td>
+                              <td class="settings__participant-action-cell">
+                                <Win95Button
+                                  size="small"
+                                  variant="toolbar"
+                                  class="settings__participant-remove"
+                                  onClick={() => removeSettingsParticipant(index())}
+                                >
+                                  Remove
+                                </Win95Button>
+                              </td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               </Show>
-              <div class="settings__participants-list">
-                <For each={visibleSettingsParticipantNames()}>
-                  {(participantName, index) => (
-                    <div class="settings__participant-row">
-                      <span class="settings__participant-name">{participantName}</span>
-                      <Win95Button
-                        size="small"
-                        variant="icon"
-                        class="settings__participant-remove"
-                        onClick={() => removeSettingsParticipant(index())}
-                      >
-                        ×
-                      </Win95Button>
-                    </div>
-                  )}
-                </For>
-              </div>
               <Show when={settingsParticipantNames().length > 5}>
                 <div class="settings__participants-toggle">
                   <Win95Button
@@ -1371,6 +1379,7 @@ export default function Grid(props: Props) {
                   kind="input"
                   id="settings-new-participant-name"
                   name="settingsNewParticipantName"
+                  size="small"
                   value={settingsNewParticipantName()}
                   placeholder="Name"
                   wrapperClass="dialog__field settings__add-field"

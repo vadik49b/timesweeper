@@ -440,8 +440,7 @@ body {
 }
 
 .error-dialog__text {
-  margin: var(--space-025) 0 0;
-  line-height: 1.35;
+  margin: 0;
 }
 
 .error-dialog__actions {

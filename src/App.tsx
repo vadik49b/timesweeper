@@ -49,8 +49,8 @@ export default function App() {
 
   return (
     <Suspense fallback={null}>
-      <Show when={eventId() === null} fallback={<Grid eventId={eventId()!} />}>
-        <Landing onOpenEvent={navigateToEvent} />
+      <Show when={eventId()} keyed fallback={<Landing onOpenEvent={navigateToEvent} />}>
+        {(id) => <Grid eventId={id} />}
       </Show>
     </Suspense>
   )
