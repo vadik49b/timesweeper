@@ -49,14 +49,14 @@ export default function ConfirmationTable(props: Props) {
         <div class="summary-slots-mobile-list">
           <For each={props.rows}>
             {(splitRow, index) => (
-              <div class="summary-slots-mobile-card">
-                <div class="summary-slots-mobile-card__section">
-                  <div class="summary-slots-mobile-card__label">
-                    Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
-                    {splitRow.noCount} no
+                <div class="summary-slots-mobile-card">
+                  <div class="summary-slots-mobile-card__section">
+                    <div class="summary-slots-mobile-card__label">
+                      Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
+                      {splitRow.noCount} no
+                    </div>
+                    <ParticipantStatusList groups={splitRow.groups} />
                   </div>
-                  <ParticipantStatusList groups={splitRow.groups} />
-                </div>
                 <div class="summary-slots-mobile-card__section">
                   <div class="summary-slots-mobile-card__label">Times</div>
                   <For each={props.timesByDayEntries(splitRow.slots)}>
@@ -74,7 +74,7 @@ export default function ConfirmationTable(props: Props) {
                     class="summary-slots-mobile-card__action"
                     onClick={() => props.onReview(splitRow)}
                   >
-                    Review suggestion
+                    Pick a time
                   </Win95Button>
                 </div>
               </div>
@@ -127,7 +127,7 @@ export default function ConfirmationTable(props: Props) {
                       variant="toolbar"
                       onClick={() => props.onReview(splitRow)}
                     >
-                      Review
+                      Pick a time
                     </Win95Button>
                   </td>
                 </tr>
