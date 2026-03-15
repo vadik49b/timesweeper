@@ -1,6 +1,6 @@
 import { createSignal, createMemo, createEffect, onMount, For, Index, Show } from 'solid-js'
 import { nanoid } from 'nanoid'
-import { computeTimeSlots, type AppEvent } from './types'
+import { computeTimeSlots, type AppEvent } from './event-helpers'
 import {
   listRecentEvents,
   pushRecentEvent,
@@ -224,7 +224,7 @@ export default function Landing(props: Props) {
     }
 
     if (participantNames.length < 2) {
-      setValidationError('Please add at least one other person.')
+      setValidationError('Please add at least one other participant.')
 
       return
     }
@@ -391,13 +391,13 @@ export default function Landing(props: Props) {
         </div>
 
         <fieldset class="field landing__group">
-          <legend>Who's in?</legend>
+          <legend>Participants</legend>
           <Index each={participants()}>
             {(p, i) => (
               <div class="participant-row">
                 <div class="participant-row__field">
                   <label class="participant-row__label" for={`participant-${i}`}>
-                    {i === 0 ? 'You' : `Person ${i + 1}`}
+                    {i === 0 ? 'You' : `Participant ${i + 1}`}
                   </label>
                   <Win95Field
                     kind="input"
@@ -420,14 +420,14 @@ export default function Landing(props: Props) {
                     class="p-rm"
                     onClick={() => removeParticipant(i)}
                   >
-                    x <span class="sr-only">Remove person {i + 1}</span>
+                    x <span class="sr-only">Remove participant {i + 1}</span>
                   </Win95Button>
                 )}
               </div>
             )}
           </Index>
           <Win95Button size="small" variant="toolbar" class="add-btn" onClick={addParticipant}>
-            <span class="hk">A</span>dd person
+            <span class="hk">A</span>dd participant
           </Win95Button>
         </fieldset>
         <Win95Button fullWidth variant="cta" class="create-btn" onClick={create}>
@@ -451,7 +451,7 @@ export default function Landing(props: Props) {
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">3</div>
             <div class="how-text">
-              See suggested times as people keep filling in their availability
+              See suggested times as participants keep filling in their availability
             </div>
           </div>
           <div class="how-step row row--start row--gap-md">

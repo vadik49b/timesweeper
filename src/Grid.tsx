@@ -18,17 +18,20 @@ import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import AvailabilityGrid from './components/AvailabilityGrid'
 import ConfirmationSection, { type SummaryIntersectionTime } from './components/ConfirmationSection'
-import StatusMiniCell from './components/StatusMiniCell'
+import ParticipantStatusList from './components/ParticipantStatusList'
 import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
   type SlotValue,
   type Participant,
+  participantStatusSummary,
   slotsPerDay,
   computeTimeSlots,
   formatDateLabel,
+  formatFullDateLabel,
+  formatLongDateLabel,
   flatToRecord,
-} from './types'
+} from './event-helpers'
 
 interface Props {
   eventId: string
@@ -102,7 +105,7 @@ export default function Grid(props: Props) {
     return result
   })
 
-  type ActiveModal = null | 'name-picker' | 'help' | 'confirm' | 'settings'
+  type ActiveModal = null | 'name-picker' | 'help' | 'confirm' | 'settings' | 'undo-confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmDay, setConfirmDay] = createSignal('')
   const [confirmTime, setConfirmTime] = createSignal('')
@@ -285,14 +288,6 @@ export default function Grid(props: Props) {
     return groups
   }
 
-  function statusNameGroups(groups: SummaryGroups) {
-    return [
-      { value: 1 as SlotValue, names: groups.yes },
-      { value: 2 as SlotValue, names: groups.maybe },
-      { value: 0 as SlotValue, names: groups.no },
-    ].filter((group) => group.names.length > 0)
-  }
-
   function openConfirm(day: string | null, time: string | null) {
     setConfirmCandidates(null)
     setConfirmDay(day ?? days()[0]?.label ?? '')
@@ -307,6 +302,12 @@ export default function Grid(props: Props) {
       return
     }
 
+    const confirmer = currentName().trim()
+
+    if (!confirmer) {
+      return
+    }
+
     const day = days().find((d) => d.label === confirmDay())
     const time = times().find((t) => t.label === confirmTime())
 
@@ -317,6 +318,7 @@ export default function Grid(props: Props) {
     const updated: AppEvent = {
       ...ev,
       status: 'confirmed',
+      confirmedBy: confirmer,
       confirmedSlot: {
         date: day.key,
         startTime: time.value,
@@ -335,9 +337,15 @@ export default function Grid(props: Props) {
       return
     }
 
-    const updated: AppEvent = { ...ev, status: 'open', confirmedSlot: undefined }
+    const updated: AppEvent = {
+      ...ev,
+      status: 'open',
+      confirmedBy: undefined,
+      confirmedSlot: undefined,
+    }
     await saveEvent(updated)
     setEvent(updated)
+    setActiveModal(null)
   }
 
   function revealSharePanel() {
@@ -376,12 +384,10 @@ export default function Grid(props: Props) {
       return
     }
 
-    const organizer = createdByName()
+    const organizer = event()?.participants[0]?.name ?? 'Unknown'
     const exists =
       organizer.trim().toLowerCase() === trimmed.toLowerCase() ||
-      settingsParticipantNames().some(
-      (name) => name.trim().toLowerCase() === trimmed.toLowerCase(),
-      )
+      settingsParticipantNames().some((name) => name.trim().toLowerCase() === trimmed.toLowerCase())
 
     if (exists) {
       setDialogError(`Duplicate name: "${trimmed}". Use a unique name.`)
@@ -418,7 +424,7 @@ export default function Grid(props: Props) {
       return
     }
 
-    const organizer = createdByName()
+    const organizer = event()?.participants[0]?.name ?? 'Unknown'
     const organizerParticipant = ev.participants[0]
 
     if (!organizerParticipant) {
@@ -450,26 +456,28 @@ export default function Grid(props: Props) {
       uniqueNameKeys.add(key)
     }
 
-    const existingByKey = new Map(ev.participants.map((participant) => [participant.name.toLowerCase(), participant]))
+    const existingByKey = new Map(
+      ev.participants.map((participant) => [participant.name.toLowerCase(), participant]),
+    )
     const spd = slotsPerDay(ev)
     const updatedParticipants = [
       organizerParticipant,
       ...nextParticipantNames.map((name) => {
-      const existing = existingByKey.get(name.toLowerCase())
+        const existing = existingByKey.get(name.toLowerCase())
 
-      if (existing) {
-        return { ...existing, name }
-      }
+        if (existing) {
+          return { ...existing, name }
+        }
 
-      const newParticipant: Participant = {
-        name,
-        timezone: '',
-        slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
-        updatedAt: null,
-        version: 0,
-      }
+        const newParticipant: Participant = {
+          name,
+          timezone: '',
+          slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
+          updatedAt: null,
+          version: 0,
+        }
 
-      return newParticipant
+        return newParticipant
       }),
     ]
 
@@ -485,7 +493,7 @@ export default function Grid(props: Props) {
       ''
 
     if (!nextSelected) {
-      setDialogError('At least 2 people are required.')
+      setDialogError('At least 2 participants are required.')
 
       return
     }
@@ -519,24 +527,6 @@ export default function Grid(props: Props) {
     }
   }
 
-  const createdByName = createMemo(() => event()?.participants[0]?.name ?? 'Unknown')
-  const greetingContext = createMemo(() => {
-    const ev = event()
-
-    if (!ev) {
-      return 'Share the event link with anyone who needs to respond.'
-    }
-
-    const organizer = createdByName()
-    const current = currentName().trim().toLowerCase()
-
-    if (current && current === organizer.toLowerCase()) {
-      return `You are organizing "${ev.name}".`
-    }
-
-    return `${organizer} is organizing "${ev.name}".`
-  })
-  const currentTimezone = createMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const confirmSlotPreview = createMemo<SummaryGroups>(() => {
     const day = days().find((entry) => entry.label === confirmDay())
     const timeIndex = times().findIndex((entry) => entry.label === confirmTime())
@@ -547,14 +537,21 @@ export default function Grid(props: Props) {
 
     return peopleGroupsForSlot(day.key, timeIndex)
   })
-  const pageTitle = createMemo(() => {
+  const introContext = createMemo(() => {
     const ev = event()
 
     if (!ev) {
-      return 'TimeSweeper — Group scheduling, no login needed'
+      return 'Share the event link with anyone who needs to respond.'
     }
 
-    return `${ev.name} — TimeSweeper`
+    const organizer = ev.participants[0]?.name ?? 'Unknown'
+    const current = currentName().trim().toLowerCase()
+
+    if (current && current === organizer.toLowerCase()) {
+      return `You are organizing "${ev.name}" event.`
+    }
+
+    return `${organizer} is organizing "${ev.name}" event.`
   })
   const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
   const pageImage = `${window.location.origin}/anti-tank-mine-logo.png`
@@ -566,38 +563,38 @@ export default function Grid(props: Props) {
       return null
     }
 
-    const dayLabel = formatDateLabel(ev.confirmedSlot.date)
+    const dayLabel = formatFullDateLabel(ev.confirmedSlot.date)
+    const heroDayLabel = formatLongDateLabel(ev.confirmedSlot.date)
     const start =
       times().find((t) => t.value === ev.confirmedSlot!.startTime)?.label ??
       ev.confirmedSlot.startTime
 
     return {
       dayLabel,
+      heroDayLabel,
       start,
       slot: ev.confirmedSlot,
     }
   })
   const isConfirmed = createMemo(() => !!confirmedInfo())
-
-  const confirmedPickedLine = createMemo(() => {
+  const confirmedPeopleGroups = createMemo(() => {
+    const ev = event()
     const info = confirmedInfo()
 
-    if (!info) {
-      return ''
+    if (!ev || !info) {
+      return emptySummaryGroups()
     }
 
-    return `${info.dayLabel} ${info.start} (${currentTimezone()})`
-  })
-  const participantsLine = createMemo(() => {
-    const ev = event()
+    const timeIndex = times().findIndex((time) => time.value === info.slot.startTime)
 
-    if (!ev) {
-      return ''
+    if (timeIndex < 0) {
+      return emptySummaryGroups()
     }
 
-    return ev.participants.map((p) => p.name).join(', ')
+    return peopleGroupsForSlot(info.slot.date, timeIndex)
   })
-  const summaryDetailsText = createMemo(() => {
+
+  function summaryDetailsText() {
     const ev = event()
     const info = confirmedInfo()
 
@@ -606,14 +603,17 @@ export default function Grid(props: Props) {
     }
 
     const end = times().find((t) => t.value === info.slot.endTime)?.label ?? info.slot.endTime
+    const createdBy = ev.participants[0]?.name ?? 'Unknown'
+    const people = ev.participants.map((participant) => participant.name).join(', ')
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
     return [
       `Event: ${ev.name}`,
-      `Created by: ${createdByName()}`,
-      `When: ${info.dayLabel} ${info.start}-${end} (${currentTimezone()})`,
-      `People: ${participantsLine()}`,
+      `Created by: ${createdBy}`,
+      `When: ${info.dayLabel} ${info.start}-${end} (${timezone})`,
+      `Participants: ${people}`,
     ].join('\n')
-  })
+  }
 
   async function copyConfirmedSummary() {
     const summary = summaryDetailsText()
@@ -624,8 +624,7 @@ export default function Grid(props: Props) {
 
     try {
       await navigator.clipboard.writeText(summary)
-    } catch {
-    }
+    } catch {}
   }
 
   function downloadIcs() {
@@ -638,13 +637,16 @@ export default function Grid(props: Props) {
 
     const dtStart = toUtcStamp(info.slot.date, info.slot.startTime)
     const dtEnd = toUtcStamp(info.slot.date, info.slot.endTime)
+    const createdBy = ev.participants[0]?.name ?? 'Unknown'
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const people = ev.participants.map((participant) => participant.name).join(', ')
     const description = [
       `Event: ${ev.name}`,
       `Status: confirmed`,
       `Link: ${eventLink()}`,
-      `Created by: ${createdByName()}`,
-      `When: ${info.dayLabel} ${info.start} (${currentTimezone()})`,
-      `People (${ev.participants.length}): ${participantsLine()}`,
+      `Created by: ${createdBy}`,
+      `When: ${info.dayLabel} ${info.start} (${timezone})`,
+      `Participants (${ev.participants.length}): ${people}`,
     ].join('\n')
     const payload = [
       'BEGIN:VCALENDAR',
@@ -690,8 +692,7 @@ export default function Grid(props: Props) {
   }
 
   function selectParticipantSafely(name: string): void {
-    selectParticipant(name).catch(() => {
-    })
+    selectParticipant(name).catch(() => {})
   }
 
   async function addParticipantFromPicker() {
@@ -794,7 +795,10 @@ export default function Grid(props: Props) {
 
     return [
       { value: '', label: 'Select your name...' },
-      ...ev.participants.map((participant) => ({ value: participant.name, label: participant.name })),
+      ...ev.participants.map((participant) => ({
+        value: participant.name,
+        label: participant.name,
+      })),
     ]
   })
 
@@ -805,8 +809,7 @@ export default function Grid(props: Props) {
 
     try {
       await selectParticipant(name)
-    } catch {
-    }
+    } catch {}
   }
 
   createEffect(() => {
@@ -832,7 +835,6 @@ export default function Grid(props: Props) {
         (e.target as HTMLElement).tagName === 'INPUT' ||
         (e.target as HTMLElement).tagName === 'SELECT'
       )
-
         return
 
       if (e.key === 's' || e.key === 'S') {
@@ -849,7 +851,6 @@ export default function Grid(props: Props) {
         e.preventDefault()
         openConfirm(null, null)
       }
-
     }
 
     makeEventListener(document, 'keydown', onKeyDown)
@@ -907,8 +908,7 @@ export default function Grid(props: Props) {
     initialize().catch(() => {
       try {
         setLoadError('network')
-      } catch {
-      }
+      } catch {}
     })
   })
 
@@ -921,26 +921,44 @@ export default function Grid(props: Props) {
       return 'Event not found in local cache or on server.'
     }
 
-    return 'Loading people...'
+    return 'Loading participants...'
   })
 
   return (
     <>
-      <Title>{pageTitle()}</Title>
+      <Title>
+        {event()
+          ? `${event()!.name} — TimeSweeper`
+          : 'TimeSweeper — Group scheduling, no login needed'}
+      </Title>
       <Meta
         name="description"
         content="Share your availability for this event to help find a time that works for all."
       />
       <Meta property="og:type" content="website" />
       <Meta property="og:url" content={pageUrl} />
-      <Meta property="og:title" content={pageTitle()} />
+      <Meta
+        property="og:title"
+        content={
+          event()
+            ? `${event()!.name} — TimeSweeper`
+            : 'TimeSweeper — Group scheduling, no login needed'
+        }
+      />
       <Meta
         property="og:description"
         content="Share your availability for this event to help find a time that works for all."
       />
       <Meta property="og:image" content={pageImage} />
       <Meta name="twitter:card" content="summary_large_image" />
-      <Meta name="twitter:title" content={pageTitle()} />
+      <Meta
+        name="twitter:title"
+        content={
+          event()
+            ? `${event()!.name} — TimeSweeper`
+            : 'TimeSweeper — Group scheduling, no login needed'
+        }
+      />
       <Meta
         name="twitter:description"
         content="Share your availability for this event to help find a time that works for all."
@@ -948,455 +966,502 @@ export default function Grid(props: Props) {
       <Meta name="twitter:image" content={pageImage} />
       <div class="grid-view">
         <Show when={localReady()} fallback={null}>
-        <div class="grid-view__shell">
-          <div class="grid-view__hero row row--between row--center">
-            <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
-              <MineIcon size={18} /> TimeSweeper
-            </a>
-            <div class="grid-view__hero-actions row row--center">
-              <span class="grid-view__hero-timezone">
-                Timezone: <b>{currentTimezone()}</b>
-              </span>
+          <div class="grid-view__shell">
+            <div class="grid-view__hero row row--between row--center">
+              <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
+                <MineIcon size={18} /> TimeSweeper
+              </a>
+              <div class="grid-view__hero-actions row row--center">
+                <span class="grid-view__hero-timezone">
+                  Timezone: <b>{Intl.DateTimeFormat().resolvedOptions().timeZone}</b>
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div class="grid-view__content">
-            <section class="grid-view__steps-panel r">
-              <div class="grid-view__panels">
-                <div class="grid-view__panel-frame">
-                <Show when={event()}>
-                  {(loadedEvent) => (
-                    <div class="grid-view__title-row">
-                      <h2 class="grid-view__pane-title grid-view__pane-title--event">
-                        {loadedEvent().name}
-                      </h2>
-                      <Win95Button
-                        size="small"
-                        variant="toolbar"
-                        class="grid-view__title-settings"
-                        onClick={openSettingsModal}
-                      >
-                        Settings
-                      </Win95Button>
-                    </div>
-                  )}
-                </Show>
-                <p class="grid-view__intro-text">
-                  Hi{' '}
-                  <Show
-                    when={!isConfirmed()}
-                    fallback={<span class="grid-controls__name">{currentName() || 'there'}</span>}
-                  >
-                    <a
-                      href="#"
-                      class="grid-controls__name-link"
-                      onClick={(event) => {
-                        event.preventDefault()
-                        setActiveModal('name-picker')
-                      }}
-                      aria-label="Switch name"
-                    >
-                      <span class="grid-controls__name">{currentName() || 'there'}</span>
-                    </a>
-                  </Show>
-                  ! {greetingContext()} Share this link with anyone who needs to respond. Fill your availability. The app will suggest the
-                  best times. Once a good option exists, anyone can confirm the event time.
-                </p>
-                <section class="grid-view__section">
-                  <div class="grid-view__section-header">
-                    <span class="grid-view__section-number">1.</span>
-                    <span>Share the link with everyone</span>
-                    <hr />
-                  </div>
-                  <div class="grid-view__section-body grid-view__section-body--title">
-                    <label for="share-link" class="share-panel__label">
-                      Event link:
-                    </label>
-                    <div class="share-panel__link-row row">
-                      <Win95Field
-                        kind="input"
-                        id="share-link"
-                        name="shareLink"
-                        type="url"
-                        size="small"
-                        value={eventUrl()}
-                        readOnly
-                        wrapperClass="dialog__field share-panel__field"
-                        inputRef={(el) => {
-                          shareInputRef = el
-                        }}
-                        onClick={() => shareInputRef.select()}
-                      />
-                      <Win95Button
-                        size="small"
-                        variant="toolbar"
-                        class="share-panel__copy-btn"
-                        onClick={() => copyLink(eventUrl())}
-                      >
-                        <span class="hk">C</span>opy
-                      </Win95Button>
-                      <div class="copy-status" aria-live="polite">
-                        {copyStatus()}
+            <div class="grid-view__content">
+              <Show
+                when={isConfirmed()}
+                fallback={
+                  <section class="grid-view__steps-panel r">
+                    <div class="grid-view__panels">
+                      <div class="grid-view__panel-frame">
+                        <Show when={event()}>
+                          {(loadedEvent) => (
+                            <div class="grid-view__title-row">
+                              <h2 class="grid-view__pane-title grid-view__pane-title--event">
+                                {loadedEvent().name}
+                              </h2>
+                              <Win95Button
+                                size="small"
+                                variant="toolbar"
+                                class="grid-view__title-settings"
+                                onClick={openSettingsModal}
+                              >
+                                Settings
+                              </Win95Button>
+                            </div>
+                          )}
+                        </Show>
+                        <p class="grid-view__intro-text">
+                          Hi{' '}
+                          <a
+                            href="#"
+                            class="grid-controls__name-link"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setActiveModal('name-picker')
+                            }}
+                            aria-label="Switch name"
+                          >
+                            <span class="grid-controls__name">{currentName() || 'there'}</span>
+                          </a>
+                          ! {introContext()} Share this link with anyone who needs to respond. Fill
+                          your availability. The app will suggest the best times. Once a good option
+                          exists, anyone can confirm the event time.
+                        </p>
+                        <section class="grid-view__section">
+                          <div class="grid-view__section-header">
+                            <span class="grid-view__section-number">1.</span>
+                            <span>Share the link with everyone</span>
+                            <hr />
+                          </div>
+                          <div class="grid-view__section-body grid-view__section-body--title">
+                            <label for="share-link" class="share-panel__label">
+                              Event link:
+                            </label>
+                            <div class="share-panel__link-row row">
+                              <Win95Field
+                                kind="input"
+                                id="share-link"
+                                name="shareLink"
+                                type="url"
+                                size="small"
+                                value={eventUrl()}
+                                readOnly
+                                wrapperClass="dialog__field share-panel__field"
+                                inputRef={(el) => {
+                                  shareInputRef = el
+                                }}
+                                onClick={() => shareInputRef.select()}
+                              />
+                              <Win95Button
+                                size="small"
+                                variant="toolbar"
+                                class="share-panel__copy-btn"
+                                onClick={() => copyLink(eventUrl())}
+                              >
+                                <span class="hk">C</span>opy
+                              </Win95Button>
+                              <div class="copy-status" aria-live="polite">
+                                {copyStatus()}
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section class="grid-view__section">
+                          <div class="grid-view__section-header">
+                            <span class="grid-view__section-number">2.</span>
+                            <span>Mark your availability</span>
+                            <hr />
+                          </div>
+                          <div class="grid-view__section-body">
+                            <div class="grid-view__legend">
+                              <AvailabilityLegend withLabels />
+                            </div>
+                            <div class="availability-grid-wrap">
+                              <AvailabilityGrid
+                                days={days()}
+                                times={times()}
+                                myState={myState()}
+                                isConfirmed={isConfirmed()}
+                                onCycle={cycleCell}
+                              />
+                            </div>
+                          </div>
+                        </section>
+
+                        <Show when={event()}>
+                          {(loadedEvent) => (
+                            <ConfirmationSection
+                              event={loadedEvent()}
+                              days={days()}
+                              times={times()}
+                              currentName={currentName()}
+                              myState={myState()}
+                              others={others()}
+                              onReviewCandidates={(candidates) => {
+                                const first = candidates[0]
+
+                                setConfirmCandidates(candidates)
+                                setConfirmDay(first?.day ?? days()[0]?.label ?? '')
+                                setConfirmTime(first?.time ?? times()[0]?.label ?? '')
+                                setActiveModal('confirm')
+                              }}
+                            />
+                          )}
+                        </Show>
                       </div>
                     </div>
-                  </div>
-                </section>
-
-                <section class="grid-view__section">
-                  <div class="grid-view__section-header">
-                    <span class="grid-view__section-number">2.</span>
-                    <span>Mark your availability</span>
-                    <hr />
-                  </div>
-                  <div class="grid-view__section-body">
-                    <div class="grid-view__legend">
-                      <AvailabilityLegend withLabels />
-                    </div>
-                    <div class="availability-grid-wrap">
-                      <AvailabilityGrid
-                        days={days()}
-                        times={times()}
-                        myState={myState()}
-                        isConfirmed={isConfirmed()}
-                        onCycle={cycleCell}
-                      />
-                    </div>
-                  </div>
-                </section>
-
+                  </section>
+                }
+              >
                 <Show when={event()}>
                   {(loadedEvent) => (
-                    <ConfirmationSection
-                      event={loadedEvent()}
-                      days={days()}
-                      times={times()}
-                      currentName={currentName()}
-                      myState={myState()}
-                      others={others()}
-                      onReviewCandidates={(candidates) => {
-                        const first = candidates[0]
+                    <section class="grid-view__confirmed-page">
+                      <div class="grid-view__confirmed-hero r">
+                        <div class="grid-view__confirmed-hero-body">
+                          <h2 class="grid-view__confirmed-title">{loadedEvent().name}</h2>
+                          <div class="grid-view__confirmed-when s">
+                            <div class="grid-view__confirmed-when-label">When</div>
+                            <div class="grid-view__confirmed-when-value">
+                              {confirmedInfo()
+                                ? `${confirmedInfo()!.heroDayLabel} at ${confirmedInfo()!.start}`
+                                : ''}
+                            </div>
+                          </div>
+                          <div class="grid-view__confirmed-details"></div>
+                          <p class="grid-view__confirmed-share-note">
+                            The event time is confirmed. You can share this page with everyone who
+                            needs to see the final time.
+                          </p>
+                          <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
+                            <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
+                            <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
+                            <Win95Button onClick={() => copyLink(eventUrl())}>
+                              Copy link
+                            </Win95Button>
+                          </div>
+                          <div class="grid-view__confirmed-copy-status" aria-live="polite">
+                            {copyStatus()}
+                          </div>
+                        </div>
+                      </div>
 
-                        setConfirmCandidates(candidates)
-                        setConfirmDay(first?.day ?? days()[0]?.label ?? '')
-                        setConfirmTime(first?.time ?? times()[0]?.label ?? '')
-                        setActiveModal('confirm')
-                      }}
-                    />
+                      <div class="grid-view__confirmed-grid">
+                        <div class="grid-view__confirmed-panel r">
+                          <div class="grid-view__confirmed-panel-body">
+                            <div class="grid-view__confirmed-details">
+                              <div>
+                                <b>Summary:</b> {participantStatusSummary(confirmedPeopleGroups())}
+                              </div>
+                            </div>
+                            <ParticipantStatusList groups={confirmedPeopleGroups()} />
+                          </div>
+                        </div>
+
+                        <div class="grid-view__confirmed-panel r">
+                          <div class="grid-view__confirmed-panel-body">
+                            <div class="grid-view__confirmed-details">
+                              <div>
+                                <b>Created by:</b> {event()?.participants[0]?.name ?? 'Unknown'}
+                              </div>
+                              <div>
+                                <b>Time confirmed by:</b>{' '}
+                                {event()?.confirmedBy?.trim() ||
+                                  event()?.participants[0]?.name ||
+                                  'Unknown'}
+                              </div>
+                            </div>
+                            <div class="grid-view__confirmed-undo-copy">
+                              Availability is locked because the event time was confirmed. If plans
+                              change, scheduling can be reopened.
+                            </div>
+                            <Win95Button
+                              class="grid-view__confirmed-undo-btn"
+                              onClick={() => setActiveModal('undo-confirm')}
+                            >
+                              Undo confirmation
+                            </Win95Button>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
                   )}
                 </Show>
-                </div>
-              </div>
-            </section>
-            {/* /panels */}
-
-            <Show when={isConfirmed()}>
-              <Win95Dialog
-                title="Time confirmed"
-                class="dialog--confirmed"
-                bodyClass="dialog-body--confirmed-overlay"
-
-                showCloseButton={false}
-              >
-                <div class="grid-view__confirmed-details">
-                  <div>
-                    <b>Event:</b> {event()!.name}
-                  </div>
-                  <div>
-                    <b>Created by:</b> {createdByName()}
-                  </div>
-                  <div>
-                    <b>When:</b> {confirmedPickedLine()}
-                  </div>
-                  <div>
-                    <b>People:</b> {participantsLine()}
-                  </div>
-                </div>
-                <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
-                  <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
-                  <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
-                </div>
-                <div class="grid-view__confirmed-separator" />
-                <div class="grid-view__confirmed-secondary">
-                  <div class="grid-view__confirmed-undo-row">
-                    <div class="grid-view__confirmed-undo-help">
-                      Availability is locked because a time was picked.
-                      <br />
-                      Need changes? Undo confirmation first.
-                    </div>
-                    <Win95Button
-                      class="grid-view__confirmed-undo-btn"
-                      onClick={undoConfirmedTime}
-                    >
-                      Undo confirmation
-                    </Win95Button>
-                  </div>
-                </div>
-              </Win95Dialog>
-            </Show>
+              </Show>
+            </div>
+            {/* /grid-view__content */}
           </div>
-          {/* /grid-view__content */}
-        </div>
-        {/* /grid-view__shell */}
+          {/* /grid-view__shell */}
 
-        <Show when={activeModal() === 'name-picker'}>
-          <Win95Dialog
-            title="Who dis?"
-            class="dialog--name-picker"
-            onClose={() => (event() ? setActiveModal(null) : goToLanding())}
-          >
-            <Show
-              when={event()}
-              fallback={
-                <div class="participant-picker__loading">
-                  <p class="participant-picker__lead">{loadingOverlayText()}</p>
-                </div>
-              }
+          <Show when={activeModal() === 'name-picker'}>
+            <Win95Dialog
+              title="Who dis?"
+              class="dialog--name-picker"
+              onClose={() => (event() ? setActiveModal(null) : goToLanding())}
             >
-              <p class="participant-picker__lead">
-                {createdByName()} is organizing "{event()?.name ?? 'this event'}" and wants to know
-                when you're available.
-              </p>
-              <p class="participant-picker__label">Who are you?</p>
               <Show
-                when={useParticipantSelect()}
+                when={event()}
                 fallback={
-                  <div class="participant-picker__list">
-                    <For each={event()?.participants ?? []}>
-                      {(participant) => (
-                        <Win95Button
-                          size="small"
-                          class={`dialog-btn participant-picker__item${
-                            currentName() === participant.name
-                              ? ' participant-picker__item--selected'
-                              : ''
-                          }`}
-                          onClick={() => {
-                            selectParticipantSafely(participant.name)
-                          }}
-                        >
-                          {participant.name}
-                        </Win95Button>
-                      )}
-                    </For>
+                  <div class="participant-picker__loading">
+                    <p class="participant-picker__lead">{loadingOverlayText()}</p>
                   </div>
                 }
               >
+                <p class="participant-picker__lead">
+                  {event()?.participants[0]?.name ?? 'Unknown'} is organizing "
+                  {event()?.name ?? 'this event'}" and wants to know when you're available.
+                </p>
+                <p class="participant-picker__label">Who are you?</p>
+                <Show
+                  when={useParticipantSelect()}
+                  fallback={
+                    <div class="participant-picker__list">
+                      <For each={event()?.participants ?? []}>
+                        {(participant) => (
+                          <Win95Button
+                            size="small"
+                            class={`dialog-btn participant-picker__item${
+                              currentName() === participant.name
+                                ? ' participant-picker__item--selected'
+                                : ''
+                            }`}
+                            onClick={() => {
+                              selectParticipantSafely(participant.name)
+                            }}
+                          >
+                            {participant.name}
+                          </Win95Button>
+                        )}
+                      </For>
+                    </div>
+                  }
+                >
+                  <Win95Field
+                    kind="select"
+                    id="participant-picker-select"
+                    name="participantPicker"
+                    size="small"
+                    value={currentName() || ''}
+                    options={participantPickerOptions()}
+                    wrapperClass="dialog__field participant-picker__select-field"
+                    onChange={onParticipantPickerChange}
+                  />
+                </Show>
+                <label class="participant-picker__label" for="new-participant-name">
+                  Not on the list?
+                </label>
                 <Win95Field
-                  kind="select"
-                  id="participant-picker-select"
-                  name="participantPicker"
-                  size="small"
-                  value={currentName() || ''}
-                  options={participantPickerOptions()}
-                  wrapperClass="dialog__field participant-picker__select-field"
-                  onChange={onParticipantPickerChange}
+                  kind="input"
+                  id="new-participant-name"
+                  name="newParticipantName"
+                  value={newParticipantName()}
+                  placeholder="Enter your name"
+                  wrapperClass="dialog__field"
+                  onInput={setNewParticipantName}
                 />
+                <div class="dialog-buttons">
+                  <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
+                    Join
+                  </Win95Button>
+                </div>
               </Show>
-              <label class="participant-picker__label" for="new-participant-name">
-                Not on the list?
+            </Win95Dialog>
+          </Show>
+
+          <Show when={activeModal() === 'help'}>
+            <Win95Dialog
+              title="Help — TimeSweeper"
+              class="dialog--help"
+              bodyClass="dialog-body--help"
+              onClose={() => setActiveModal(null)}
+            >
+              <p class="help__lead">
+                <b>How to use TimeSweeper:</b>
+              </p>
+              <p class="help__step">
+                <b>1.</b> Click your <b>name</b> and pick your name
+              </p>
+              <p class="help__step">
+                <b>2.</b> Click a cell to mark availability:
+                <br />
+                <AvailabilityLegend mini class="help__cycle" />
+              </p>
+              <p class="help__step">
+                <b>3.</b> Check "Summary" to compare best and near-match slots
+              </p>
+              <p class="help__step">
+                <b>4.</b> Open "Share this event link" and send it to others
+              </p>
+              <p class="help__step">
+                <b>5.</b> When everyone agrees, click <b>Confirm</b>
+              </p>
+              <p class="help__keys">
+                <b>Keyboard shortcuts:</b>
+                <br />
+                <span class="help__key-line">F3 / S — Focus share link</span>
+              </p>
+              <div class="dialog-buttons">
+                <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
+                  OK
+                </Win95Button>
+              </div>
+            </Win95Dialog>
+          </Show>
+
+          <Show when={activeModal() === 'settings'}>
+            <Win95Dialog
+              title="Event settings"
+              class="dialog--settings"
+              bodyClass="dialog-body--settings"
+              onClose={() => setActiveModal(null)}
+            >
+              <label class="settings__label" for="settings-event-name">
+                Event name:
               </label>
               <Win95Field
                 kind="input"
-                id="new-participant-name"
-                name="newParticipantName"
-                value={newParticipantName()}
-                placeholder="Enter your name"
+                id="settings-event-name"
+                name="settingsEventName"
+                value={settingsEventName()}
                 wrapperClass="dialog__field"
-                onInput={setNewParticipantName}
+                onInput={setSettingsEventName}
               />
-              <div class="dialog-buttons">
-                <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
-                  Join
-                </Win95Button>
-              </div>
-            </Show>
-          </Win95Dialog>
-        </Show>
-
-        <Show when={activeModal() === 'help'}>
-          <Win95Dialog
-            title="Help — TimeSweeper"
-            class="dialog--help"
-            bodyClass="dialog-body--help"
-            onClose={() => setActiveModal(null)}
-          >
-            <p class="help__lead">
-              <b>How to use TimeSweeper:</b>
-            </p>
-            <p class="help__step">
-              <b>1.</b> Click your <b>name</b> and pick your name
-            </p>
-            <p class="help__step">
-              <b>2.</b> Click a cell to mark availability:
-              <br />
-              <AvailabilityLegend mini class="help__cycle" />
-            </p>
-            <p class="help__step">
-              <b>3.</b> Check "Summary" to compare best and near-match slots
-            </p>
-            <p class="help__step">
-              <b>4.</b> Open "Share this event link" and send it to others
-            </p>
-            <p class="help__step">
-              <b>5.</b> When everyone agrees, click <b>Confirm</b>
-            </p>
-            <p class="help__keys">
-              <b>Keyboard shortcuts:</b>
-              <br />
-              <span class="help__key-line">F3 / S — Focus share link</span>
-            </p>
-            <div class="dialog-buttons">
-              <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
-                OK
-              </Win95Button>
-            </div>
-          </Win95Dialog>
-        </Show>
-
-        <Show when={activeModal() === 'settings'}>
-          <Win95Dialog
-            title="Event settings"
-            class="dialog--settings"
-            bodyClass="dialog-body--settings"
-            onClose={() => setActiveModal(null)}
-          >
-            <label class="settings__label" for="settings-event-name">
-              Event name:
-            </label>
-            <Win95Field
-              kind="input"
-              id="settings-event-name"
-              name="settingsEventName"
-              value={settingsEventName()}
-              wrapperClass="dialog__field"
-              onInput={setSettingsEventName}
-            />
-            <label class="settings__label" for="settings-organizer-name">
-              Organizer:
-            </label>
-            <p class="settings__organizer">{createdByName()}</p>
-            <p class="settings__label">Dates:</p>
-            <p class="settings__organizer">Locked after event creation to keep everyone aligned.</p>
-            <p class="settings__label">People:</p>
-            <Show when={settingsParticipantNames().length === 0}>
-              <p class="settings__note">Add at least one person before saving.</p>
-            </Show>
-            <div class="settings__participants-list">
-              <For each={visibleSettingsParticipantNames()}>
-                {(participantName, index) => (
-                  <div class="settings__participant-row">
-                    <span class="settings__participant-name">{participantName}</span>
-                    <Win95Button
-                      size="small"
-                      variant="icon"
-                      class="settings__participant-remove"
-                      onClick={() => removeSettingsParticipant(index())}
-                    >
-                      ×
-                    </Win95Button>
-                  </div>
-                )}
-              </For>
-            </div>
-            <Show when={settingsParticipantNames().length > 5}>
-              <div class="settings__participants-toggle">
-                <Win95Button
-                  size="small"
-                  variant="toolbar"
-                  onClick={() => setShowAllSettingsParticipants(!showAllSettingsParticipants())}
-                >
-                  <Show
-                    when={showAllSettingsParticipants()}
-                    fallback={`Show all ${settingsParticipantNames().length} people`}
-                  >
-                    Show fewer people
-                  </Show>
-                </Win95Button>
-              </div>
-            </Show>
-            <label class="settings__label" for="settings-new-participant-name">
-              Add person:
-            </label>
-            <div class="settings__add-row">
-              <Win95Field
-                kind="input"
-                id="settings-new-participant-name"
-                name="settingsNewParticipantName"
-                value={settingsNewParticipantName()}
-                placeholder="Name"
-                wrapperClass="dialog__field settings__add-field"
-                onInput={setSettingsNewParticipantName}
-              />
-              <Win95Button size="small" variant="toolbar" onClick={addSettingsParticipant}>
-                Add
-              </Win95Button>
-            </div>
-            <div class="dialog-buttons">
-              <Win95Button class="dialog-btn" onClick={saveSettings}>
-                Save
-              </Win95Button>
-              <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
-                Cancel
-              </Win95Button>
-            </div>
-          </Win95Dialog>
-        </Show>
-
-        <Show when={!!dialogError()}>
-          <ErrorDialog message={dialogError()} onClose={() => setDialogError('')} />
-        </Show>
-
-        <Show when={activeModal() === 'confirm'}>
-          <Win95Dialog
-            title="Confirm Time"
-            class="dialog--confirm"
-            bodyClass="dialog-body--confirm"
-            onClose={() => setActiveModal(null)}
-          >
-            <p class="confirm__lead">Confirm this time for everyone?</p>
-            <Show when={(confirmCandidates()?.length ?? 0) > 1}>
-              <p class="confirm__scope-note">
-                Choose one of {(confirmCandidates()?.length ?? 0)} matching time variants.
+              <label class="settings__label" for="settings-organizer-name">
+                Organizer:
+              </label>
+              <p class="settings__organizer">{event()?.participants[0]?.name ?? 'Unknown'}</p>
+              <p class="settings__label">Dates:</p>
+              <p class="settings__organizer">
+                Locked after event creation to keep everyone aligned.
               </p>
-            </Show>
-            <label class="confirm__label" for="confirm-date-time">
-              Date and time:
-            </label>
-            <Win95Field
-              kind="select"
-              id="confirm-date-time"
-              name="confirmDateTime"
-              size="small"
-              value={confirmDateTimeValue()}
-              options={confirmDateTimeOptions()}
-              wrapperClass="confirm__field confirm__field--date-time"
-              onChange={onConfirmDateTimeChange}
-            />
-            <div class="confirm__preview s">
-              <For each={statusNameGroups(confirmSlotPreview())}>
-                {(group) => (
-                  <div class="confirm__preview-row summary-slots-table__people-row">
-                    <StatusMiniCell value={group.value} class="status-mini-cell--aligned" />
-                    <span>{group.names.join(', ')}</span>
-                  </div>
-                )}
-              </For>
-            </div>
-            <p class="confirm__note">
-              Everyone will see the confirmed time.
-              <br />
-              This can be undone later.
-            </p>
-            <div class="dialog-buttons">
-              <Win95Button class="dialog-btn" onClick={doConfirm}>
-                <span class="hk">C</span>onfirm
-              </Win95Button>
-              <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
-                Cancel
-              </Win95Button>
-            </div>
-          </Win95Dialog>
-        </Show>
+              <p class="settings__label">Participants:</p>
+              <Show when={settingsParticipantNames().length === 0}>
+                <p class="settings__note">Add at least one participant before saving.</p>
+              </Show>
+              <div class="settings__participants-list">
+                <For each={visibleSettingsParticipantNames()}>
+                  {(participantName, index) => (
+                    <div class="settings__participant-row">
+                      <span class="settings__participant-name">{participantName}</span>
+                      <Win95Button
+                        size="small"
+                        variant="icon"
+                        class="settings__participant-remove"
+                        onClick={() => removeSettingsParticipant(index())}
+                      >
+                        ×
+                      </Win95Button>
+                    </div>
+                  )}
+                </For>
+              </div>
+              <Show when={settingsParticipantNames().length > 5}>
+                <div class="settings__participants-toggle">
+                  <Win95Button
+                    size="small"
+                    variant="toolbar"
+                    onClick={() => setShowAllSettingsParticipants(!showAllSettingsParticipants())}
+                  >
+                    <Show
+                      when={showAllSettingsParticipants()}
+                      fallback={`Show all ${settingsParticipantNames().length} participants`}
+                    >
+                      Show fewer participants
+                    </Show>
+                  </Win95Button>
+                </div>
+              </Show>
+              <label class="settings__label" for="settings-new-participant-name">
+                Add participant:
+              </label>
+              <div class="settings__add-row">
+                <Win95Field
+                  kind="input"
+                  id="settings-new-participant-name"
+                  name="settingsNewParticipantName"
+                  value={settingsNewParticipantName()}
+                  placeholder="Name"
+                  wrapperClass="dialog__field settings__add-field"
+                  onInput={setSettingsNewParticipantName}
+                />
+                <Win95Button size="small" variant="toolbar" onClick={addSettingsParticipant}>
+                  Add
+                </Win95Button>
+              </div>
+              <div class="dialog-buttons">
+                <Win95Button class="dialog-btn" onClick={saveSettings}>
+                  Save
+                </Win95Button>
+                <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
+                  Cancel
+                </Win95Button>
+              </div>
+            </Win95Dialog>
+          </Show>
+
+          <Show when={!!dialogError()}>
+            <ErrorDialog message={dialogError()} onClose={() => setDialogError('')} />
+          </Show>
+
+          <Show when={activeModal() === 'confirm'}>
+            <Win95Dialog
+              title="Confirm Time"
+              class="dialog--confirm"
+              bodyClass="dialog-body--confirm"
+              onClose={() => setActiveModal(null)}
+            >
+              <p class="confirm__lead">Confirm this time for everyone?</p>
+              <Show when={(confirmCandidates()?.length ?? 0) > 1}>
+                <p class="confirm__scope-note">
+                  Choose one of {confirmCandidates()?.length ?? 0} matching time variants.
+                </p>
+              </Show>
+              <label class="confirm__label" for="confirm-date-time">
+                Date and time:
+              </label>
+              <Win95Field
+                kind="select"
+                id="confirm-date-time"
+                name="confirmDateTime"
+                size="small"
+                value={confirmDateTimeValue()}
+                options={confirmDateTimeOptions()}
+                wrapperClass="confirm__field confirm__field--date-time"
+                onChange={onConfirmDateTimeChange}
+              />
+              <div class="confirm__preview s">
+                <ParticipantStatusList groups={confirmSlotPreview()} />
+              </div>
+              <p class="confirm__note">
+                Everyone will see the confirmed time.
+                <br />
+                This can be undone later.
+              </p>
+              <div class="dialog-buttons">
+                <Win95Button class="dialog-btn" onClick={doConfirm}>
+                  <span class="hk">C</span>onfirm
+                </Win95Button>
+                <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
+                  Cancel
+                </Win95Button>
+              </div>
+            </Win95Dialog>
+          </Show>
+
+          <Show when={activeModal() === 'undo-confirm'}>
+            <Win95Dialog
+              title="Undo confirmation"
+              class="dialog--confirm"
+              bodyClass="dialog-body--confirm"
+              onClose={() => setActiveModal(null)}
+            >
+              <p class="confirm__lead">Reopen scheduling for this event?</p>
+              <p class="confirm__note">
+                The confirmed page will go away and everyone will be able to edit availability
+                again.
+              </p>
+              <div class="dialog-buttons">
+                <Win95Button class="dialog-btn" onClick={undoConfirmedTime}>
+                  Undo confirmation
+                </Win95Button>
+                <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
+                  Cancel
+                </Win95Button>
+              </div>
+            </Win95Dialog>
+          </Show>
         </Show>
       </div>
     </>

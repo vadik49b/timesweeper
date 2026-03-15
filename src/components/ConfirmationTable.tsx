@@ -1,9 +1,8 @@
 import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
 import Win95Button from './Win95Button'
-import StatusMiniCell from './StatusMiniCell'
-import type { SlotValue } from '../types'
+import ParticipantStatusList from './ParticipantStatusList'
+import type { ParticipantSummaryGroups } from '../event-helpers'
 
-type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
 type SummaryIntersectionTime = {
   day: string
   dk: string
@@ -12,7 +11,7 @@ type SummaryIntersectionTime = {
 }
 type SummarySplitRow = {
   key: string
-  groups: SummaryGroups
+  groups: ParticipantSummaryGroups
   yesCount: number
   maybeCount: number
   noCount: number
@@ -23,7 +22,6 @@ type SummarySplitRow = {
 interface Props {
   rows: SummarySplitRow[]
   onReview: (row: SummarySplitRow) => void
-  statusNameGroups: (groups: SummaryGroups) => Array<{ value: SlotValue; names: string[] }>
   timesByDayEntries: (slots: SummaryIntersectionTime[]) => Array<[string, string[]]>
 }
 
@@ -57,16 +55,7 @@ export default function ConfirmationTable(props: Props) {
                     Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
                     {splitRow.noCount} no
                   </div>
-                  <div class="summary-slots-mobile-card__people-list">
-                    <For each={props.statusNameGroups(splitRow.groups)}>
-                      {(group) => (
-                        <div class="summary-slots-mobile-card__people-row">
-                          <StatusMiniCell value={group.value} class="summary-slots-mobile-card__icon" />
-                          <span>{group.names.join(', ')}</span>
-                        </div>
-                      )}
-                    </For>
-                  </div>
+                  <ParticipantStatusList groups={splitRow.groups} />
                 </div>
                 <div class="summary-slots-mobile-card__section">
                   <div class="summary-slots-mobile-card__label">Times</div>
@@ -98,7 +87,7 @@ export default function ConfirmationTable(props: Props) {
         <table class="summary-slots-table">
           <thead>
             <tr>
-              <th>People</th>
+              <th>Participants</th>
               <th class="summary-slots-table__num">Yes</th>
               <th class="summary-slots-table__num">Maybe</th>
               <th class="summary-slots-table__num">No</th>
@@ -117,16 +106,7 @@ export default function ConfirmationTable(props: Props) {
                   }}
                 >
                   <td class="summary-slots-table__people-cell">
-                    <div class="summary-slots-table__people-main">
-                      <For each={props.statusNameGroups(splitRow.groups)}>
-                        {(group) => (
-                          <div class="summary-slots-table__people-row">
-                            <StatusMiniCell value={group.value} class="status-mini-cell--aligned" />
-                            <span>{group.names.join(', ')}</span>
-                          </div>
-                        )}
-                      </For>
-                    </div>
+                    <ParticipantStatusList groups={splitRow.groups} />
                   </td>
                   <td class="summary-slots-table__num">{splitRow.yesCount}</td>
                   <td class="summary-slots-table__num">{splitRow.maybeCount}</td>

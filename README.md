@@ -30,7 +30,7 @@ TimeSweeper is a no-login group availability app with a Windows 95 Minesweeper v
 - `src/components/Win95Button.tsx`: shared button component (`normal|small`, `fullWidth`)
 - `src/components/Win95Field.tsx`: shared input/select fields
 - `src/components/AvailabilityLegend.tsx`: cycle legend
-- `src/types.ts`: event model and slot/date helpers
+- `src/event-helpers.ts`: event model and slot/date helpers
 - `src/db.ts`: local TinyBase stores and event room websocket sync
 - `worker/src/worker.ts`: Durable Object websocket backend
 
@@ -43,6 +43,7 @@ AppEvent {
   created: number
   status: 'open' | 'confirmed'
   maxParticipants: number
+  confirmedBy?: string
   confirmedSlot?: { date: string; startTime: string; endTime: string }
   dates: string[]
   timeRange: { start: string; end: string }

@@ -2,6 +2,18 @@ export const SLOT_DURATION = 30
 
 export type SlotValue = 0 | 1 | 2
 
+export interface ParticipantSummaryGroups {
+  yes: string[]
+  maybe: string[]
+  no: string[]
+}
+
+export interface ParticipantStatusRow {
+  value: SlotValue
+  names: string[]
+  label: 'yes' | 'maybe' | 'no'
+}
+
 export interface Participant {
   name: string
   timezone: string
@@ -22,6 +34,7 @@ export interface AppEvent {
   created: number
   status: 'open' | 'confirmed'
   maxParticipants: number
+  confirmedBy?: string
   confirmedSlot?: ConfirmedSlot
   dates: string[]
   timeRange: { start: string; end: string }
@@ -63,6 +76,29 @@ export function formatDateLabel(ds: string): string {
   return `${dow} ${d}`
 }
 
+export function formatFullDateLabel(ds: string): string {
+  const [y, m, d] = ds.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+
+  return dt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+export function formatLongDateLabel(ds: string): string {
+  const [y, m, d] = ds.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+
+  return dt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
 export function flatToRecord(
   slots: SlotValue[],
   dates: string[],
@@ -90,4 +126,18 @@ export function recordToFlat(
   })
 
   return flat
+}
+
+export function participantStatusRows(groups: ParticipantSummaryGroups): ParticipantStatusRow[] {
+  return [
+    { value: 1 as SlotValue, names: groups.yes, label: 'yes' as const },
+    { value: 2 as SlotValue, names: groups.maybe, label: 'maybe' as const },
+    { value: 0 as SlotValue, names: groups.no, label: 'no' as const },
+  ].filter((group) => group.names.length > 0)
+}
+
+export function participantStatusSummary(groups: ParticipantSummaryGroups): string {
+  return participantStatusRows(groups)
+    .map((group) => `${group.names.length} ${group.label}`)
+    .join(', ')
 }

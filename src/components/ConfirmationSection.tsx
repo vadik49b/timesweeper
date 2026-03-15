@@ -1,7 +1,7 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import ConfirmationTable from './ConfirmationTable'
-import type { AppEvent, SlotValue } from '../types'
+import type { AppEvent, SlotValue } from '../event-helpers'
 
 type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
 export type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
@@ -107,14 +107,6 @@ export default function ConfirmationSection(props: Props) {
     })
 
     return groups
-  }
-
-  function statusNameGroups(groups: SummaryGroups) {
-    return [
-      { value: 1 as SlotValue, names: groups.yes },
-      { value: 2 as SlotValue, names: groups.maybe },
-      { value: 0 as SlotValue, names: groups.no },
-    ].filter((group) => group.names.length > 0)
   }
 
   function timesByDayEntries(slots: SummaryIntersectionTime[]) {
@@ -359,17 +351,17 @@ export default function ConfirmationSection(props: Props) {
 
     if (summarySplitRows().length === 0) {
       if (pending.length > 0) {
-        return `Still waiting on availability from ${pending.join(', ')}. Suggestions will show up once people start filling their availability.`
+        return `Still waiting on availability from ${pending.join(', ')}. Suggestions will show up once participants start filling their availability.`
       }
 
-      return 'Suggestions will show up once people start filling their availability.'
+      return 'Suggestions will show up once participants start filling their availability.'
     }
 
     if (pending.length === 0) {
-      return 'Suggestions update as people continue filling availability.'
+      return 'Suggestions update as participants continue filling availability.'
     }
 
-    return `Suggestions update as people continue filling availability. ${pending.join(', ')} haven't opened the link yet.`
+    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't opened the link yet.`
   })
 
   return (
@@ -396,7 +388,6 @@ export default function ConfirmationSection(props: Props) {
               <ConfirmationTable
                 rows={visibleSummarySplitRows()}
                 onReview={(row) => props.onReviewCandidates(row.slots)}
-                statusNameGroups={statusNameGroups}
                 timesByDayEntries={timesByDayEntries}
               />
               <Show when={summarySplitRows().length > SPLIT_ROWS_PREVIEW_COUNT}>

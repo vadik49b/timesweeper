@@ -1,4 +1,4 @@
-import type { SlotValue } from '../types'
+import type { SlotValue } from '../event-helpers'
 
 interface Props {
   value: SlotValue

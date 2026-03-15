@@ -57,6 +57,7 @@
   --fs-lg: 22px;
   --fs-xl: 26px;
   --fs-hero: 42px;
+  --fs-display-title: clamp(34px, 5vw, 56px);
   --fw-regular: 400;
   --fw-bold: 700;
   --space-0: 0;

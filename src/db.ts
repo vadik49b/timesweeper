@@ -7,7 +7,7 @@ import {
   type WsSynchronizer,
 } from 'tinybase/synchronizers/synchronizer-ws-client'
 import ReconnectingWebSocket from 'reconnecting-websocket'
-import type { AppEvent, SlotValue } from './types'
+import type { AppEvent, SlotValue } from './event-helpers'
 
 const EVENT_TABLE = 'events'
 const EVENT_CELL = 'event'
