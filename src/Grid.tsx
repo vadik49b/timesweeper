@@ -626,24 +626,12 @@ export default function Grid(props: Props) {
     ].join('\n')
   }
 
-  async function copyConfirmedSummary() {
-    const summary = summaryDetailsText()
-
-    if (!summary) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(summary)
-    } catch {}
-  }
-
-  function downloadIcs() {
+  function buildIcsExport() {
     const info = confirmedInfo()
     const ev = event()
 
     if (!info || !ev) {
-      return
+      return null
     }
 
     const dtStart = toUtcStamp(info.slot.date, info.slot.startTime)
@@ -675,13 +663,83 @@ export default function Grid(props: Props) {
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n')
+    const fileName = `${ev.name.replace(/\s+/g, '-').toLowerCase() || 'timesweeper'}.ics`
     const blob = new Blob([payload], { type: 'text/calendar;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${ev.name.replace(/\s+/g, '-').toLowerCase() || 'timesweeper'}.ics`
-    a.click()
-    URL.revokeObjectURL(url)
+
+    return {
+      blob,
+      ev,
+      fileName,
+      payload,
+      url: URL.createObjectURL(blob),
+    }
+  }
+
+  async function copyConfirmedSummary() {
+    const summary = summaryDetailsText()
+
+    if (!summary) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(summary)
+    } catch {}
+  }
+
+  async function downloadIcs() {
+    const exportData = buildIcsExport()
+
+    if (!exportData) {
+      return
+    }
+
+    const { blob, ev, fileName, url } = exportData
+    const isTelegramWebView = /Telegram/i.test(navigator.userAgent)
+    const canShareFiles =
+      typeof File !== 'undefined' &&
+      typeof navigator.canShare === 'function' &&
+      typeof navigator.share === 'function'
+
+    if (canShareFiles) {
+      const file = new File([blob], fileName, { type: 'text/calendar;charset=utf-8' })
+
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: ev.name,
+            text: `Calendar file for ${ev.name}`,
+          })
+          setCopyStatus('Calendar file ready to share.')
+
+          return
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return
+          }
+        }
+      }
+    }
+
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.rel = 'noopener noreferrer'
+      a.target = '_blank'
+      document.body.append(a)
+      a.click()
+      a.remove()
+
+      if (isTelegramWebView) {
+        setCopyStatus('If Telegram blocks the file, open this page in your browser and try again.')
+      } else {
+        setCopyStatus('Calendar file download started.')
+      }
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
   }
 
   async function selectParticipant(name: string) {
