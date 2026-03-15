@@ -354,18 +354,6 @@
   flex-shrink: 0;
 }
 
-.support-panel {
-  background: var(--bg);
-  padding: var(--space-350) var(--space-300);
-  text-align: center;
-}
-
-.support-copy {
-  font-size: var(--fs-xs);
-  line-height: 1.4;
-  margin: 0 0 var(--space-350);
-}
-
 .footer {
   margin-top: var(--space-900);
   font-size: var(--fs-xxs);
