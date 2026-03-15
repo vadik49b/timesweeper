@@ -221,7 +221,7 @@
   }
   .grid-view__hero {
     flex-wrap: wrap;
-    margin-bottom: var(--space-300);
+    margin-bottom: var(--space-700);
   }
   .grid-view__brand {
     font-size: var(--fs-lg);
