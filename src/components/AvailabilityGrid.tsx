@@ -6,16 +6,17 @@ type Day = {
 }
 
 type Time = {
+  key: string
   label: string
-  value: string
 }
 
 interface Props {
   days: Day[]
   times: Time[]
-  myState: Record<string, number[]>
+  selectedSlots: number[]
+  slotIndexByDayAndTime: Record<string, Record<string, number>>
   isConfirmed: boolean
-  onCycle: (dayKey: string, timeIndex: number) => void
+  onCycle: (slotIndex: number) => void
 }
 
 function statusLabel(value: number | undefined): string {
@@ -57,34 +58,57 @@ export default function AvailabilityGrid(props: Props) {
       <For each={props.times}>
         {(time, timeIndex) => (
           <For each={props.days}>
-            {(day, dayIndex) => (
-              <button
-                type="button"
-                classList={{
-                  'availability-grid__cell': true,
-                  'availability-grid__cell--yes': props.myState[day.key]?.[timeIndex()] === 1,
-                  'availability-grid__cell--maybe': props.myState[day.key]?.[timeIndex()] === 2,
-                  'availability-grid__cell--first-time': timeIndex() === 0,
-                  'availability-grid__cell--first-day': dayIndex() === 0,
-                }}
-                style={{
-                  '--ti': String(timeIndex()),
-                  '--di': String(dayIndex()),
-                }}
-                aria-label={`${day.label} at ${time.label}. Current status: ${statusLabel(
-                  props.myState[day.key]?.[timeIndex()],
-                )}. Activate to cycle.`}
-                disabled={props.isConfirmed}
-                onClick={() => props.onCycle(day.key, timeIndex())}
-              >
-                <Show when={props.myState[day.key]?.[timeIndex()] === 1}>
-                  <span class="availability-grid__icon">✔</span>
-                </Show>
-                <Show when={props.myState[day.key]?.[timeIndex()] === 2}>
-                  <span class="availability-grid__icon">?</span>
-                </Show>
-              </button>
-            )}
+            {(day, dayIndex) => {
+              const slotIndex = () => props.slotIndexByDayAndTime[day.key]?.[time.key]
+              const slotValue = () => {
+                const nextSlotIndex = slotIndex()
+
+                return nextSlotIndex === undefined ? undefined : props.selectedSlots[nextSlotIndex]
+              }
+              const hasSlot = () => slotIndex() !== undefined
+
+              return (
+                <button
+                  type="button"
+                  classList={{
+                    'availability-grid__cell': true,
+                    'availability-grid__cell--yes': slotValue() === 1,
+                    'availability-grid__cell--maybe': slotValue() === 2,
+                    'availability-grid__cell--first-time': timeIndex() === 0,
+                    'availability-grid__cell--first-day': dayIndex() === 0,
+                    'availability-grid__cell--empty': !hasSlot(),
+                  }}
+                  style={{
+                    '--ti': String(timeIndex()),
+                    '--di': String(dayIndex()),
+                  }}
+                  aria-label={
+                    hasSlot()
+                      ? `${day.label} at ${time.label}. Current status: ${statusLabel(
+                          slotValue(),
+                        )}. Activate to cycle.`
+                      : `${day.label} at ${time.label}. No availability slot here.`
+                  }
+                  disabled={props.isConfirmed || !hasSlot()}
+                  onClick={() => {
+                    const nextSlotIndex = slotIndex()
+
+                    if (nextSlotIndex === undefined) {
+                      return
+                    }
+
+                    props.onCycle(nextSlotIndex)
+                  }}
+                >
+                  <Show when={slotValue() === 1}>
+                    <span class="availability-grid__icon">✔</span>
+                  </Show>
+                  <Show when={slotValue() === 2}>
+                    <span class="availability-grid__icon">?</span>
+                  </Show>
+                </button>
+              )
+            }}
           </For>
         )}
       </For>

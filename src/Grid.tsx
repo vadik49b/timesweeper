@@ -9,7 +9,7 @@ import {
   saveEvent,
   setSelectedParticipantName,
   subscribeEvent,
-  updateParticipantSlots,
+  updateParticipantSlot,
 } from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
@@ -22,15 +22,14 @@ import ParticipantStatusList from './components/ParticipantStatusList'
 import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
+  buildAvailabilityGridModel,
+  formatSlotFullDayLabel,
+  formatSlotLongDayLabel,
+  formatSlotTimeLabel,
+  getSlotEndUtcMs,
   type SlotValue,
   type Participant,
   participantStatusSummary,
-  slotsPerDay,
-  computeTimeSlots,
-  formatDateLabel,
-  formatFullDateLabel,
-  formatLongDateLabel,
-  flatToRecord,
 } from './event-helpers'
 
 interface Props {
@@ -45,70 +44,42 @@ export default function Grid(props: Props) {
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
   const [newParticipantName, setNewParticipantName] = createSignal('')
 
-  const days = createMemo(() => {
+  const gridModel = createMemo(() => {
     const ev = event()
 
     if (!ev) {
-      return []
+      return {
+        days: [],
+        times: [],
+        slots: [],
+        slotIndexByDayAndTime: {},
+      }
     }
 
-    return ev.dates.map((ds) => ({ key: ds, label: formatDateLabel(ds) }))
+    return buildAvailabilityGridModel(ev.slotStartsUtc)
   })
 
-  const times = createMemo(() => {
-    const ev = event()
-
-    if (!ev) {
-      return []
-    }
-
-    return computeTimeSlots(ev.timeRange)
-  })
+  const days = createMemo(() => gridModel().days)
+  const times = createMemo(() => gridModel().times)
+  const displaySlots = createMemo(() => gridModel().slots)
+  const slotIndexByDayAndTime = createMemo(() => gridModel().slotIndexByDayAndTime)
 
   const [currentName, setCurrentName] = createSignal('')
-
-  const myState = createMemo<Record<string, number[]>>(() => {
+  const currentParticipant = createMemo(() => {
     const ev = event()
     const name = currentName()
 
     if (!ev || !name) {
-      return {}
+      return null
     }
 
-    const participant = ev.participants.find((entry) => entry.name === name)
-
-    if (!participant) {
-      return {}
-    }
-
-    return flatToRecord(participant.slots, ev.dates, slotsPerDay(ev))
+    return ev.participants.find((entry) => entry.name === name) ?? null
   })
-
-  // Read-only slots for all other participants
-  const others = createMemo(() => {
-    const ev = event()
-
-    if (!ev) {
-      return {}
-    }
-    const cur = currentName()
-    const spd = slotsPerDay(ev)
-    const result: Record<string, Record<string, number[]>> = {}
-    ev.participants.forEach((p) => {
-      if (p.name === cur) {
-        return
-      }
-
-      result[p.name] = flatToRecord(p.slots, ev.dates, spd)
-    })
-
-    return result
-  })
+  const selectedSlots = createMemo(() => currentParticipant()?.slots ?? [])
 
   type ActiveModal = null | 'name-picker' | 'help' | 'confirm' | 'settings' | 'undo-confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
-  const [confirmDay, setConfirmDay] = createSignal('')
-  const [confirmTime, setConfirmTime] = createSignal('')
+  const [confirmSlotIndex, setConfirmSlotIndex] = createSignal<number | null>(null)
   const [confirmCandidates, setConfirmCandidates] = createSignal<SummaryIntersectionTime[] | null>(
     null,
   )
@@ -128,20 +99,8 @@ export default function Grid(props: Props) {
     }
   }
 
-  function addMinutes(hhmm: string, minutes: number) {
-    const [h, m] = hhmm.split(':').map(Number)
-    const total = h * 60 + m + minutes
-    const wrapped = ((total % 1440) + 1440) % 1440
-    const oh = Math.floor(wrapped / 60)
-    const om = wrapped % 60
-
-    return `${String(oh).padStart(2, '0')}:${String(om).padStart(2, '0')}`
-  }
-
-  function toUtcStamp(ds: string, hhmm: string) {
-    const [y, m, d] = ds.split('-').map(Number)
-    const [h, mm] = hhmm.split(':').map(Number)
-    const dt = new Date(Date.UTC(y, m - 1, d, h, mm, 0))
+  function toUtcStamp(utcMs: number) {
+    const dt = new Date(utcMs)
     const stamp = dt.toISOString().replace(/[-:]/g, '')
 
     return stamp.slice(0, 15) + 'Z'
@@ -159,115 +118,31 @@ export default function Grid(props: Props) {
     return `${window.location.origin}/e/${props.eventId}`
   }
 
-  function getSlotIndex(ev: AppEvent, dayKey: string, timeIndex: number): number {
-    const dayIndex = ev.dates.findIndex((date) => date === dayKey)
-
-    if (dayIndex < 0) {
-      return -1
-    }
-
-    return dayIndex * slotsPerDay(ev) + timeIndex
-  }
-
-  async function cycleCell(dk: string, ti: number) {
-    if (isConfirmed()) {
-      return
-    }
-
-    const ev = event()
-
-    if (!ev) {
-      return
-    }
-
-    const name = currentName()
-
-    if (!name) {
-      return
-    }
-
-    const participantIndex = ev.participants.findIndex((entry) => entry.name === name)
-
-    if (participantIndex < 0) {
-      return
-    }
-
-    const slotIndex = getSlotIndex(ev, dk, ti)
-
-    if (slotIndex < 0) {
-      return
-    }
-
-    const participant = ev.participants[participantIndex]
-    const prev = participant.slots[slotIndex] ?? 0
-    const next = (prev + 1) % 3
-
-    if (prev === next) {
-      return
-    }
-
-    const nextSlots = [...participant.slots]
-    nextSlots[slotIndex] = next as SlotValue
-
-    const updatedAt = Date.now()
-    const nextVersion = (participant.version ?? 0) + 1
-    await updateParticipantSlots(ev.id, name, nextSlots, updatedAt, nextVersion)
-
-    const nextEvent: AppEvent = {
-      ...ev,
-      participants: ev.participants.map((entry, index) =>
-        index === participantIndex
-          ? {
-              ...entry,
-              slots: nextSlots,
-              updatedAt,
-              version: nextVersion,
-            }
-          : entry,
-      ),
-    }
-
-    setEvent(nextEvent)
-
-    if (navigator.vibrate) {
-      navigator.vibrate(10)
-    }
-  }
-
-  function emptySummaryGroups(): SummaryGroups {
-    return {
-      yes: [],
-      maybe: [],
-      no: [],
-    }
-  }
-
-  function peopleGroupsForSlot(dayKey: string, timeIndex: number): SummaryGroups {
+  function peopleGroupsForSlot(slotIndex: number): SummaryGroups {
     const ev = event()
 
     if (!ev) {
       return emptySummaryGroups()
     }
 
-    const participantNames = [...ev.participants.map((p) => p.name)].sort((a, b) => {
-      if (a === currentName()) {
-        return -1
-      }
+    const participantNames = [...ev.participants.map((participant) => participant.name)].sort(
+      (a, b) => {
+        if (a === currentName()) {
+          return -1
+        }
 
-      if (b === currentName()) {
-        return 1
-      }
+        if (b === currentName()) {
+          return 1
+        }
 
-      return a.localeCompare(b)
-    })
-
+        return a.localeCompare(b)
+      },
+    )
     const groups = emptySummaryGroups()
 
     participantNames.forEach((name) => {
-      const value =
-        name === currentName()
-          ? ((myState()[dayKey]?.[timeIndex] ?? 0) as SlotValue)
-          : ((others()[name]?.[dayKey]?.[timeIndex] ?? 0) as SlotValue)
+      const participant = ev.participants.find((entry) => entry.name === name)
+      const value = (participant?.slots[slotIndex] ?? 0) as SlotValue
       const displayName = name === currentName() ? 'You' : name
 
       if (value === 1) {
@@ -288,10 +163,66 @@ export default function Grid(props: Props) {
     return groups
   }
 
-  function openConfirm(day: string | null, time: string | null) {
+  async function cycleCell(slotIndex: number) {
+    if (isConfirmed()) {
+      return
+    }
+
+    const ev = event()
+    const participant = currentParticipant()
+
+    if (!ev || !participant) {
+      return
+    }
+
+    const name = currentName()
+
+    if (!name) {
+      return
+    }
+
+    const prev = participant.slots[slotIndex] ?? 0
+    const next = (prev + 1) % 3
+
+    if (prev === next) {
+      return
+    }
+
+    const nextSlots = [...participant.slots]
+    nextSlots[slotIndex] = next as SlotValue
+
+    await updateParticipantSlot(ev.id, name, slotIndex, next as SlotValue)
+
+    const nextEvent: AppEvent = {
+      ...ev,
+      participants: ev.participants.map((entry) =>
+        entry.name === participant.name
+          ? {
+              ...entry,
+              slots: nextSlots,
+            }
+          : entry,
+      ),
+    }
+
+    setEvent(nextEvent)
+
+    if (navigator.vibrate) {
+      navigator.vibrate(10)
+    }
+  }
+
+  function emptySummaryGroups(): SummaryGroups {
+    return {
+      yes: [],
+      maybe: [],
+      no: [],
+    }
+  }
+
+  function openConfirm(slotIndex: number | null) {
     setConfirmCandidates(null)
-    setConfirmDay(day ?? days()[0]?.label ?? '')
-    setConfirmTime(time ?? times()[0]?.label ?? '')
+    setConfirmSlotIndex(slotIndex ?? displaySlots()[0]?.slotIndex ?? null)
     setActiveModal('confirm')
   }
 
@@ -308,10 +239,9 @@ export default function Grid(props: Props) {
       return
     }
 
-    const day = days().find((d) => d.label === confirmDay())
-    const time = times().find((t) => t.label === confirmTime())
+    const slotIndex = confirmSlotIndex()
 
-    if (!day || !time) {
+    if (slotIndex === null || slotIndex < 0 || slotIndex >= ev.slotStartsUtc.length) {
       return
     }
 
@@ -319,11 +249,7 @@ export default function Grid(props: Props) {
       ...ev,
       status: 'confirmed',
       confirmedBy: confirmer,
-      confirmedSlot: {
-        date: day.key,
-        startTime: time.value,
-        endTime: addMinutes(time.value, 30),
-      },
+      confirmedSlotIndex: slotIndex,
     }
     await saveEvent(updated)
     setEvent(updated)
@@ -341,7 +267,7 @@ export default function Grid(props: Props) {
       ...ev,
       status: 'open',
       confirmedBy: undefined,
-      confirmedSlot: undefined,
+      confirmedSlotIndex: undefined,
     }
     await saveEvent(updated)
     setEvent(updated)
@@ -461,7 +387,6 @@ export default function Grid(props: Props) {
     const existingByKey = new Map(
       ev.participants.map((participant) => [participant.name.toLowerCase(), participant]),
     )
-    const spd = slotsPerDay(ev)
     const updatedParticipants = [
       organizerParticipant,
       ...nextParticipantNames.map((name) => {
@@ -473,10 +398,7 @@ export default function Grid(props: Props) {
 
         const newParticipant: Participant = {
           name,
-          timezone: '',
-          slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
-          updatedAt: null,
-          version: 0,
+          slots: new Array(ev.slotStartsUtc.length).fill(0) as SlotValue[],
         }
 
         return newParticipant
@@ -530,14 +452,13 @@ export default function Grid(props: Props) {
   }
 
   const confirmSlotPreview = createMemo<SummaryGroups>(() => {
-    const day = days().find((entry) => entry.label === confirmDay())
-    const timeIndex = times().findIndex((entry) => entry.label === confirmTime())
+    const slotIndex = confirmSlotIndex()
 
-    if (!day || timeIndex < 0) {
+    if (slotIndex === null || slotIndex < 0) {
       return emptySummaryGroups()
     }
 
-    return peopleGroupsForSlot(day.key, timeIndex)
+    return peopleGroupsForSlot(slotIndex)
   })
   const introContext = createMemo(() => {
     const ev = event()
@@ -570,40 +491,37 @@ export default function Grid(props: Props) {
   const confirmedInfo = createMemo(() => {
     const ev = event()
 
-    if (!ev || ev.status !== 'confirmed' || !ev.confirmedSlot) {
+    if (
+      !ev ||
+      ev.status !== 'confirmed' ||
+      typeof ev.confirmedSlotIndex !== 'number' ||
+      ev.confirmedSlotIndex < 0
+    ) {
       return null
     }
 
-    const dayLabel = formatFullDateLabel(ev.confirmedSlot.date)
-    const heroDayLabel = formatLongDateLabel(ev.confirmedSlot.date)
-    const start =
-      times().find((t) => t.value === ev.confirmedSlot!.startTime)?.label ??
-      ev.confirmedSlot.startTime
+    const startUtcMs = ev.slotStartsUtc[ev.confirmedSlotIndex]
+
+    if (typeof startUtcMs !== 'number') {
+      return null
+    }
+
+    const endUtcMs = getSlotEndUtcMs(startUtcMs)
 
     return {
-      dayLabel,
-      heroDayLabel,
-      start,
-      slot: ev.confirmedSlot,
+      dayLabel: formatSlotFullDayLabel(startUtcMs),
+      heroDayLabel: formatSlotLongDayLabel(startUtcMs),
+      start: formatSlotTimeLabel(startUtcMs),
+      end: formatSlotTimeLabel(endUtcMs),
+      slotIndex: ev.confirmedSlotIndex,
+      startUtcMs,
+      endUtcMs,
     }
   })
   const isConfirmed = createMemo(() => !!confirmedInfo())
-  const confirmedPeopleGroups = createMemo(() => {
-    const ev = event()
-    const info = confirmedInfo()
-
-    if (!ev || !info) {
-      return emptySummaryGroups()
-    }
-
-    const timeIndex = times().findIndex((time) => time.value === info.slot.startTime)
-
-    if (timeIndex < 0) {
-      return emptySummaryGroups()
-    }
-
-    return peopleGroupsForSlot(info.slot.date, timeIndex)
-  })
+  const confirmedPeopleGroups = createMemo(() =>
+    confirmedInfo() ? peopleGroupsForSlot(confirmedInfo()!.slotIndex) : emptySummaryGroups(),
+  )
 
   function summaryDetailsText() {
     const ev = event()
@@ -613,7 +531,6 @@ export default function Grid(props: Props) {
       return ''
     }
 
-    const end = times().find((t) => t.value === info.slot.endTime)?.label ?? info.slot.endTime
     const createdBy = ev.participants[0]?.name ?? 'Unknown'
     const people = ev.participants.map((participant) => participant.name).join(', ')
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -621,7 +538,7 @@ export default function Grid(props: Props) {
     return [
       `Event: ${ev.name}`,
       `Created by: ${createdBy}`,
-      `When: ${info.dayLabel} ${info.start}-${end} (${timezone})`,
+      `When: ${info.dayLabel} ${info.start}-${info.end} (${timezone})`,
       `Participants: ${people}`,
     ].join('\n')
   }
@@ -634,8 +551,8 @@ export default function Grid(props: Props) {
       return null
     }
 
-    const dtStart = toUtcStamp(info.slot.date, info.slot.startTime)
-    const dtEnd = toUtcStamp(info.slot.date, info.slot.endTime)
+    const dtStart = toUtcStamp(info.startUtcMs)
+    const dtEnd = toUtcStamp(info.endUtcMs)
     const createdBy = ev.participants[0]?.name ?? 'Unknown'
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     const people = ev.participants.map((participant) => participant.name).join(', ')
@@ -653,7 +570,7 @@ export default function Grid(props: Props) {
       'PRODID:-//TimeSweeper//EN',
       'BEGIN:VEVENT',
       `UID:${ev.id}@timesweeper.app`,
-      `DTSTAMP:${toUtcStamp(info.slot.date, info.slot.startTime)}`,
+      `DTSTAMP:${toUtcStamp(info.startUtcMs)}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,
       'STATUS:CONFIRMED',
@@ -787,13 +704,9 @@ export default function Grid(props: Props) {
       return
     }
 
-    const spd = slotsPerDay(ev)
     const newP: Participant = {
       name: trimmed,
-      timezone: '',
-      slots: new Array(ev.dates.length * spd).fill(0) as SlotValue[],
-      updatedAt: null,
-      version: 0,
+      slots: new Array(ev.slotStartsUtc.length).fill(0) as SlotValue[],
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
@@ -821,36 +734,29 @@ export default function Grid(props: Props) {
     const candidates = confirmCandidates()
 
     if (!candidates || candidates.length === 0) {
-      const options: Array<{ value: string; label: string }> = []
-
-      days().forEach((day) => {
-        times().forEach((time) => {
-          options.push({
-            value: `${day.label}||${time.label}`,
-            label: `${day.label} ${time.label}`,
-          })
-        })
-      })
-
-      return options
+      return displaySlots().map((slot) => ({
+        value: String(slot.slotIndex),
+        label: `${slot.dayLabel} ${slot.timeLabel}`,
+      }))
     }
 
     return candidates.map((candidate) => ({
-      value: `${candidate.day}||${candidate.time}`,
-      label: `${candidate.day} ${candidate.time}`,
+      value: String(candidate.slotIndex),
+      label: `${candidate.dayLabel} ${candidate.timeLabel}`,
     }))
   })
-  const confirmDateTimeValue = createMemo(() => `${confirmDay()}||${confirmTime()}`)
+  const confirmDateTimeValue = createMemo(() =>
+    confirmSlotIndex() === null ? '' : String(confirmSlotIndex()),
+  )
 
   function onConfirmDateTimeChange(next: string) {
-    const [nextDay, nextTime] = next.split('||')
+    const nextSlotIndex = Number(next)
 
-    if (!nextDay || !nextTime) {
+    if (!Number.isInteger(nextSlotIndex) || nextSlotIndex < 0) {
       return
     }
 
-    setConfirmDay(nextDay)
-    setConfirmTime(nextTime)
+    setConfirmSlotIndex(nextSlotIndex)
   }
   const useParticipantSelect = createMemo(() => {
     const count = event()?.participants.length ?? 0
@@ -920,7 +826,7 @@ export default function Grid(props: Props) {
 
       if (e.key === 'F5') {
         e.preventDefault()
-        openConfirm(null, null)
+        openConfirm(null)
       }
     }
 
@@ -1126,7 +1032,8 @@ export default function Grid(props: Props) {
                               <AvailabilityGrid
                                 days={days()}
                                 times={times()}
-                                myState={myState()}
+                                selectedSlots={selectedSlots()}
+                                slotIndexByDayAndTime={slotIndexByDayAndTime()}
                                 isConfirmed={isConfirmed()}
                                 onCycle={cycleCell}
                               />
@@ -1138,17 +1045,15 @@ export default function Grid(props: Props) {
                           {(loadedEvent) => (
                             <ConfirmationSection
                               event={loadedEvent()}
-                              days={days()}
-                              times={times()}
                               currentName={currentName()}
-                              myState={myState()}
-                              others={others()}
+                              displaySlots={displaySlots()}
                               onReviewCandidates={(candidates) => {
                                 const first = candidates[0]
 
                                 setConfirmCandidates(candidates)
-                                setConfirmDay(first?.day ?? days()[0]?.label ?? '')
-                                setConfirmTime(first?.time ?? times()[0]?.label ?? '')
+                                setConfirmSlotIndex(
+                                  first?.slotIndex ?? displaySlots()[0]?.slotIndex ?? null,
+                                )
                                 setActiveModal('confirm')
                               }}
                             />

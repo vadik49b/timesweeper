@@ -2,13 +2,8 @@ import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import ParticipantStatusList from './ParticipantStatusList'
 import type { ParticipantSummaryGroups } from '../event-helpers'
+import type { SummaryIntersectionTime } from './ConfirmationSection'
 
-type SummaryIntersectionTime = {
-  day: string
-  dk: string
-  time: string
-  ti: number
-}
 type SummarySplitRow = {
   key: string
   groups: ParticipantSummaryGroups
@@ -49,21 +44,23 @@ export default function ConfirmationTable(props: Props) {
         <div class="summary-slots-mobile-list">
           <For each={props.rows}>
             {(splitRow, index) => (
-                <div class="summary-slots-mobile-card">
-                  <div class="summary-slots-mobile-card__section">
-                    <div class="summary-slots-mobile-card__label">
-                      Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
-                      {splitRow.noCount} no
-                    </div>
-                    <ParticipantStatusList groups={splitRow.groups} />
+              <div class="summary-slots-mobile-card">
+                <div class="summary-slots-mobile-card__section">
+                  <div class="summary-slots-mobile-card__label">
+                    Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
+                    {splitRow.noCount} no
                   </div>
+                  <ParticipantStatusList groups={splitRow.groups} />
+                </div>
                 <div class="summary-slots-mobile-card__section">
                   <div class="summary-slots-mobile-card__label">Times</div>
                   <For each={props.timesByDayEntries(splitRow.slots)}>
                     {(dayGroup) => (
                       <div class="summary-slots-table__times-row">
                         <span class="summary-slots-table__times-day">{dayGroup[0]}:</span>{' '}
-                        <span class="summary-slots-table__times-list">{dayGroup[1].join(', ')}</span>
+                        <span class="summary-slots-table__times-list">
+                          {dayGroup[1].join(', ')}
+                        </span>
                       </div>
                     )}
                   </For>
@@ -116,7 +113,9 @@ export default function ConfirmationTable(props: Props) {
                       {(dayGroup) => (
                         <div class="summary-slots-table__times-row">
                           <span class="summary-slots-table__times-day">{dayGroup[0]}:</span>{' '}
-                          <span class="summary-slots-table__times-list">{dayGroup[1].join(', ')}</span>
+                          <span class="summary-slots-table__times-list">
+                            {dayGroup[1].join(', ')}
+                          </span>
                         </div>
                       )}
                     </For>

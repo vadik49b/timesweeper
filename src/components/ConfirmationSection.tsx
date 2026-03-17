@@ -1,19 +1,14 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import ConfirmationTable from './ConfirmationTable'
-import type { AppEvent, SlotValue } from '../event-helpers'
+import type { AppEvent, DisplaySlot, SlotValue } from '../event-helpers'
 
 type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
 export type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
-export type SummaryIntersectionTime = {
-  day: string
-  dk: string
-  time: string
-  ti: number
-}
+export type SummaryIntersectionTime = DisplaySlot
 type SummaryIntersectionDate = {
   day: string
-  dk: string
+  dayKey: string
   times: SummaryIntersectionTime[]
 }
 type SummaryIntersection = {
@@ -34,23 +29,10 @@ type SummarySplitRow = {
   slots: SummaryIntersectionTime[]
 }
 
-type Day = {
-  key: string
-  label: string
-}
-
-type Time = {
-  label: string
-  value: string
-}
-
 interface Props {
   event: AppEvent
-  days: Day[]
-  times: Time[]
   currentName: string
-  myState: Record<string, number[]>
-  others: Record<string, Record<string, number[]>>
+  displaySlots: DisplaySlot[]
   onReviewCandidates: (candidates: SummaryIntersectionTime[]) => void
 }
 
@@ -67,10 +49,10 @@ function emptySummaryGroups(): SummaryGroups {
 export default function ConfirmationSection(props: Props) {
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
 
-  function peopleGroupsForSlot(dayKey: string, timeIndex: number): SummaryGroups {
-    const ev = props.event
-
-    const participantNames = [...ev.participants.map((p) => p.name)].sort((a, b) => {
+  function peopleGroupsForSlot(slotIndex: number): SummaryGroups {
+    const participantNames = [
+      ...props.event.participants.map((participant) => participant.name),
+    ].sort((a, b) => {
       if (a === props.currentName) {
         return -1
       }
@@ -85,10 +67,8 @@ export default function ConfirmationSection(props: Props) {
     const groups = emptySummaryGroups()
 
     participantNames.forEach((name) => {
-      const value =
-        name === props.currentName
-          ? ((props.myState[dayKey]?.[timeIndex] ?? 0) as SlotValue)
-          : ((props.others[name]?.[dayKey]?.[timeIndex] ?? 0) as SlotValue)
+      const participant = props.event.participants.find((entry) => entry.name === name)
+      const value = (participant?.slots[slotIndex] ?? 0) as SlotValue
       const displayName = name === props.currentName ? 'You' : name
 
       if (value === 1) {
@@ -113,30 +93,28 @@ export default function ConfirmationSection(props: Props) {
     const timesByDay = new Map<string, string[]>()
 
     slots.forEach((slot) => {
-      const existing = timesByDay.get(slot.day)
+      const existing = timesByDay.get(slot.dayLabel)
 
       if (existing) {
-        existing.push(slot.time)
+        existing.push(slot.timeLabel)
 
         return
       }
 
-      timesByDay.set(slot.day, [slot.time])
+      timesByDay.set(slot.dayLabel, [slot.timeLabel])
     })
 
     return [...timesByDay.entries()]
   }
 
   const summaryIntersections = createMemo<SummaryIntersection[]>(() => {
-    const ev = props.event
-    const d = props.days
-    const t = props.times
-
-    if (d.length === 0 || t.length === 0) {
+    if (props.displaySlots.length === 0) {
       return []
     }
 
-    const participantNames = [...ev.participants.map((p) => p.name)].sort((a, b) => {
+    const participantNames = [
+      ...props.event.participants.map((participant) => participant.name),
+    ].sort((a, b) => {
       if (a === props.currentName) {
         return -1
       }
@@ -147,8 +125,7 @@ export default function ConfirmationSection(props: Props) {
 
       return 0
     })
-
-    const dayOrder = new Map(ev.dates.map((dayKey, index) => [dayKey, index]))
+    const dayOrder = new Map<string, number>()
     const intersections = new Map<
       string,
       {
@@ -161,91 +138,91 @@ export default function ConfirmationSection(props: Props) {
       }
     >()
 
-    d.forEach((day) => {
-      t.forEach((slot, ti) => {
-        const cells: SummaryCell[] = participantNames.map((name) => {
-          const value =
-            name === props.currentName
-              ? ((props.myState[day.key]?.[ti] ?? 0) as SlotValue)
-              : ((props.others[name]?.[day.key]?.[ti] ?? 0) as SlotValue)
+    props.displaySlots.forEach((slot) => {
+      if (!dayOrder.has(slot.dayKey)) {
+        dayOrder.set(slot.dayKey, dayOrder.size)
+      }
 
-          return {
-            name,
-            value,
-            isCurrent: name === props.currentName,
-          }
-        })
-        const yesCount = cells.filter((cell) => cell.value === 1).length
-        const maybeCount = cells.filter((cell) => cell.value === 2).length
-        const canAttend = yesCount + maybeCount
+      const cells: SummaryCell[] = participantNames.map((name) => {
+        const participant = props.event.participants.find((entry) => entry.name === name)
+        const value = (participant?.slots[slot.slotIndex] ?? 0) as SlotValue
 
-        if (canAttend === 0) {
-          return
+        return {
+          name,
+          value,
+          isCurrent: name === props.currentName,
         }
-
-        const score = yesCount + maybeCount * 0.5
-        const noCount = cells.length - canAttend
-        const kind = noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial'
-        const key = cells.map((cell) => String(cell.value)).join('')
-        const allGroups: SummaryGroups = {
-          yes: cells
-            .filter((cell) => cell.value === 1)
-            .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
-          maybe: cells
-            .filter((cell) => cell.value === 2)
-            .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
-          no: cells
-            .filter((cell) => cell.value === 0)
-            .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
-        }
-
-        const existing = intersections.get(key)
-
-        if (!existing) {
-          intersections.set(key, {
-            key,
-            allGroups,
-            score,
-            canAttend,
-            kind,
-            times: [{ dk: day.key, ti, day: day.label, time: slot.label }],
-          })
-
-          return
-        }
-
-        existing.times.push({ dk: day.key, ti, day: day.label, time: slot.label })
       })
+      const yesCount = cells.filter((cell) => cell.value === 1).length
+      const maybeCount = cells.filter((cell) => cell.value === 2).length
+      const canAttend = yesCount + maybeCount
+
+      if (canAttend === 0) {
+        return
+      }
+
+      const score = yesCount + maybeCount * 0.5
+      const noCount = cells.length - canAttend
+      const kind = noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial'
+      const key = cells.map((cell) => String(cell.value)).join('')
+      const allGroups: SummaryGroups = {
+        yes: cells
+          .filter((cell) => cell.value === 1)
+          .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
+        maybe: cells
+          .filter((cell) => cell.value === 2)
+          .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
+        no: cells
+          .filter((cell) => cell.value === 0)
+          .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
+      }
+      const existing = intersections.get(key)
+
+      if (!existing) {
+        intersections.set(key, {
+          key,
+          allGroups,
+          score,
+          canAttend,
+          kind,
+          times: [slot],
+        })
+
+        return
+      }
+
+      existing.times.push(slot)
     })
 
     const entries: SummaryIntersection[] = [...intersections.values()].map((entry) => {
       const byDate = new Map<string, SummaryIntersectionDate>()
-      entry.times.forEach((timeEntry) => {
-        const dateGroup = byDate.get(timeEntry.dk)
+
+      entry.times.forEach((slot) => {
+        const dateGroup = byDate.get(slot.dayKey)
 
         if (!dateGroup) {
-          byDate.set(timeEntry.dk, {
-            day: timeEntry.day,
-            dk: timeEntry.dk,
-            times: [timeEntry],
+          byDate.set(slot.dayKey, {
+            day: slot.dayLabel,
+            dayKey: slot.dayKey,
+            times: [slot],
           })
 
           return
         }
 
-        dateGroup.times.push(timeEntry)
+        dateGroup.times.push(slot)
       })
 
       const dates = [...byDate.values()]
         .sort((a, b) => {
-          const aOrder = dayOrder.get(a.dk) ?? Number.MAX_SAFE_INTEGER
-          const bOrder = dayOrder.get(b.dk) ?? Number.MAX_SAFE_INTEGER
+          const aOrder = dayOrder.get(a.dayKey) ?? Number.MAX_SAFE_INTEGER
+          const bOrder = dayOrder.get(b.dayKey) ?? Number.MAX_SAFE_INTEGER
 
           return aOrder - bOrder
         })
         .map((dateGroup) => ({
           ...dateGroup,
-          times: [...dateGroup.times].sort((a, b) => a.ti - b.ti),
+          times: [...dateGroup.times].sort((a, b) => a.slotIndex - b.slotIndex),
         }))
 
       return {
@@ -282,35 +259,21 @@ export default function ConfirmationSection(props: Props) {
     return entries
   })
   const summarySplitRows = createMemo<SummarySplitRow[]>(() => {
-    const intersections = summaryIntersections()
-    const rows: SummarySplitRow[] = []
-
-    intersections.forEach((intersection) => {
-      const slots: SummaryIntersectionTime[] = []
-
-      intersection.dates.forEach((dateGroup) => {
-        dateGroup.times.forEach((timeEntry) => {
-          slots.push(timeEntry)
-        })
-      })
+    return summaryIntersections().map((intersection) => {
+      const slots = intersection.dates.flatMap((dateGroup) => dateGroup.times)
       const first = slots[0]
-      const groups = first ? peopleGroupsForSlot(first.dk, first.ti) : emptySummaryGroups()
-      const yesCount = groups.yes.length
-      const maybeCount = groups.maybe.length
-      const noCount = groups.no.length
+      const groups = first ? peopleGroupsForSlot(first.slotIndex) : emptySummaryGroups()
 
-      rows.push({
+      return {
         key: intersection.key,
         groups,
-        yesCount,
-        maybeCount,
-        noCount,
+        yesCount: groups.yes.length,
+        maybeCount: groups.maybe.length,
+        noCount: groups.no.length,
         kind: intersection.kind,
         slots,
-      })
+      }
     })
-
-    return rows
   })
   const visibleSummarySplitRows = createMemo(() => {
     const all = summarySplitRows()
@@ -322,31 +285,15 @@ export default function ConfirmationSection(props: Props) {
     return all.slice(0, SPLIT_ROWS_PREVIEW_COUNT)
   })
   const participantsWithAvailability = createMemo(() => {
-    const ev = props.event
-
-    return ev.participants.filter((participant) => {
-      if (participant.name === props.currentName) {
-        return Object.values(props.myState).some((daySlots) => daySlots.some((v) => v > 0))
-      }
-
-      return participant.slots.some((v) => v > 0)
-    }).length
+    return props.event.participants.filter((participant) =>
+      participant.slots.some((value) => value > 0),
+    ).length
   })
   const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
   const suggestionsHelperText = createMemo(() => {
-    const ev = props.event
-
-    const pending = ev.participants
-      .filter((participant) => {
-        if (participant.name === props.currentName) {
-          return false
-        }
-
-        const hasUpdated = participant.updatedAt !== null
-        const hasAnyAvailability = participant.slots.some((value) => value > 0)
-
-        return !hasUpdated && !hasAnyAvailability
-      })
+    const pending = props.event.participants
+      .filter((participant) => participant.name !== props.currentName)
+      .filter((participant) => participant.slots.every((value) => value === 0))
       .map((participant) => participant.name)
 
     if (summarySplitRows().length === 0) {
@@ -361,7 +308,7 @@ export default function ConfirmationSection(props: Props) {
       return 'Suggestions update as participants continue filling availability.'
     }
 
-    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't opened the link yet.`
+    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't marked availability yet.`
   })
 
   return (

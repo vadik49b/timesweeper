@@ -313,6 +313,10 @@
   font-size: var(--fs-xs);
   pointer-events: none;
 }
+.availability-grid__cell.availability-grid__cell--empty {
+  cursor: default;
+  background: color-mix(in srgb, var(--bg) 75%, var(--bdk) 25%);
+}
 .availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--yes,
 .availability-grid__cell.availability-grid__cell--first-time.availability-grid__cell--maybe {
   border-top-width: var(--border-thin);

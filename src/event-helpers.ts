@@ -16,16 +16,33 @@ export interface ParticipantStatusRow {
 
 export interface Participant {
   name: string
-  timezone: string
   slots: SlotValue[]
-  updatedAt: number | null
-  version?: number
 }
 
-export interface ConfirmedSlot {
-  date: string
-  startTime: string
-  endTime: string
+export interface DisplayDay {
+  key: string
+  label: string
+}
+
+export interface DisplayTime {
+  key: string
+  label: string
+  minutes: number
+}
+
+export interface DisplaySlot {
+  slotIndex: number
+  dayKey: string
+  dayLabel: string
+  timeKey: string
+  timeLabel: string
+}
+
+export interface AvailabilityGridModel {
+  days: DisplayDay[]
+  times: DisplayTime[]
+  slots: DisplaySlot[]
+  slotIndexByDayAndTime: Record<string, Record<string, number>>
 }
 
 export interface AppEvent {
@@ -33,54 +50,37 @@ export interface AppEvent {
   name: string
   created: number
   status: 'open' | 'confirmed'
-  maxParticipants: number
   confirmedBy?: string
-  confirmedSlot?: ConfirmedSlot
-  dates: string[]
-  timeRange: { start: string; end: string }
+  confirmedSlotIndex?: number
+  slotStartsUtc: number[]
   participants: Participant[]
 }
 
-export function slotsPerDay(event: AppEvent): number {
-  const [sh, sm] = event.timeRange.start.split(':').map(Number)
-  const [eh, em] = event.timeRange.end.split(':').map(Number)
-
-  return (eh * 60 + em - (sh * 60 + sm)) / SLOT_DURATION
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
 }
 
-export function computeTimeSlots(timeRange: {
-  start: string
-  end: string
-}): { label: string; value: string }[] {
-  const [sh, sm] = timeRange.start.split(':').map(Number)
-  const [eh, em] = timeRange.end.split(':').map(Number)
-  const startMins = sh * 60 + sm
-  const endMins = eh * 60 + em
-  const out: { label: string; value: string }[] = []
-  for (let m = startMins; m < endMins; m += SLOT_DURATION) {
-    const h = Math.floor(m / 60)
-    const min = m % 60
-    const hh = h % 12 || 12
-    const mm = String(min).padStart(2, '0')
-    out.push({ label: `${hh}:${mm}`, value: `${String(h).padStart(2, '0')}:${mm}` })
-  }
-
-  return out
+function localDayKeyFromDate(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
 }
 
-export function formatDateLabel(ds: string): string {
-  const [y, m, d] = ds.split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()]
-
-  return `${dow} ${d}`
+function localTimeKeyFromDate(date: Date): string {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
-export function formatFullDateLabel(ds: string): string {
-  const [y, m, d] = ds.split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
+export function getSlotEndUtcMs(startUtcMs: number): number {
+  return startUtcMs + SLOT_DURATION * 60_000
+}
 
-  return dt.toLocaleDateString('en-US', {
+export function formatSlotDayLabel(startUtcMs: number): string {
+  const date = new Date(startUtcMs)
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]
+
+  return `${dow} ${date.getDate()}`
+}
+
+export function formatSlotFullDayLabel(startUtcMs: number): string {
+  return new Date(startUtcMs).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -88,44 +88,69 @@ export function formatFullDateLabel(ds: string): string {
   })
 }
 
-export function formatLongDateLabel(ds: string): string {
-  const [y, m, d] = ds.split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-
-  return dt.toLocaleDateString('en-US', {
+export function formatSlotLongDayLabel(startUtcMs: number): string {
+  return new Date(startUtcMs).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   })
 }
 
-export function flatToRecord(
-  slots: SlotValue[],
-  dates: string[],
-  spd: number,
-): Record<string, number[]> {
-  const record: Record<string, number[]> = {}
-  dates.forEach((ds, di) => {
-    record[ds] = Array.from({ length: spd }, (_, ti) => slots[di * spd + ti] ?? 0)
+export function formatSlotTimeLabel(startUtcMs: number): string {
+  return new Date(startUtcMs).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
   })
-
-  return record
 }
 
-export function recordToFlat(
-  record: Record<string, number[]>,
-  dates: string[],
-  spd: number,
-): SlotValue[] {
-  const flat: SlotValue[] = new Array(dates.length * spd).fill(0)
-  dates.forEach((ds, di) => {
-    const day = record[ds] ?? []
-    for (let ti = 0; ti < spd; ti++) {
-      flat[di * spd + ti] = (day[ti] ?? 0) as SlotValue
-    }
+export function getDisplaySlot(startUtcMs: number, slotIndex: number): DisplaySlot {
+  const date = new Date(startUtcMs)
+
+  return {
+    slotIndex,
+    dayKey: localDayKeyFromDate(date),
+    dayLabel: formatSlotDayLabel(startUtcMs),
+    timeKey: localTimeKeyFromDate(date),
+    timeLabel: formatSlotTimeLabel(startUtcMs),
+  }
+}
+
+export function buildAvailabilityGridModel(slotStartsUtc: number[]): AvailabilityGridModel {
+  const dayMap = new Map<string, DisplayDay>()
+  const timeMap = new Map<string, DisplayTime>()
+  const slots: DisplaySlot[] = []
+  const slotIndexByDayAndTime: Record<string, Record<string, number>> = {}
+
+  slotStartsUtc.forEach((startUtcMs, slotIndex) => {
+    const displaySlot = getDisplaySlot(startUtcMs, slotIndex)
+    const date = new Date(startUtcMs)
+
+    dayMap.set(displaySlot.dayKey, {
+      key: displaySlot.dayKey,
+      label: displaySlot.dayLabel,
+    })
+    timeMap.set(displaySlot.timeKey, {
+      key: displaySlot.timeKey,
+      label: displaySlot.timeLabel,
+      minutes: date.getHours() * 60 + date.getMinutes(),
+    })
+    slotIndexByDayAndTime[displaySlot.dayKey] ??= {}
+    slotIndexByDayAndTime[displaySlot.dayKey][displaySlot.timeKey] = slotIndex
+    slots.push(displaySlot)
   })
 
-  return flat
+  return {
+    days: [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    times: [...timeMap.values()].sort((a, b) => {
+      if (a.minutes !== b.minutes) {
+        return a.minutes - b.minutes
+      }
+
+      return a.key.localeCompare(b.key)
+    }),
+    slots,
+    slotIndexByDayAndTime,
+  }
 }
 
 export function participantStatusRows(groups: ParticipantSummaryGroups): ParticipantStatusRow[] {

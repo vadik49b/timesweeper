@@ -1,6 +1,6 @@
 import { createSignal, createMemo, createEffect, onMount, For, Index, Show } from 'solid-js'
 import { nanoid } from 'nanoid'
-import { computeTimeSlots, type AppEvent } from './event-helpers'
+import { SLOT_DURATION, type AppEvent } from './event-helpers'
 import {
   listRecentEvents,
   pushRecentEvent,
@@ -195,6 +195,25 @@ export default function Landing(props: Props) {
     })
   })
 
+  function buildSlotStartsUtc(dates: string[], start: string, end: string): number[] {
+    const [startHour, startMinute] = start.split(':').map(Number)
+    const [endHour, endMinute] = end.split(':').map(Number)
+    const slotStartsUtc: number[] = []
+
+    dates.forEach((day) => {
+      const [year, month, date] = day.split('-').map(Number)
+      const current = new Date(year, month - 1, date, startHour, startMinute, 0, 0)
+      const endDate = new Date(year, month - 1, date, endHour, endMinute, 0, 0)
+
+      while (current.getTime() < endDate.getTime()) {
+        slotStartsUtc.push(current.getTime())
+        current.setMinutes(current.getMinutes() + SLOT_DURATION)
+      }
+    })
+
+    return slotStartsUtc
+  }
+
   async function create() {
     if (!eventName().trim()) {
       setValidationError('Please enter an event name.')
@@ -245,22 +264,16 @@ export default function Landing(props: Props) {
 
     setParticipants(participantNames)
     setValidationError('')
-    const timeRange = { start: timeStart(), end: timeEnd() }
-    const spd = computeTimeSlots(timeRange).length
+    const slotStartsUtc = buildSlotStartsUtc(dates, timeStart(), timeEnd())
     const event: AppEvent = {
       id: nanoid(),
       name: eventName().trim(),
       created: Date.now(),
       status: 'open',
-      maxParticipants: Number.MAX_SAFE_INTEGER,
-      dates,
-      timeRange,
+      slotStartsUtc,
       participants: participantNames.map((name) => ({
         name: name.trim(),
-        timezone: '',
-        slots: new Array(dates.length * spd).fill(0) as (0 | 1 | 2)[],
-        updatedAt: null,
-        version: 0,
+        slots: new Array(slotStartsUtc.length).fill(0) as (0 | 1 | 2)[],
       })),
     }
     await saveEvent(event)

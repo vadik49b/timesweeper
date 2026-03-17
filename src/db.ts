@@ -7,16 +7,28 @@ import {
   type WsSynchronizer,
 } from 'tinybase/synchronizers/synchronizer-ws-client'
 import ReconnectingWebSocket from 'reconnecting-websocket'
-import type { AppEvent, SlotValue } from './event-helpers'
+import type { AppEvent, Participant, SlotValue } from './event-helpers'
 
-const EVENT_TABLE = 'events'
-const EVENT_CELL = 'event'
+const EVENT_META_TABLE = 'eventMeta'
+const EVENT_NAME_CELL = 'name'
+const EVENT_CREATED_CELL = 'created'
+const EVENT_CONFIRMATION_CELL = 'confirmation'
+const SLOT_DEFINITIONS_TABLE = 'slotDefinitions'
+const SLOT_START_UTC_CELL = 'startUtc'
+const PARTICIPANTS_TABLE = 'participants'
+const PARTICIPANT_NAME_CELL = 'name'
+const PARTICIPANT_ORDER_CELL = 'order'
+const AVAILABILITY_TABLE = 'availability'
 const RECENTLY_OPENED_EVENTS_VALUE = 'recentlyOpenedEvents'
 const SELECTED_PARTICIPANTS_TABLE = 'selectedParticipants'
 const SELECTED_PARTICIPANT_NAME_CELL = 'name'
 const MAX_RECENT_EVENTS = 5
 
 type EventRoomStore = ReturnType<typeof createMergeableStore>
+
+type EventConfirmation =
+  | { status: 'open' }
+  | { status: 'confirmed'; slotIndex: number; confirmedBy: string }
 
 export interface RecentEventSummary {
   id: string
@@ -43,6 +55,42 @@ function eventSyncUrl(eventId: string): string {
   url.pathname = `/api/events/${encodeURIComponent(eventId)}`
 
   return url.toString()
+}
+
+function slotCellId(slotIndex: number): string {
+  return `s${slotIndex}`
+}
+
+function parseSlotIndex(slotId: string): number | null {
+  if (!slotId.startsWith('s')) {
+    return null
+  }
+
+  const value = Number(slotId.slice(1))
+
+  return Number.isInteger(value) && value >= 0 ? value : null
+}
+
+function normalizeConfirmation(value: unknown): EventConfirmation {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { status: 'open' }
+  }
+
+  const candidate = value as Partial<EventConfirmation>
+
+  if (
+    candidate.status === 'confirmed' &&
+    typeof candidate.slotIndex === 'number' &&
+    typeof candidate.confirmedBy === 'string'
+  ) {
+    return {
+      status: 'confirmed',
+      slotIndex: candidate.slotIndex,
+      confirmedBy: candidate.confirmedBy,
+    }
+  }
+
+  return { status: 'open' }
 }
 
 async function createLocalStore(): Promise<Store> {
@@ -91,18 +139,108 @@ export async function setSelectedParticipantName(
   )
 }
 
-function readEventFromStore(store: Store, eventId: string): AppEvent | undefined {
-  if (!store.hasRow(EVENT_TABLE, eventId)) {
+function readSlotStartsFromStore(store: Store): number[] {
+  if (!store.hasTable(SLOT_DEFINITIONS_TABLE)) {
+    return []
+  }
+
+  return store
+    .getRowIds(SLOT_DEFINITIONS_TABLE)
+    .map((rowId) => {
+      const slotIndex = parseSlotIndex(String(rowId))
+      const startUtcMs = store.getCell(SLOT_DEFINITIONS_TABLE, rowId, SLOT_START_UTC_CELL)
+
+      return typeof startUtcMs === 'number' && slotIndex !== null ? { slotIndex, startUtcMs } : null
+    })
+    .filter((slot): slot is { slotIndex: number; startUtcMs: number } => slot !== null)
+    .sort((a, b) => a.slotIndex - b.slotIndex)
+    .map((slot) => slot.startUtcMs)
+}
+
+function readParticipantsFromStore(store: Store, slotCount: number): Participant[] {
+  if (!store.hasTable(PARTICIPANTS_TABLE)) {
+    return []
+  }
+
+  return store
+    .getRowIds(PARTICIPANTS_TABLE)
+    .map((rowId) => {
+      const name = store.getCell(PARTICIPANTS_TABLE, rowId, PARTICIPANT_NAME_CELL)
+      const order = store.getCell(PARTICIPANTS_TABLE, rowId, PARTICIPANT_ORDER_CELL)
+
+      return typeof name === 'string'
+        ? {
+            rowId: String(rowId),
+            name,
+            order: typeof order === 'number' ? order : Number.MAX_SAFE_INTEGER,
+          }
+        : null
+    })
+    .filter(
+      (participant): participant is { rowId: string; name: string; order: number } =>
+        participant !== null,
+    )
+    .sort((a, b) => {
+      if (a.order !== b.order) {
+        return a.order - b.order
+      }
+
+      return a.name.localeCompare(b.name)
+    })
+    .map((participant) => {
+      const slots = new Array(slotCount).fill(0) as SlotValue[]
+
+      if (store.hasRow(AVAILABILITY_TABLE, participant.rowId)) {
+        const availabilityRow = store.getRow(AVAILABILITY_TABLE, participant.rowId)
+
+        Object.entries(availabilityRow).forEach(([cellId, rawValue]) => {
+          const slotIndex = parseSlotIndex(cellId)
+
+          if (slotIndex === null || slotIndex >= slotCount) {
+            return
+          }
+
+          if (rawValue === 0 || rawValue === 1 || rawValue === 2) {
+            slots[slotIndex] = rawValue
+          }
+        })
+      }
+
+      return {
+        name: participant.name,
+        slots,
+      }
+    })
+}
+
+function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | undefined {
+  if (!store.hasRow(EVENT_META_TABLE, eventId)) {
     return undefined
   }
 
-  const row = store.getRow(EVENT_TABLE, eventId) as Partial<Record<typeof EVENT_CELL, AppEvent>>
+  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_NAME_CELL)
+  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL)
 
-  if (!row || !row[EVENT_CELL]) {
+  if (typeof name !== 'string' || typeof created !== 'number') {
     return undefined
   }
 
-  return row[EVENT_CELL]
+  const slotStartsUtc = readSlotStartsFromStore(store)
+  const participants = readParticipantsFromStore(store, slotStartsUtc.length)
+  const confirmation = normalizeConfirmation(
+    store.getCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMATION_CELL),
+  )
+
+  return {
+    id: eventId,
+    name,
+    created,
+    status: confirmation.status,
+    confirmedBy: confirmation.status === 'confirmed' ? confirmation.confirmedBy : undefined,
+    confirmedSlotIndex: confirmation.status === 'confirmed' ? confirmation.slotIndex : undefined,
+    slotStartsUtc,
+    participants,
+  }
 }
 
 function getRecentlyOpenedEvents(store: Store): RecentEventSummary[] {
@@ -195,13 +333,6 @@ function ensureEventRoomSync(eventId: string, store: EventRoomStore): void {
 
 async function loadEventRoomStore(eventId: string): Promise<EventRoomStore> {
   const eventRoomStore = createMergeableStore(`sync-${eventId}`)
-
-  eventRoomStore.setTablesSchema({
-    [EVENT_TABLE]: {
-      [EVENT_CELL]: { type: 'object' },
-    },
-  })
-
   const persister = createIndexedDbPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
 
   await persister.load()
@@ -243,6 +374,81 @@ export async function closeEventStore(eventId?: string): Promise<void> {
   eventRoomStorePromise = null
 }
 
+function writeNormalizedEvent(store: EventRoomStore, event: AppEvent): void {
+  store.transaction(() => {
+    store.setCell(EVENT_META_TABLE, event.id, EVENT_NAME_CELL, event.name)
+    store.setCell(EVENT_META_TABLE, event.id, EVENT_CREATED_CELL, event.created)
+    store.setCell(EVENT_META_TABLE, event.id, EVENT_CONFIRMATION_CELL, {
+      status: event.status,
+      ...(event.status === 'confirmed' &&
+      typeof event.confirmedSlotIndex === 'number' &&
+      typeof event.confirmedBy === 'string'
+        ? {
+            slotIndex: event.confirmedSlotIndex,
+            confirmedBy: event.confirmedBy,
+          }
+        : {}),
+    })
+
+    const nextSlotRowIds = new Set(event.slotStartsUtc.map((_, slotIndex) => slotCellId(slotIndex)))
+
+    if (store.hasTable(SLOT_DEFINITIONS_TABLE)) {
+      store.getRowIds(SLOT_DEFINITIONS_TABLE).forEach((rowId) => {
+        if (!nextSlotRowIds.has(String(rowId))) {
+          store.delRow(SLOT_DEFINITIONS_TABLE, rowId)
+        }
+      })
+    }
+
+    event.slotStartsUtc.forEach((startUtcMs, slotIndex) => {
+      store.setCell(SLOT_DEFINITIONS_TABLE, slotCellId(slotIndex), SLOT_START_UTC_CELL, startUtcMs)
+    })
+
+    const nextParticipantNames = new Set(event.participants.map((participant) => participant.name))
+
+    if (store.hasTable(PARTICIPANTS_TABLE)) {
+      store.getRowIds(PARTICIPANTS_TABLE).forEach((rowId) => {
+        const participantName = String(rowId)
+
+        if (!nextParticipantNames.has(participantName)) {
+          store.delRow(PARTICIPANTS_TABLE, rowId)
+          store.delRow(AVAILABILITY_TABLE, rowId)
+        }
+      })
+    }
+
+    event.participants.forEach((participant, order) => {
+      store.setCell(PARTICIPANTS_TABLE, participant.name, PARTICIPANT_NAME_CELL, participant.name)
+      store.setCell(PARTICIPANTS_TABLE, participant.name, PARTICIPANT_ORDER_CELL, order)
+
+      const nextAvailabilityCellIds = new Set<string>()
+
+      participant.slots.forEach((slotValue, slotIndex) => {
+        const cellId = slotCellId(slotIndex)
+
+        nextAvailabilityCellIds.add(cellId)
+
+        if (slotValue === 0) {
+          store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true)
+
+          return
+        }
+
+        store.setCell(AVAILABILITY_TABLE, participant.name, cellId, slotValue)
+      })
+
+      if (store.hasRow(AVAILABILITY_TABLE, participant.name)) {
+        Object.keys(store.getRow(AVAILABILITY_TABLE, participant.name)).forEach((cellId) => {
+          if (!nextAvailabilityCellIds.has(cellId)) {
+            store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true)
+          }
+        })
+      }
+    })
+
+  })
+}
+
 async function pushEventToRoomStore(event: AppEvent): Promise<void> {
   if (!eventRoomStorePromise || eventRoomId !== event.id) {
     await openEventStore(event.id)
@@ -250,9 +456,7 @@ async function pushEventToRoomStore(event: AppEvent): Promise<void> {
 
   const store = await requireOpenEventRoomStore(event.id)
 
-  store.setRow(EVENT_TABLE, event.id, {
-    [EVENT_CELL]: event as unknown as Record<string, unknown>,
-  })
+  writeNormalizedEvent(store, event)
 }
 
 export async function listRecentEvents(): Promise<RecentEventSummary[]> {
@@ -308,12 +512,7 @@ export async function subscribeEvent(
   onChange: (event: AppEvent | undefined) => void,
 ): Promise<() => void> {
   const store = await requireOpenEventRoomStore(eventId)
-
-  const listenerId = store.addTableListener(EVENT_TABLE, (_store, tableId) => {
-    if (tableId !== EVENT_TABLE) {
-      return
-    }
-
+  const listenerId = store.addDidFinishTransactionListener(() => {
     onChange(readEventFromStore(store, eventId))
   })
 
@@ -324,35 +523,26 @@ export async function subscribeEvent(
   }
 }
 
-export async function updateParticipantSlots(
+export async function updateParticipantSlot(
   eventId: string,
   name: string,
-  slots: SlotValue[],
-  updatedAt: number,
-  version?: number,
+  slotIndex: number,
+  value: SlotValue,
 ): Promise<void> {
-  const event = await getEvent(eventId)
+  const store = await requireOpenEventRoomStore(eventId)
 
-  if (!event) {
+  if (
+    !store.hasRow(PARTICIPANTS_TABLE, name) ||
+    !store.hasRow(SLOT_DEFINITIONS_TABLE, slotCellId(slotIndex))
+  ) {
     return
   }
 
-  const index = event.participants.findIndex((participant) => participant.name === name)
+  if (value === 0) {
+    store.delCell(AVAILABILITY_TABLE, name, slotCellId(slotIndex), true)
 
-  if (index < 0) {
     return
   }
 
-  const nextParticipants = [...event.participants]
-  nextParticipants[index] = {
-    ...nextParticipants[index],
-    slots,
-    updatedAt,
-    version,
-  }
-
-  await saveEvent({
-    ...event,
-    participants: nextParticipants,
-  })
+  store.setCell(AVAILABILITY_TABLE, name, slotCellId(slotIndex), value)
 }
