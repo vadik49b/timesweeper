@@ -30,14 +30,15 @@ import {
   buildDisplayModel,
   type DisplayModel,
   emptyParticipantSummaryGroups,
+  findDuplicateName,
   getEventSlotCount,
+  getNameKey,
   getParticipantSlotValue,
   getParticipantSummaryGroups,
   isEventConfirmed,
+  participantStatusSummary,
   type ParticipantSummaryGroups,
   type SlotValue,
-  type Participant,
-  participantStatusSummary,
 } from './event-helpers'
 
 interface Props {
@@ -94,6 +95,8 @@ export default function Grid(props: Props) {
   const [copyStatus, setCopyStatus] = createSignal('')
 
   let shareInputRef!: HTMLInputElement
+  const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   function goToLanding() {
     if (window.location.pathname !== '/') {
@@ -115,10 +118,6 @@ export default function Grid(props: Props) {
       .replace(/\n/g, '\\n')
       .replace(/,/g, '\\,')
       .replace(/;/g, '\\;')
-  }
-
-  function eventLink() {
-    return `${window.location.origin}/e/${props.eventId}`
   }
 
   function peopleGroupsForSlot(slotIndex: number): ParticipantSummaryGroups {
@@ -276,12 +275,10 @@ export default function Grid(props: Props) {
     }
 
     const organizer = event()?.participants[0]?.name ?? 'Unknown'
-    const exists =
-      organizer.trim().toLowerCase() === trimmed.toLowerCase() ||
-      settingsParticipantNames().some((name) => name.trim().toLowerCase() === trimmed.toLowerCase())
+    const duplicateName = findDuplicateName([trimmed], [organizer, ...settingsParticipantNames()])
 
-    if (exists) {
-      setDialogError(`Duplicate name: "${trimmed}". Use a unique name.`)
+    if (duplicateName) {
+      setDialogError(`Duplicate name: "${duplicateName}". Use a unique name.`)
 
       return
     }
@@ -299,6 +296,17 @@ export default function Grid(props: Props) {
 
     return all.slice(0, 5)
   })
+
+  async function applyUpdatedEvent(updated: AppEvent, nextSelected: string) {
+    await updateEventSettings(updated.id, {
+      name: updated.name,
+      participants: updated.participants,
+    })
+    setSelectedParticipantName(updated.id, nextSelected)
+    pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
+    setEvent(updated)
+    setCurrentName(nextSelected)
+  }
 
   async function saveSettings() {
     const ev = event()
@@ -334,39 +342,30 @@ export default function Grid(props: Props) {
       return
     }
 
-    const uniqueNameKeys = new Set<string>()
-    uniqueNameKeys.add(organizer.trim().toLowerCase())
+    const duplicateName = findDuplicateName(nextParticipantNames, [organizer])
 
-    for (const name of nextParticipantNames) {
-      const key = name.toLowerCase()
+    if (duplicateName) {
+      setDialogError(`Duplicate name: "${duplicateName}". Use unique names.`)
 
-      if (uniqueNameKeys.has(key)) {
-        setDialogError(`Duplicate name: "${name}". Use unique names.`)
-
-        return
-      }
-
-      uniqueNameKeys.add(key)
+      return
     }
 
     const existingByKey = new Map(
-      ev.participants.map((participant) => [participant.name.toLowerCase(), participant]),
+      ev.participants.map((participant) => [getNameKey(participant.name), participant]),
     )
     const updatedParticipants = [
       organizerParticipant,
       ...nextParticipantNames.map((name) => {
-        const existing = existingByKey.get(name.toLowerCase())
+        const existing = existingByKey.get(getNameKey(name))
 
         if (existing) {
           return { ...existing, name }
         }
 
-        const newParticipant: Participant = {
+        return {
           name,
           slots: {},
         }
-
-        return newParticipant
       }),
     ]
 
@@ -375,9 +374,10 @@ export default function Grid(props: Props) {
       name: nextEventName,
       participants: updatedParticipants,
     }
-    const selected = currentName()
+    const selectedKey = getNameKey(currentName())
     const nextSelected =
-      updatedParticipants.find((participant) => participant.name === selected)?.name ??
+      updatedParticipants.find((participant) => getNameKey(participant.name) === selectedKey)
+        ?.name ??
       updatedParticipants[0]?.name ??
       ''
 
@@ -387,15 +387,7 @@ export default function Grid(props: Props) {
       return
     }
 
-    await updateEventSettings(updated.id, {
-      name: updated.name,
-      participants: updated.participants,
-    })
-    setSelectedParticipantName(updated.id, nextSelected)
-    pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
-
-    setEvent(updated)
-    setCurrentName(nextSelected)
+    await applyUpdatedEvent(updated, nextSelected)
     setActiveModal(null)
   }
 
@@ -437,9 +429,9 @@ export default function Grid(props: Props) {
     }
 
     const organizer = ev.participants[0]?.name ?? 'Unknown'
-    const current = currentName().trim().toLowerCase()
+    const current = currentName()
 
-    if (current && current === organizer.toLowerCase()) {
+    if (current && getNameKey(current) === getNameKey(organizer)) {
       return `You are organizing "${ev.name}" event.`
     }
 
@@ -454,7 +446,6 @@ export default function Grid(props: Props) {
 
     return `${ev.name} — TimeSweeper`
   })
-  const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
   const pageImage = `${window.location.origin}/anti-tank-mine-logo.png`
 
   const confirmedInfo = createMemo(() => {
@@ -521,12 +512,11 @@ export default function Grid(props: Props) {
 
     const createdBy = ev.participants[0]?.name ?? 'Unknown'
     const people = ev.participants.map((participant) => participant.name).join(', ')
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
     return [
       `Event: ${ev.name}`,
       `Created by: ${createdBy}`,
-      `When: ${info.dayLabel} ${info.start}-${info.end} (${timezone})`,
+      `When: ${info.dayLabel} ${info.start}-${info.end} (${localTimezone})`,
       `Participants: ${people}`,
     ].join('\n')
   }
@@ -542,14 +532,13 @@ export default function Grid(props: Props) {
     const dtStart = toUtcStamp(info.startUtcMs)
     const dtEnd = toUtcStamp(info.endUtcMs)
     const createdBy = ev.participants[0]?.name ?? 'Unknown'
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     const people = ev.participants.map((participant) => participant.name).join(', ')
     const description = [
       `Event: ${ev.name}`,
       `Status: confirmed`,
-      `Link: ${eventLink()}`,
+      `Link: ${pageUrl}`,
       `Created by: ${createdBy}`,
-      `When: ${info.dayLabel} ${info.start} (${timezone})`,
+      `When: ${info.dayLabel} ${info.start} (${localTimezone})`,
       `Participants (${ev.participants.length}): ${people}`,
     ].join('\n')
     const payload = [
@@ -564,7 +553,7 @@ export default function Grid(props: Props) {
       'STATUS:CONFIRMED',
       `SUMMARY:${icsEscape(`TimeSweeper: ${ev.name}`)}`,
       `DESCRIPTION:${icsEscape(description)}`,
-      `URL:${icsEscape(eventLink())}`,
+      `URL:${icsEscape(pageUrl)}`,
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n')
@@ -678,7 +667,9 @@ export default function Grid(props: Props) {
       return
     }
 
-    const existing = ev.participants.find((p) => p.name.toLowerCase() === trimmed.toLowerCase())
+    const existing = ev.participants.find(
+      (participant) => getNameKey(participant.name) === getNameKey(trimmed),
+    )
 
     if (existing) {
       setDialogError(
@@ -688,19 +679,11 @@ export default function Grid(props: Props) {
       return
     }
 
-    const newP: Participant = {
-      name: trimmed,
-      slots: {},
+    const updated: AppEvent = {
+      ...ev,
+      participants: [...ev.participants, { name: trimmed, slots: {} }],
     }
-    const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
-    await updateEventSettings(updated.id, {
-      name: updated.name,
-      participants: updated.participants,
-    })
-    setSelectedParticipantName(updated.id, trimmed)
-    pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
-    setEvent(updated)
-    setCurrentName(trimmed)
+    await applyUpdatedEvent(updated, trimmed)
     setNewParticipantName('')
     setActiveModal(null)
   }
@@ -717,7 +700,6 @@ export default function Grid(props: Props) {
     }
   }
 
-  const eventUrl = createMemo(() => `${window.location.origin}/e/${props.eventId}`)
   const confirmDateTimeOptions = createMemo(() => {
     const candidates = confirmCandidates()
 
@@ -919,7 +901,7 @@ export default function Grid(props: Props) {
               </a>
               <div class="grid-view__hero-actions row row--center">
                 <span class="grid-view__hero-timezone">
-                  Timezone: <b>{Intl.DateTimeFormat().resolvedOptions().timeZone}</b>
+                  Timezone: <b>{localTimezone}</b>
                 </span>
               </div>
             </div>
@@ -982,7 +964,7 @@ export default function Grid(props: Props) {
                                 name="shareLink"
                                 type="url"
                                 size="small"
-                                value={eventUrl()}
+                                value={pageUrl}
                                 readOnly
                                 wrapperClass="dialog__field share-panel__field"
                                 inputRef={(el) => {
@@ -994,7 +976,7 @@ export default function Grid(props: Props) {
                                 size="small"
                                 variant="toolbar"
                                 class="share-panel__copy-btn"
-                                onClick={() => copyLink(eventUrl())}
+                                onClick={() => copyLink(pageUrl)}
                               >
                                 <span class="hk">C</span>opy
                               </Win95Button>
@@ -1073,9 +1055,7 @@ export default function Grid(props: Props) {
                           <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
                             <Win95Button onClick={downloadIcs}>Download .ics</Win95Button>
                             <Win95Button onClick={copyConfirmedSummary}>Copy summary</Win95Button>
-                            <Win95Button onClick={() => copyLink(eventUrl())}>
-                              Copy link
-                            </Win95Button>
+                            <Win95Button onClick={() => copyLink(pageUrl)}>Copy link</Win95Button>
                           </div>
                           <div class="grid-view__confirmed-copy-status" aria-live="polite">
                             {copyStatus()}

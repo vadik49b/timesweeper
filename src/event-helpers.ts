@@ -260,6 +260,30 @@ export function hasParticipantAvailability(participant: Pick<Participant, 'slots
   return Object.keys(participant.slots).length > 0
 }
 
+export function getNameKey(name: string): string {
+  return name.trim().toLowerCase()
+}
+
+export function findDuplicateName(names: string[], reservedNames: string[] = []): string | null {
+  const seen = new Set(reservedNames.map(getNameKey))
+
+  for (const name of names) {
+    const trimmed = name.trim()
+
+    if (!trimmed) {
+      continue
+    }
+
+    if (seen.has(getNameKey(trimmed))) {
+      return trimmed
+    }
+
+    seen.add(getNameKey(trimmed))
+  }
+
+  return null
+}
+
 export function getOrderedParticipants(
   participants: Participant[],
   currentName: string,

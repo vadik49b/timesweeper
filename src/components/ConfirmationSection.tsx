@@ -4,29 +4,14 @@ import ConfirmationTable from './ConfirmationTable'
 import {
   emptyParticipantSummaryGroups,
   getParticipantSlotValue,
-  getParticipantSummaryGroups,
   getOrderedParticipants,
   hasParticipantAvailability,
   type AppEvent,
   type DisplaySlot,
   type ParticipantSummaryGroups,
-  type SlotValue,
 } from '../event-helpers'
 
-type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
 export type SummaryIntersectionTime = DisplaySlot
-type SummaryIntersectionDate = {
-  day: string
-  dayKey: string
-  times: SummaryIntersectionTime[]
-}
-type SummaryIntersection = {
-  key: string
-  score: number
-  canAttend: number
-  kind: 'best' | 'almost' | 'partial'
-  dates: SummaryIntersectionDate[]
-}
 type SummarySplitRow = {
   key: string
   groups: ParticipantSummaryGroups
@@ -35,6 +20,8 @@ type SummarySplitRow = {
   noCount: number
   kind: 'best' | 'almost' | 'partial'
   slots: SummaryIntersectionTime[]
+  score: number
+  canAttend: number
 }
 
 interface Props {
@@ -67,109 +54,72 @@ export default function ConfirmationSection(props: Props) {
     return [...timesByDay.entries()]
   }
 
-  const summaryIntersections = createMemo<SummaryIntersection[]>(() => {
+  const summaryRows = createMemo<SummarySplitRow[]>(() => {
     if (props.displaySlots.length === 0) {
       return []
     }
 
     const orderedParticipants = getOrderedParticipants(props.event.participants, props.currentName)
-    const dayOrder = new Map<string, number>()
-    const intersections = new Map<
-      string,
-      {
-        key: string
-        score: number
-        canAttend: number
-        kind: 'best' | 'almost' | 'partial'
-        times: SummaryIntersectionTime[]
-      }
-    >()
+    const rows = new Map<string, SummarySplitRow>()
 
     props.displaySlots.forEach((slot) => {
-      if (!dayOrder.has(slot.dayKey)) {
-        dayOrder.set(slot.dayKey, dayOrder.size)
-      }
+      const groups = emptyParticipantSummaryGroups()
+      let key = ''
 
-      const cells: SummaryCell[] = orderedParticipants.map((participant) => {
+      orderedParticipants.forEach((participant) => {
         const value = getParticipantSlotValue(participant, slot.startUtcIso)
-        return {
-          name: participant.name,
-          value,
-          isCurrent: participant.name === props.currentName,
+        const displayName = participant.name === props.currentName ? 'You' : participant.name
+
+        key += String(value)
+
+        if (value === 1) {
+          groups.yes.push(displayName)
+
+          return
         }
+
+        if (value === 2) {
+          groups.maybe.push(displayName)
+
+          return
+        }
+
+        groups.no.push(displayName)
       })
-      const yesCount = cells.filter((cell) => cell.value === 1).length
-      const maybeCount = cells.filter((cell) => cell.value === 2).length
+      const yesCount = groups.yes.length
+      const maybeCount = groups.maybe.length
       const canAttend = yesCount + maybeCount
 
       if (canAttend === 0) {
         return
       }
 
-      const score = yesCount + maybeCount * 0.5
-      const noCount = cells.length - canAttend
-      const kind = noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial'
-      const key = cells.map((cell) => String(cell.value)).join('')
-      const existing = intersections.get(key)
+      const existing = rows.get(key)
 
       if (!existing) {
-        intersections.set(key, {
+        const noCount = groups.no.length
+
+        rows.set(key, {
           key,
-          score,
+          groups,
+          yesCount,
+          maybeCount,
+          noCount,
+          kind: noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial',
+          slots: [slot],
+          score: yesCount + maybeCount * 0.5,
           canAttend,
-          kind,
-          times: [slot],
         })
 
         return
       }
 
-      existing.times.push(slot)
+      existing.slots.push(slot)
     })
 
-    const entries: SummaryIntersection[] = [...intersections.values()].map((entry) => {
-      const byDate = new Map<string, SummaryIntersectionDate>()
+    const kindRank: Record<SummarySplitRow['kind'], number> = { best: 0, almost: 1, partial: 2 }
 
-      entry.times.forEach((slot) => {
-        const dateGroup = byDate.get(slot.dayKey)
-
-        if (!dateGroup) {
-          byDate.set(slot.dayKey, {
-            day: slot.dayLabel,
-            dayKey: slot.dayKey,
-            times: [slot],
-          })
-
-          return
-        }
-
-        dateGroup.times.push(slot)
-      })
-
-      const dates = [...byDate.values()]
-        .sort((a, b) => {
-          const aOrder = dayOrder.get(a.dayKey) ?? Number.MAX_SAFE_INTEGER
-          const bOrder = dayOrder.get(b.dayKey) ?? Number.MAX_SAFE_INTEGER
-
-          return aOrder - bOrder
-        })
-        .map((dateGroup) => ({
-          ...dateGroup,
-          times: [...dateGroup.times].sort((a, b) => a.slotIndex - b.slotIndex),
-        }))
-
-      return {
-        key: entry.key,
-        score: entry.score,
-        canAttend: entry.canAttend,
-        kind: entry.kind,
-        dates,
-      }
-    })
-
-    const kindRank: Record<SummaryIntersection['kind'], number> = { best: 0, almost: 1, partial: 2 }
-
-    entries.sort((a, b) => {
+    return [...rows.values()].sort((a, b) => {
       if (kindRank[a.kind] !== kindRank[b.kind]) {
         return kindRank[a.kind] - kindRank[b.kind]
       }
@@ -182,35 +132,11 @@ export default function ConfirmationSection(props: Props) {
         return b.canAttend - a.canAttend
       }
 
-      return (
-        b.dates.reduce((sum, day) => sum + day.times.length, 0) -
-        a.dates.reduce((sum, day) => sum + day.times.length, 0)
-      )
-    })
-
-    return entries
-  })
-  const summarySplitRows = createMemo<SummarySplitRow[]>(() => {
-    return summaryIntersections().map((intersection) => {
-      const slots = intersection.dates.flatMap((dateGroup) => dateGroup.times)
-      const first = slots[0]
-      const groups = first
-        ? getParticipantSummaryGroups(props.event, props.currentName, first.startUtcIso)
-        : emptyParticipantSummaryGroups()
-
-      return {
-        key: intersection.key,
-        groups,
-        yesCount: groups.yes.length,
-        maybeCount: groups.maybe.length,
-        noCount: groups.no.length,
-        kind: intersection.kind,
-        slots,
-      }
+      return b.slots.length - a.slots.length
     })
   })
-  const visibleSummarySplitRows = createMemo(() => {
-    const all = summarySplitRows()
+  const visibleSummaryRows = createMemo(() => {
+    const all = summaryRows()
 
     if (showAllSummaryRows()) {
       return all
@@ -218,18 +144,16 @@ export default function ConfirmationSection(props: Props) {
 
     return all.slice(0, SPLIT_ROWS_PREVIEW_COUNT)
   })
-  const participantsWithAvailability = createMemo(() => {
-    return props.event.participants.filter((participant) => hasParticipantAvailability(participant))
-      .length
-  })
-  const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
+  const canShowSuggestions = createMemo(
+    () => props.event.participants.filter(hasParticipantAvailability).length >= 2,
+  )
   const suggestionsHelperText = createMemo(() => {
     const pending = props.event.participants
       .filter((participant) => participant.name !== props.currentName)
       .filter((participant) => !hasParticipantAvailability(participant))
       .map((participant) => participant.name)
 
-    if (summarySplitRows().length === 0) {
+    if (summaryRows().length === 0) {
       if (pending.length > 0) {
         return `Still waiting on availability from ${pending.join(', ')}. Suggestions will show up once participants start filling their availability.`
       }
@@ -257,7 +181,7 @@ export default function ConfirmationSection(props: Props) {
         </p>
         <Show when={canShowSuggestions()} fallback={<></>}>
           <Show
-            when={summarySplitRows().length > 0}
+            when={summaryRows().length > 0}
             fallback={
               <div class="empty-text grid-view__panel-content--title-aligned">
                 No candidate times yet
@@ -266,11 +190,11 @@ export default function ConfirmationSection(props: Props) {
           >
             <div class="summary-table-wrap grid-view__panel-content--title-aligned">
               <ConfirmationTable
-                rows={visibleSummarySplitRows()}
+                rows={visibleSummaryRows()}
                 onReview={(row) => props.onReviewCandidates(row.slots)}
                 timesByDayEntries={timesByDayEntries}
               />
-              <Show when={summarySplitRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
+              <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
                 <div class="summary-list__meta-row">
                   <div class="summary-list__toggle-row">
                     <Win95Button
@@ -279,7 +203,7 @@ export default function ConfirmationSection(props: Props) {
                     >
                       <Show
                         when={showAllSummaryRows()}
-                        fallback={`Show all ${summarySplitRows().length} groups`}
+                        fallback={`Show all ${summaryRows().length} groups`}
                       >
                         Show fewer groups
                       </Show>

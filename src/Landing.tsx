@@ -11,6 +11,7 @@ import {
 import { nanoid } from 'nanoid'
 import {
   buildSlotStartsUtcIso,
+  findDuplicateName,
   parseTimeStringToMinutes,
   SLOT_DURATION,
   type AppEvent,
@@ -106,9 +107,10 @@ export default function Landing(props: Props) {
 
     return days
   })
+  const selectedDateKeys = createMemo(() => Object.keys(selectedDates()).sort())
 
   const selectedDateLabels = createMemo(() => {
-    const keys = Object.keys(selectedDates()).sort()
+    const keys = selectedDateKeys()
 
     if (keys.length === 0) {
       return 'No dates selected'
@@ -149,7 +151,7 @@ export default function Landing(props: Props) {
       delete next[ds]
       setSelectedDates(next)
     } else {
-      if (Object.keys(cur).length >= 7) {
+      if (selectedDateKeys().length >= 7) {
         return
       }
 
@@ -204,7 +206,7 @@ export default function Landing(props: Props) {
 
       return
     }
-    const dates = Object.keys(selectedDates()).sort()
+    const dates = selectedDateKeys()
 
     if (dates.length === 0) {
       setValidationError('Please pick at least one date.')
@@ -227,6 +229,7 @@ export default function Landing(props: Props) {
 
     const trimmedParticipants = participants().map((p) => p.trim())
     const participantNames = trimmedParticipants.filter(Boolean)
+    const duplicateName = findDuplicateName(participantNames)
 
     if (!trimmedParticipants[0]) {
       setValidationError('Enter your name')
@@ -240,18 +243,10 @@ export default function Landing(props: Props) {
       return
     }
 
-    const participantNameKeys = new Set<string>()
+    if (duplicateName) {
+      setValidationError(`Duplicate name: "${duplicateName}". Use unique names.`)
 
-    for (const name of participantNames) {
-      const key = name.toLowerCase()
-
-      if (participantNameKeys.has(key)) {
-        setValidationError(`Duplicate name: "${name}". Use unique names.`)
-
-        return
-      }
-
-      participantNameKeys.add(key)
+      return
     }
 
     setParticipants(participantNames)
@@ -276,7 +271,7 @@ export default function Landing(props: Props) {
       created: Date.now(),
       slotStartsUtcIso,
       participants: participantNames.map((name) => ({
-        name: name.trim(),
+        name,
         slots: {},
       })),
     }

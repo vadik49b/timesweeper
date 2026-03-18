@@ -124,7 +124,10 @@ function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | 
   }
 }
 
-function writeEventMeta(store: EventRoomStore, event: Pick<AppEvent, 'id' | 'name' | 'created'>): void {
+function writeEventMeta(
+  store: EventRoomStore,
+  event: Pick<AppEvent, 'id' | 'name' | 'created'>,
+): void {
   store.setCell(EVENT_META_TABLE, event.id, EVENT_NAME_CELL, event.name)
   store.setCell(EVENT_META_TABLE, event.id, EVENT_CREATED_CELL, event.created)
 }
@@ -164,10 +167,7 @@ function writeConfirmation(
   }
 }
 
-function syncParticipantAvailability(
-  store: EventRoomStore,
-  participants: Participant[],
-): void {
+function syncParticipantAvailability(store: EventRoomStore, participants: Participant[]): void {
   const nextParticipantNames = new Set(participants.map((participant) => participant.name))
 
   if (store.hasTable(AVAILABILITY_TABLE)) {
