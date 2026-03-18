@@ -62,6 +62,13 @@ export interface DisplaySlot {
   timeLabel: string
 }
 
+export interface DisplayModel {
+  slots: DisplaySlot[]
+  days: DisplayDay[]
+  times: DisplayTime[]
+  slotByDayTime: Record<string, DisplaySlot | undefined>
+}
+
 export interface AppEvent {
   id: string
   name: string
@@ -253,12 +260,68 @@ export function hasParticipantAvailability(participant: Pick<Participant, 'slots
   return Object.keys(participant.slots).length > 0
 }
 
-export function buildDisplaySlots(slotStartsUtcIso: string[]): DisplaySlot[] {
+export function getOrderedParticipants(
+  participants: Participant[],
+  currentName: string,
+): Participant[] {
+  return [...participants].sort((a, b) => {
+    if (a.name === currentName) {
+      return -1
+    }
+
+    if (b.name === currentName) {
+      return 1
+    }
+
+    return a.name.localeCompare(b.name)
+  })
+}
+
+export function emptyParticipantSummaryGroups(): ParticipantSummaryGroups {
+  return {
+    yes: [],
+    maybe: [],
+    no: [],
+  }
+}
+
+export function getParticipantSummaryGroups(
+  event: Pick<AppEvent, 'participants'>,
+  currentName: string,
+  slotStartUtcIso: string,
+): ParticipantSummaryGroups {
+  const groups = emptyParticipantSummaryGroups()
+
+  getOrderedParticipants(event.participants, currentName).forEach((participant) => {
+    const value = getParticipantSlotValue(participant, slotStartUtcIso)
+    const displayName = participant.name === currentName ? 'You' : participant.name
+
+    if (value === 1) {
+      groups.yes.push(displayName)
+
+      return
+    }
+
+    if (value === 2) {
+      groups.maybe.push(displayName)
+
+      return
+    }
+
+    groups.no.push(displayName)
+  })
+
+  return groups
+}
+
+export function buildDisplayModel(slotStartsUtcIso: string[]): DisplayModel {
   const slots: DisplaySlot[] = []
+  const dayMap = new Map<string, DisplayDay>()
+  const timeMap = new Map<string, DisplayTime>()
+  const slotByDayTime: DisplayModel['slotByDayTime'] = {}
 
   slotStartsUtcIso.forEach((slotStartUtcIso, slotIndex) => {
     const date = parseISO(slotStartUtcIso)
-
     const dayKey = lightFormat(date, 'yyyy-MM-dd')
     const dayLabel = intlFormat(date, {
       weekday: 'short',
@@ -269,53 +332,40 @@ export function buildDisplaySlots(slotStartsUtcIso: string[]): DisplaySlot[] {
       hour: 'numeric',
       minute: '2-digit',
     })
-
-    slots.push({
+    const slot = {
       slotIndex,
       startUtcIso: slotStartUtcIso,
       dayKey,
       dayLabel,
       timeKey,
       timeLabel,
-    })
-  })
-
-  return slots
-}
-
-export function buildDisplayDays(slots: DisplaySlot[]): DisplayDay[] {
-  const dayMap = new Map<string, DisplayDay>()
-
-  slots.forEach((slot) => {
-    dayMap.set(slot.dayKey, {
-      key: slot.dayKey,
-      label: slot.dayLabel,
-    })
-  })
-
-  return [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key))
-}
-
-export function buildDisplayTimes(slots: DisplaySlot[]): DisplayTime[] {
-  const timeMap = new Map<string, DisplayTime>()
-
-  slots.forEach((slot) => {
-    const date = parseISO(slot.startUtcIso)
-
-    timeMap.set(slot.timeKey, {
-      key: slot.timeKey,
-      label: slot.timeLabel,
-      minutes: getHours(date) * 60 + getMinutes(date),
-    })
-  })
-
-  return [...timeMap.values()].sort((a, b) => {
-    if (a.minutes !== b.minutes) {
-      return a.minutes - b.minutes
     }
 
-    return a.key.localeCompare(b.key)
+    slots.push(slot)
+    dayMap.set(dayKey, {
+      key: dayKey,
+      label: dayLabel,
+    })
+    timeMap.set(timeKey, {
+      key: timeKey,
+      label: timeLabel,
+      minutes: getHours(date) * 60 + getMinutes(date),
+    })
+    slotByDayTime[`${dayKey}|${timeKey}`] = slot
   })
+
+  return {
+    slots,
+    days: [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    times: [...timeMap.values()].sort((a, b) => {
+      if (a.minutes !== b.minutes) {
+        return a.minutes - b.minutes
+      }
+
+      return a.key.localeCompare(b.key)
+    }),
+    slotByDayTime,
+  }
 }
 
 export function isEventConfirmed(

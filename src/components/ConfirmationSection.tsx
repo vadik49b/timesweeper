@@ -2,15 +2,18 @@ import { createMemo, createSignal, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import ConfirmationTable from './ConfirmationTable'
 import {
+  emptyParticipantSummaryGroups,
   getParticipantSlotValue,
+  getParticipantSummaryGroups,
+  getOrderedParticipants,
   hasParticipantAvailability,
   type AppEvent,
   type DisplaySlot,
+  type ParticipantSummaryGroups,
   type SlotValue,
 } from '../event-helpers'
 
 type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
-export type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
 export type SummaryIntersectionTime = DisplaySlot
 type SummaryIntersectionDate = {
   day: string
@@ -19,7 +22,6 @@ type SummaryIntersectionDate = {
 }
 type SummaryIntersection = {
   key: string
-  allGroups: SummaryGroups
   score: number
   canAttend: number
   kind: 'best' | 'almost' | 'partial'
@@ -27,7 +29,7 @@ type SummaryIntersection = {
 }
 type SummarySplitRow = {
   key: string
-  groups: SummaryGroups
+  groups: ParticipantSummaryGroups
   yesCount: number
   maybeCount: number
   noCount: number
@@ -44,62 +46,8 @@ interface Props {
 
 const SPLIT_ROWS_PREVIEW_COUNT = 10
 
-function emptySummaryGroups(): SummaryGroups {
-  return {
-    yes: [],
-    maybe: [],
-    no: [],
-  }
-}
-
 export default function ConfirmationSection(props: Props) {
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
-
-  function peopleGroupsForSlot(slotIndex: number): SummaryGroups {
-    const slot = props.displaySlots[slotIndex]
-
-    if (!slot) {
-      return emptySummaryGroups()
-    }
-
-    const participantNames = [
-      ...props.event.participants.map((participant) => participant.name),
-    ].sort((a, b) => {
-      if (a === props.currentName) {
-        return -1
-      }
-
-      if (b === props.currentName) {
-        return 1
-      }
-
-      return a.localeCompare(b)
-    })
-
-    const groups = emptySummaryGroups()
-
-    participantNames.forEach((name) => {
-      const participant = props.event.participants.find((entry) => entry.name === name)
-      const value = getParticipantSlotValue(participant, slot.startUtcIso)
-      const displayName = name === props.currentName ? 'You' : name
-
-      if (value === 1) {
-        groups.yes.push(displayName)
-
-        return
-      }
-
-      if (value === 2) {
-        groups.maybe.push(displayName)
-
-        return
-      }
-
-      groups.no.push(displayName)
-    })
-
-    return groups
-  }
 
   function timesByDayEntries(slots: SummaryIntersectionTime[]) {
     const timesByDay = new Map<string, string[]>()
@@ -124,25 +72,12 @@ export default function ConfirmationSection(props: Props) {
       return []
     }
 
-    const participantNames = [
-      ...props.event.participants.map((participant) => participant.name),
-    ].sort((a, b) => {
-      if (a === props.currentName) {
-        return -1
-      }
-
-      if (b === props.currentName) {
-        return 1
-      }
-
-      return 0
-    })
+    const orderedParticipants = getOrderedParticipants(props.event.participants, props.currentName)
     const dayOrder = new Map<string, number>()
     const intersections = new Map<
       string,
       {
         key: string
-        allGroups: SummaryGroups
         score: number
         canAttend: number
         kind: 'best' | 'almost' | 'partial'
@@ -155,14 +90,12 @@ export default function ConfirmationSection(props: Props) {
         dayOrder.set(slot.dayKey, dayOrder.size)
       }
 
-      const cells: SummaryCell[] = participantNames.map((name) => {
-        const participant = props.event.participants.find((entry) => entry.name === name)
+      const cells: SummaryCell[] = orderedParticipants.map((participant) => {
         const value = getParticipantSlotValue(participant, slot.startUtcIso)
-
         return {
-          name,
+          name: participant.name,
           value,
-          isCurrent: name === props.currentName,
+          isCurrent: participant.name === props.currentName,
         }
       })
       const yesCount = cells.filter((cell) => cell.value === 1).length
@@ -177,23 +110,11 @@ export default function ConfirmationSection(props: Props) {
       const noCount = cells.length - canAttend
       const kind = noCount === 0 ? 'best' : noCount === 1 ? 'almost' : 'partial'
       const key = cells.map((cell) => String(cell.value)).join('')
-      const allGroups: SummaryGroups = {
-        yes: cells
-          .filter((cell) => cell.value === 1)
-          .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
-        maybe: cells
-          .filter((cell) => cell.value === 2)
-          .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
-        no: cells
-          .filter((cell) => cell.value === 0)
-          .map((cell) => (cell.isCurrent ? 'You' : cell.name)),
-      }
       const existing = intersections.get(key)
 
       if (!existing) {
         intersections.set(key, {
           key,
-          allGroups,
           score,
           canAttend,
           kind,
@@ -239,7 +160,6 @@ export default function ConfirmationSection(props: Props) {
 
       return {
         key: entry.key,
-        allGroups: entry.allGroups,
         score: entry.score,
         canAttend: entry.canAttend,
         kind: entry.kind,
@@ -274,7 +194,9 @@ export default function ConfirmationSection(props: Props) {
     return summaryIntersections().map((intersection) => {
       const slots = intersection.dates.flatMap((dateGroup) => dateGroup.times)
       const first = slots[0]
-      const groups = first ? peopleGroupsForSlot(first.slotIndex) : emptySummaryGroups()
+      const groups = first
+        ? getParticipantSummaryGroups(props.event, props.currentName, first.startUtcIso)
+        : emptyParticipantSummaryGroups()
 
       return {
         key: intersection.key,

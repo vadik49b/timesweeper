@@ -1,6 +1,5 @@
 import { createSignal, Show, Suspense, lazy, onMount } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
-import { touchRecentEvent } from './db'
 
 const Landing = lazy(() => import('./Landing'))
 const Grid = lazy(() => import('./Grid'))
@@ -16,14 +15,6 @@ export default function App() {
     parseEventIdFromPath(window.location.pathname),
   )
 
-  function touchRecentSilently(id: string | null) {
-    if (!id) {
-      return
-    }
-
-    touchRecentEvent(id)
-  }
-
   function navigateToEvent(id: string) {
     const nextPath = `/e/${encodeURIComponent(id)}`
 
@@ -32,18 +23,13 @@ export default function App() {
     }
 
     setEventId(id)
-    touchRecentSilently(id)
   }
 
   onMount(() => {
     const onPopState = () => {
-      const id = parseEventIdFromPath(window.location.pathname)
-      setEventId(id)
-      touchRecentSilently(id)
+      setEventId(parseEventIdFromPath(window.location.pathname))
     }
 
-    const initialId = parseEventIdFromPath(window.location.pathname)
-    touchRecentSilently(initialId)
     makeEventListener(window, 'popstate', onPopState)
   })
 

@@ -1,7 +1,6 @@
 import { createMergeableStore } from 'tinybase/mergeable-store'
-import { createStore, type Store } from 'tinybase/store'
+import type { Store } from 'tinybase/store'
 import { createIndexedDbPersister } from 'tinybase/persisters/persister-indexed-db'
-import { createLocalPersister } from 'tinybase/persisters/persister-browser'
 import {
   createWsSynchronizer,
   type WsSynchronizer,
@@ -17,9 +16,8 @@ const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
 const EVENT_CONFIRMED_BY_CELL = 'confirmedBy'
 const EVENT_CONFIRMED_START_UTC_CELL = 'confirmedStartUtc'
 const AVAILABILITY_TABLE = 'availability'
-const RECENTLY_OPENED_EVENTS_VALUE = 'recentlyOpenedEvents'
-const SELECTED_PARTICIPANTS_TABLE = 'selectedParticipants'
-const SELECTED_PARTICIPANT_NAME_CELL = 'name'
+const RECENT_EVENTS_STORAGE_KEY = 'timesweeper-recent-events'
+const SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX = 'timesweeper-selected-participant:'
 const MAX_RECENT_EVENTS = 5
 
 type EventRoomStore = ReturnType<typeof createMergeableStore>
@@ -34,7 +32,6 @@ let eventRoomId: string | null = null
 let eventRoomStorePromise: Promise<EventRoomStore> | null = null
 let eventRoomSynchronizer: WsSynchronizer<ReconnectingWebSocket> | null = null
 let eventRoomSyncPromise: Promise<void> | null = null
-const localStorePromise = createLocalStore()
 
 function eventSyncUrl(eventId: string): string {
   const origin = import.meta.env.VITE_WS_ORIGIN
@@ -51,50 +48,12 @@ function eventSyncUrl(eventId: string): string {
   return url.toString()
 }
 
-async function createLocalStore(): Promise<Store> {
-  const store = createStore()
-
-  store.setValuesSchema({
-    [RECENTLY_OPENED_EVENTS_VALUE]: { type: 'array', default: [] },
-  })
-
-  store.setTablesSchema({
-    [SELECTED_PARTICIPANTS_TABLE]: {
-      [SELECTED_PARTICIPANT_NAME_CELL]: { type: 'string' },
-    },
-  })
-
-  const persister = createLocalPersister(store, 'timesweeper-local-meta')
-
-  await persister.load()
-  await persister.startAutoSave()
-
-  return store
+export function getSelectedParticipantName(eventId: string): string | null {
+  return localStorage.getItem(`${SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX}${eventId}`)
 }
 
-export async function getSelectedParticipantName(eventId: string): Promise<string | null> {
-  const localStore = await localStorePromise
-  const selected = localStore.getCell(
-    SELECTED_PARTICIPANTS_TABLE,
-    eventId,
-    SELECTED_PARTICIPANT_NAME_CELL,
-  )
-
-  return typeof selected === 'string' ? selected : null
-}
-
-export async function setSelectedParticipantName(
-  eventId: string,
-  participantName: string,
-): Promise<void> {
-  const localStore = await localStorePromise
-
-  localStore.setCell(
-    SELECTED_PARTICIPANTS_TABLE,
-    eventId,
-    SELECTED_PARTICIPANT_NAME_CELL,
-    participantName,
-  )
+export function setSelectedParticipantName(eventId: string, participantName: string): void {
+  localStorage.setItem(`${SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX}${eventId}`, participantName)
 }
 
 function readSlotStartsUtcIsoFromStore(
@@ -236,39 +195,20 @@ function syncParticipantAvailability(
   })
 }
 
-function getRecentlyOpenedEvents(store: Store): RecentEventSummary[] {
-  const raw = store.getValue(RECENTLY_OPENED_EVENTS_VALUE)
-
-  if (!Array.isArray(raw)) {
-    return []
-  }
-
-  return raw
-    .filter((entry): entry is RecentEventSummary => {
-      if (!entry || typeof entry !== 'object') {
-        return false
-      }
-
-      const candidate = entry as Partial<RecentEventSummary>
-
-      return (
-        typeof candidate.id === 'string' &&
-        typeof candidate.name === 'string' &&
-        typeof candidate.created === 'number'
-      )
-    })
-    .slice(0, MAX_RECENT_EVENTS)
+function getRecentlyOpenedEvents(): RecentEventSummary[] {
+  return (
+    JSON.parse(localStorage.getItem(RECENT_EVENTS_STORAGE_KEY) ?? '[]') as RecentEventSummary[]
+  ).slice(0, MAX_RECENT_EVENTS)
 }
 
-async function pushRecentSummary(summary: RecentEventSummary): Promise<void> {
-  const localStore = await localStorePromise
-  const recentlyOpenedEvents = getRecentlyOpenedEvents(localStore)
+function pushRecentSummary(summary: RecentEventSummary): void {
+  const recentlyOpenedEvents = getRecentlyOpenedEvents()
   const nextRecentlyOpenedEvents = [
     summary,
     ...recentlyOpenedEvents.filter((entry) => entry.id !== summary.id),
   ].slice(0, MAX_RECENT_EVENTS)
 
-  localStore.setValue(RECENTLY_OPENED_EVENTS_VALUE, nextRecentlyOpenedEvents)
+  localStorage.setItem(RECENT_EVENTS_STORAGE_KEY, JSON.stringify(nextRecentlyOpenedEvents))
 }
 
 async function stopEventRoomSync(): Promise<void> {
@@ -375,42 +315,12 @@ async function requireWritableEventStore(eventId: string): Promise<EventRoomStor
   return requireOpenEventRoomStore(eventId)
 }
 
-export async function listRecentEvents(): Promise<RecentEventSummary[]> {
-  const localStore = await localStorePromise
-
-  return getRecentlyOpenedEvents(localStore)
+export function listRecentEvents(): RecentEventSummary[] {
+  return getRecentlyOpenedEvents()
 }
 
-export async function pushRecentEvent(summary: RecentEventSummary): Promise<void> {
-  await pushRecentSummary(summary)
-}
-
-export async function touchRecentEvent(eventId: string): Promise<void> {
-  const localStore = await localStorePromise
-  const recentlyOpenedEvents = getRecentlyOpenedEvents(localStore)
-  const existing = recentlyOpenedEvents.find((entry) => entry.id === eventId)
-
-  if (existing) {
-    await pushRecentSummary(existing)
-
-    return
-  }
-
-  const store =
-    eventRoomId === eventId && eventRoomStorePromise
-      ? await eventRoomStorePromise
-      : await loadEventRoomStore(eventId)
-  const event = readEventFromStore(store, eventId)
-
-  if (!event) {
-    return
-  }
-
-  await pushRecentSummary({
-    id: event.id,
-    name: event.name,
-    created: event.created,
-  })
+export function pushRecentEvent(summary: RecentEventSummary): void {
+  pushRecentSummary(summary)
 }
 
 export async function createEvent(event: AppEvent): Promise<void> {

@@ -68,9 +68,8 @@ export default function Landing(props: Props) {
   const participantInputRefs: HTMLInputElement[] = []
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  onMount(async () => {
-    const events = await listRecentEvents()
-    setRecentEvents(events.slice(0, 5))
+  onMount(() => {
+    setRecentEvents(listRecentEvents().slice(0, 5))
   })
 
   const calDays = createMemo(() => {
@@ -282,8 +281,8 @@ export default function Landing(props: Props) {
       })),
     }
     await createEvent(event)
-    await setSelectedParticipantName(event.id, participantNames[0])
-    await pushRecentEvent({ id: event.id, name: event.name, created: event.created })
+    setSelectedParticipantName(event.id, participantNames[0])
+    pushRecentEvent({ id: event.id, name: event.name, created: event.created })
     props.onOpenEvent(event.id)
   }
 
@@ -494,9 +493,9 @@ export default function Landing(props: Props) {
               <a
                 class="recent-item"
                 href={`/e/${e.id}`}
-                onClick={async (event) => {
+                onClick={(event) => {
                   event.preventDefault()
-                  await pushRecentEvent(e)
+                  pushRecentEvent(e)
                   props.onOpenEvent(e.id)
                 }}
               >

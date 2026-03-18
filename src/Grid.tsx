@@ -8,6 +8,7 @@ import {
   getEvent,
   getSelectedParticipantName,
   openEventStore,
+  pushRecentEvent,
   setSelectedParticipantName,
   subscribeEvent,
   unconfirmEvent,
@@ -26,12 +27,14 @@ import MineIcon from './icons/MineIcon'
 import {
   SLOT_DURATION,
   type AppEvent,
-  buildDisplayDays,
-  buildDisplaySlots,
-  buildDisplayTimes,
+  buildDisplayModel,
+  type DisplayModel,
+  emptyParticipantSummaryGroups,
   getEventSlotCount,
   getParticipantSlotValue,
+  getParticipantSummaryGroups,
   isEventConfirmed,
+  type ParticipantSummaryGroups,
   type SlotValue,
   type Participant,
   participantStatusSummary,
@@ -41,7 +44,12 @@ interface Props {
   eventId: string
 }
 
-type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
+const EMPTY_DISPLAY: DisplayModel = {
+  slots: [],
+  days: [],
+  times: [],
+  slotByDayTime: {},
+}
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
@@ -49,17 +57,15 @@ export default function Grid(props: Props) {
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
   const [newParticipantName, setNewParticipantName] = createSignal('')
 
-  const displaySlots = createMemo(() => {
+  const display = createMemo(() => {
     const ev = event()
 
-    if (!ev) {
-      return []
-    }
-
-    return buildDisplaySlots(ev.slotStartsUtcIso)
+    return ev ? buildDisplayModel(ev.slotStartsUtcIso) : EMPTY_DISPLAY
   })
-  const days = createMemo(() => buildDisplayDays(displaySlots()))
-  const times = createMemo(() => buildDisplayTimes(displaySlots()))
+  const displaySlots = () => display().slots
+  const days = () => display().days
+  const times = () => display().times
+  const slotByDayTime = () => display().slotByDayTime
 
   const [currentName, setCurrentName] = createSignal('')
   const currentParticipant = createMemo(() => {
@@ -115,51 +121,13 @@ export default function Grid(props: Props) {
     return `${window.location.origin}/e/${props.eventId}`
   }
 
-  function peopleGroupsForSlot(slotIndex: number): SummaryGroups {
+  function peopleGroupsForSlot(slotIndex: number): ParticipantSummaryGroups {
     const ev = event()
+    const slot = displaySlots()[slotIndex]
 
-    if (!ev) {
-      return emptySummaryGroups()
-    }
-
-    const slot = displaySlots()[slotIndex]!
-
-    const participantNames = [...ev.participants.map((participant) => participant.name)].sort(
-      (a, b) => {
-        if (a === currentName()) {
-          return -1
-        }
-
-        if (b === currentName()) {
-          return 1
-        }
-
-        return a.localeCompare(b)
-      },
-    )
-    const groups = emptySummaryGroups()
-
-    participantNames.forEach((name) => {
-      const participant = ev.participants.find((entry) => entry.name === name)
-      const value = getParticipantSlotValue(participant, slot.startUtcIso)
-      const displayName = name === currentName() ? 'You' : name
-
-      if (value === 1) {
-        groups.yes.push(displayName)
-
-        return
-      }
-
-      if (value === 2) {
-        groups.maybe.push(displayName)
-
-        return
-      }
-
-      groups.no.push(displayName)
-    })
-
-    return groups
+    return ev && slot
+      ? getParticipantSummaryGroups(ev, currentName(), slot.startUtcIso)
+      : emptyParticipantSummaryGroups()
   }
 
   async function cycleCell(slotIndex: number) {
@@ -217,15 +185,6 @@ export default function Grid(props: Props) {
       navigator.vibrate(10)
     }
   }
-
-  function emptySummaryGroups(): SummaryGroups {
-    return {
-      yes: [],
-      maybe: [],
-      no: [],
-    }
-  }
-
   function openConfirm(slotIndex: number | null) {
     setConfirmCandidates(null)
     setConfirmSlotIndex(slotIndex ?? displaySlots()[0]?.slotIndex ?? null)
@@ -432,7 +391,8 @@ export default function Grid(props: Props) {
       name: updated.name,
       participants: updated.participants,
     })
-    await setSelectedParticipantName(updated.id, nextSelected)
+    setSelectedParticipantName(updated.id, nextSelected)
+    pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
 
     setEvent(updated)
     setCurrentName(nextSelected)
@@ -460,11 +420,11 @@ export default function Grid(props: Props) {
     }
   }
 
-  const confirmSlotPreview = createMemo<SummaryGroups>(() => {
+  const confirmSlotPreview = createMemo<ParticipantSummaryGroups>(() => {
     const slotIndex = confirmSlotIndex()
 
     if (slotIndex === null || slotIndex < 0) {
-      return emptySummaryGroups()
+      return emptyParticipantSummaryGroups()
     }
 
     return peopleGroupsForSlot(slotIndex)
@@ -545,7 +505,7 @@ export default function Grid(props: Props) {
     const info = confirmedInfo()
 
     if (!info || info.slotIndex === null) {
-      return emptySummaryGroups()
+      return emptyParticipantSummaryGroups()
     }
 
     return peopleGroupsForSlot(info.slotIndex)
@@ -687,7 +647,7 @@ export default function Grid(props: Props) {
     }
   }
 
-  async function selectParticipant(name: string) {
+  function selectParticipant(name: string) {
     const ev = event()
 
     if (!ev) {
@@ -700,13 +660,9 @@ export default function Grid(props: Props) {
       return
     }
 
-    await setSelectedParticipantName(ev.id, name)
+    setSelectedParticipantName(ev.id, name)
     setCurrentName(name)
     setActiveModal(null)
-  }
-
-  function selectParticipantSafely(name: string): void {
-    selectParticipant(name).catch(() => {})
   }
 
   async function addParticipantFromPicker() {
@@ -741,15 +697,16 @@ export default function Grid(props: Props) {
       name: updated.name,
       participants: updated.participants,
     })
-    await setSelectedParticipantName(updated.id, trimmed)
+    setSelectedParticipantName(updated.id, trimmed)
+    pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
     setEvent(updated)
     setCurrentName(trimmed)
     setNewParticipantName('')
     setActiveModal(null)
   }
 
-  async function initializeSelectedParticipant(ev: AppEvent) {
-    const savedName = await getSelectedParticipantName(ev.id)
+  function initializeSelectedParticipant(ev: AppEvent) {
+    const savedName = getSelectedParticipantName(ev.id)
     const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
 
     if (savedName && exists) {
@@ -810,14 +767,12 @@ export default function Grid(props: Props) {
     ]
   })
 
-  async function onParticipantPickerChange(name: string) {
+  function onParticipantPickerChange(name: string) {
     if (!name) {
       return
     }
 
-    try {
-      await selectParticipant(name)
-    } catch {}
+    selectParticipant(name)
   }
 
   createEffect(() => {
@@ -902,7 +857,8 @@ export default function Grid(props: Props) {
 
         if (initial) {
           setEvent(initial)
-          await initializeSelectedParticipant(initial)
+          pushRecentEvent({ id: initial.id, name: initial.name, created: initial.created })
+          initializeSelectedParticipant(initial)
         } else {
           setLoadError('not-found')
         }
@@ -1063,7 +1019,7 @@ export default function Grid(props: Props) {
                               <AvailabilityGrid
                                 days={days()}
                                 times={times()}
-                                displaySlots={displaySlots()}
+                                slotByDayTime={slotByDayTime()}
                                 selectedSlots={selectedSlots()}
                                 isConfirmed={isConfirmed()}
                                 onCycle={cycleCell}
@@ -1207,7 +1163,7 @@ export default function Grid(props: Props) {
                                 : ''
                             }`}
                             onClick={() => {
-                              selectParticipantSafely(participant.name)
+                              selectParticipant(participant.name)
                             }}
                           >
                             {participant.name}
