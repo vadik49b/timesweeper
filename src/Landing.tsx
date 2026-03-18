@@ -1,4 +1,12 @@
 import { createSignal, createMemo, createEffect, onMount, For, Index, Show } from 'solid-js'
+import {
+  addMinutes,
+  getDaysInMonth,
+  intlFormat,
+  isSameDay,
+  lightFormat,
+  startOfToday,
+} from 'date-fns'
 import { nanoid } from 'nanoid'
 import { SLOT_DURATION, type AppEvent } from './event-helpers'
 import {
@@ -14,30 +22,21 @@ import ErrorDialog from './components/ErrorDialog'
 import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
 
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
 const DOWS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const TIMES = (() => {
   const out: { label: string; value: string }[] = []
-  for (let h = 0; h < 24; h++) {
-    for (const m of [0, 30]) {
-      const hh = h % 12 || 12
-      const ampm = h < 12 ? 'AM' : 'PM'
-      const mm = m === 0 ? '00' : '30'
-      out.push({ label: `${hh}:${mm} ${ampm}`, value: `${String(h).padStart(2, '0')}:${mm}` })
-    }
+  let current = new Date(2000, 0, 1, 0, 0, 0, 0)
+  const end = new Date(2000, 0, 2, 0, 0, 0, 0)
+
+  while (current < end) {
+    out.push({
+      label: intlFormat(current, {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+      value: lightFormat(current, 'HH:mm'),
+    })
+    current = addMinutes(current, SLOT_DURATION)
   }
 
   return out
@@ -48,8 +47,7 @@ interface Props {
 }
 
 export default function Landing(props: Props) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = startOfToday()
 
   const [calYear, setCalYear] = createSignal(today.getFullYear())
   const [calMonth, setCalMonth] = createSignal(today.getMonth())
@@ -79,7 +77,7 @@ export default function Landing(props: Props) {
       startDow = 6
     }
 
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const daysInMonth = getDaysInMonth(first)
     const days: {
       day: number | null
       ds: string | null
@@ -91,12 +89,12 @@ export default function Landing(props: Props) {
       days.push({ day: null, ds: null, isPast: false, isToday: false, isSelected: false })
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d)
-      const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      const ds = lightFormat(date, 'yyyy-MM-dd')
       days.push({
         day: d,
         ds,
         isPast: date < today,
-        isToday: date.getTime() === today.getTime(),
+        isToday: isSameDay(date, today),
         isSelected: !!selectedDates()[ds],
       })
     }
@@ -111,12 +109,12 @@ export default function Landing(props: Props) {
       return 'No dates selected'
     }
 
-    const labels = keys.map((ds) => {
-      const [y, m, d] = ds.split('-').map(Number)
-      const dt = new Date(y, m - 1, d)
-
-      return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()] + ' ' + d
-    })
+    const labels = keys.map((ds) =>
+      intlFormat(new Date(`${ds}T00:00:00`), {
+        weekday: 'short',
+        day: 'numeric',
+      }),
+    )
 
     return `${labels.join(', ')} (${keys.length} day${keys.length > 1 ? 's' : ''})`
   })
@@ -196,18 +194,15 @@ export default function Landing(props: Props) {
   })
 
   function buildSlotStartsUtc(dates: string[], start: string, end: string): number[] {
-    const [startHour, startMinute] = start.split(':').map(Number)
-    const [endHour, endMinute] = end.split(':').map(Number)
     const slotStartsUtc: number[] = []
 
     dates.forEach((day) => {
-      const [year, month, date] = day.split('-').map(Number)
-      const current = new Date(year, month - 1, date, startHour, startMinute, 0, 0)
-      const endDate = new Date(year, month - 1, date, endHour, endMinute, 0, 0)
+      let current = new Date(`${day}T${start}:00`)
+      const endDate = new Date(`${day}T${end}:00`)
 
       while (current.getTime() < endDate.getTime()) {
         slotStartsUtc.push(current.getTime())
-        current.setMinutes(current.getMinutes() + SLOT_DURATION)
+        current = addMinutes(current, SLOT_DURATION)
       }
     })
 
@@ -328,7 +323,10 @@ export default function Landing(props: Props) {
                 &lt;
               </Win95Button>
               <span>
-                {MONTHS[calMonth()]} {calYear()}
+                {intlFormat(new Date(calYear(), calMonth(), 1), {
+                  month: 'long',
+                  year: 'numeric',
+                })}
               </span>
               <Win95Button
                 size="small"
@@ -356,7 +354,7 @@ export default function Landing(props: Props) {
                     disabled={day.day === null || day.isPast}
                     aria-label={
                       day.ds
-                        ? new Date(`${day.ds}T00:00:00`).toLocaleDateString('en-US', {
+                        ? intlFormat(new Date(`${day.ds}T00:00:00`), {
                             weekday: 'long',
                             month: 'long',
                             day: 'numeric',
@@ -497,11 +495,7 @@ export default function Landing(props: Props) {
                 </span>
                 {e.name}
                 <span class="recent-date">
-                  |{' '}
-                  {new Date(e.created).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
+                  | {intlFormat(new Date(e.created), { month: 'short', day: 'numeric' })}
                 </span>
               </a>
             ))

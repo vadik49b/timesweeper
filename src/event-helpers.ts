@@ -1,3 +1,5 @@
+import { intlFormat, lightFormat } from 'date-fns'
+
 export const SLOT_DURATION = 30
 
 export type SlotValue = 0 | 1 | 2
@@ -56,65 +58,6 @@ export interface AppEvent {
   participants: Participant[]
 }
 
-function pad2(value: number): string {
-  return String(value).padStart(2, '0')
-}
-
-function localDayKeyFromDate(date: Date): string {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
-}
-
-function localTimeKeyFromDate(date: Date): string {
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
-}
-
-export function getSlotEndUtcMs(startUtcMs: number): number {
-  return startUtcMs + SLOT_DURATION * 60_000
-}
-
-export function formatSlotDayLabel(startUtcMs: number): string {
-  const date = new Date(startUtcMs)
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]
-
-  return `${dow} ${date.getDate()}`
-}
-
-export function formatSlotFullDayLabel(startUtcMs: number): string {
-  return new Date(startUtcMs).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-export function formatSlotLongDayLabel(startUtcMs: number): string {
-  return new Date(startUtcMs).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
-export function formatSlotTimeLabel(startUtcMs: number): string {
-  return new Date(startUtcMs).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-export function getDisplaySlot(startUtcMs: number, slotIndex: number): DisplaySlot {
-  const date = new Date(startUtcMs)
-
-  return {
-    slotIndex,
-    dayKey: localDayKeyFromDate(date),
-    dayLabel: formatSlotDayLabel(startUtcMs),
-    timeKey: localTimeKeyFromDate(date),
-    timeLabel: formatSlotTimeLabel(startUtcMs),
-  }
-}
-
 export function buildAvailabilityGridModel(slotStartsUtc: number[]): AvailabilityGridModel {
   const dayMap = new Map<string, DisplayDay>()
   const timeMap = new Map<string, DisplayTime>()
@@ -122,20 +65,36 @@ export function buildAvailabilityGridModel(slotStartsUtc: number[]): Availabilit
   const slotIndexByDayAndTime: Record<string, Record<string, number>> = {}
 
   slotStartsUtc.forEach((startUtcMs, slotIndex) => {
-    const displaySlot = getDisplaySlot(startUtcMs, slotIndex)
     const date = new Date(startUtcMs)
-
-    dayMap.set(displaySlot.dayKey, {
-      key: displaySlot.dayKey,
-      label: displaySlot.dayLabel,
+    const dayKey = lightFormat(date, 'yyyy-MM-dd')
+    const dayLabel = intlFormat(date, {
+      weekday: 'short',
+      day: 'numeric',
     })
-    timeMap.set(displaySlot.timeKey, {
-      key: displaySlot.timeKey,
-      label: displaySlot.timeLabel,
+    const timeKey = lightFormat(date, 'HH:mm')
+    const timeLabel = intlFormat(date, {
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    const displaySlot: DisplaySlot = {
+      slotIndex,
+      dayKey,
+      dayLabel,
+      timeKey,
+      timeLabel,
+    }
+
+    dayMap.set(dayKey, {
+      key: dayKey,
+      label: dayLabel,
+    })
+    timeMap.set(timeKey, {
+      key: timeKey,
+      label: timeLabel,
       minutes: date.getHours() * 60 + date.getMinutes(),
     })
-    slotIndexByDayAndTime[displaySlot.dayKey] ??= {}
-    slotIndexByDayAndTime[displaySlot.dayKey][displaySlot.timeKey] = slotIndex
+    slotIndexByDayAndTime[dayKey] ??= {}
+    slotIndexByDayAndTime[dayKey][timeKey] = slotIndex
     slots.push(displaySlot)
   })
 

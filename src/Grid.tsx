@@ -1,6 +1,7 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
+import { addMinutes, intlFormat } from 'date-fns'
 import {
   closeEventStore,
   getEvent,
@@ -21,12 +22,9 @@ import ConfirmationSection, { type SummaryIntersectionTime } from './components/
 import ParticipantStatusList from './components/ParticipantStatusList'
 import MineIcon from './icons/MineIcon'
 import {
+  SLOT_DURATION,
   type AppEvent,
   buildAvailabilityGridModel,
-  formatSlotFullDayLabel,
-  formatSlotLongDayLabel,
-  formatSlotTimeLabel,
-  getSlotEndUtcMs,
   type SlotValue,
   type Participant,
   participantStatusSummary,
@@ -506,16 +504,36 @@ export default function Grid(props: Props) {
       return null
     }
 
-    const endUtcMs = getSlotEndUtcMs(startUtcMs)
+    const startDate = new Date(startUtcMs)
+    const endDate = addMinutes(startDate, SLOT_DURATION)
+    const dayLabel = intlFormat(startDate, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    const heroDayLabel = intlFormat(startDate, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    })
+    const start = intlFormat(startDate, {
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    const end = intlFormat(endDate, {
+      hour: 'numeric',
+      minute: '2-digit',
+    })
 
     return {
-      dayLabel: formatSlotFullDayLabel(startUtcMs),
-      heroDayLabel: formatSlotLongDayLabel(startUtcMs),
-      start: formatSlotTimeLabel(startUtcMs),
-      end: formatSlotTimeLabel(endUtcMs),
+      dayLabel,
+      heroDayLabel,
+      start,
+      end,
       slotIndex: ev.confirmedSlotIndex,
       startUtcMs,
-      endUtcMs,
+      endUtcMs: endDate.getTime(),
     }
   })
   const isConfirmed = createMemo(() => !!confirmedInfo())
