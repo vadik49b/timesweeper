@@ -52,10 +52,16 @@ const EMPTY_DISPLAY: DisplayModel = {
   slotByDayTime: {},
 }
 
+const LOADING_MESSAGES = [
+  'Loading event...',
+  'Connecting to the event. First load on a new device can take a few seconds.',
+  'Still connecting. This can take a little longer on a new device.',
+]
+
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
   const [localReady, setLocalReady] = createSignal(false)
-  const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
+  const [loadingMessageIndex, setLoadingMessageIndex] = createSignal(0)
   const [newParticipantName, setNewParticipantName] = createSignal('')
 
   const display = createMemo(() => {
@@ -700,6 +706,25 @@ export default function Grid(props: Props) {
     }
   }
 
+  function applyLoadedEvent(next: AppEvent) {
+    const previous = event()
+
+    setEvent(next)
+
+    if (
+      !previous ||
+      previous.id !== next.id ||
+      previous.name !== next.name ||
+      previous.created !== next.created
+    ) {
+      pushRecentEvent({ id: next.id, name: next.name, created: next.created })
+    }
+
+    if (!previous) {
+      initializeSelectedParticipant(next)
+    }
+  }
+
   const confirmDateTimeOptions = createMemo(() => {
     const candidates = confirmCandidates()
 
@@ -774,6 +799,11 @@ export default function Grid(props: Props) {
   onMount(() => {
     let unsubscribe: (() => void) | null = null
     let isDisposed = false
+    const loadingMessageTimer = window.setInterval(() => {
+      if (!event()) {
+        setLoadingMessageIndex((index) => (index + 1) % LOADING_MESSAGES.length)
+      }
+    }, 3000)
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -801,6 +831,8 @@ export default function Grid(props: Props) {
     makeEventListener(document, 'keydown', onKeyDown)
 
     onCleanup(() => {
+      window.clearInterval(loadingMessageTimer)
+
       if (unsubscribe) {
         unsubscribe()
       }
@@ -822,13 +854,8 @@ export default function Grid(props: Props) {
 
         unsubscribe = await subscribeEvent(props.eventId, (next) => {
           if (next) {
-            setEvent(next)
-            setLoadError('none')
-
-            return
+            applyLoadedEvent(next)
           }
-
-          setLoadError('not-found')
         })
 
         const initial = await getEvent(props.eventId)
@@ -838,37 +865,18 @@ export default function Grid(props: Props) {
         }
 
         if (initial) {
-          setEvent(initial)
-          pushRecentEvent({ id: initial.id, name: initial.name, created: initial.created })
-          initializeSelectedParticipant(initial)
-        } else {
-          setLoadError('not-found')
+          applyLoadedEvent(initial)
         }
       } catch {
-        setLoadError('network')
       } finally {
         setLocalReady(true)
       }
     }
 
-    initialize().catch(() => {
-      try {
-        setLoadError('network')
-      } catch {}
-    })
+    initialize().catch(() => {})
   })
 
-  const loadingOverlayText = createMemo(() => {
-    if (loadError() === 'network') {
-      return 'Could not reach server to load this event.'
-    }
-
-    if (loadError() === 'not-found') {
-      return 'Event not found in local cache or on server.'
-    }
-
-    return 'Loading participants...'
-  })
+  const loadingOverlayText = createMemo(() => LOADING_MESSAGES[loadingMessageIndex()])
 
   return (
     <>
