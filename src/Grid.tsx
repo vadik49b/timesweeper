@@ -4,12 +4,14 @@ import { Title, Meta } from '@solidjs/meta'
 import { addMinutes, intlFormat, parseISO } from 'date-fns'
 import {
   closeEventStore,
+  confirmEvent,
   getEvent,
   getSelectedParticipantName,
   openEventStore,
-  saveEvent,
   setSelectedParticipantName,
   subscribeEvent,
+  unconfirmEvent,
+  updateEventSettings,
   updateParticipantSlot,
 } from './db'
 import Win95Field from './components/Win95Field'
@@ -256,7 +258,7 @@ export default function Grid(props: Props) {
       confirmedBy: confirmer,
       confirmedStartUtc: confirmedSlot.startUtcIso,
     }
-    await saveEvent(updated)
+    await confirmEvent(ev.id, confirmer, confirmedSlot.startUtcIso)
     setEvent(updated)
     setActiveModal(null)
   }
@@ -273,7 +275,7 @@ export default function Grid(props: Props) {
       confirmedBy: undefined,
       confirmedStartUtc: undefined,
     }
-    await saveEvent(updated)
+    await unconfirmEvent(ev.id)
     setEvent(updated)
     setActiveModal(null)
   }
@@ -426,7 +428,10 @@ export default function Grid(props: Props) {
       return
     }
 
-    await saveEvent(updated)
+    await updateEventSettings(updated.id, {
+      name: updated.name,
+      participants: updated.participants,
+    })
     await setSelectedParticipantName(updated.id, nextSelected)
 
     setEvent(updated)
@@ -732,7 +737,10 @@ export default function Grid(props: Props) {
       slots: {},
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
-    await saveEvent(updated)
+    await updateEventSettings(updated.id, {
+      name: updated.name,
+      participants: updated.participants,
+    })
     await setSelectedParticipantName(updated.id, trimmed)
     setEvent(updated)
     setCurrentName(trimmed)

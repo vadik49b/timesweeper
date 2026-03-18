@@ -111,7 +111,7 @@ function readSlotStartsUtcIsoFromStore(
 }
 
 function readParticipantNamesFromStore(store: Store, eventId: string): string[] {
-  return store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]
+  return (store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]) ?? []
 }
 
 function readConfirmedFieldsFromStore(
@@ -163,6 +163,77 @@ function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | 
     ...confirmed,
     participants,
   }
+}
+
+function writeEventMeta(store: EventRoomStore, event: Pick<AppEvent, 'id' | 'name' | 'created'>): void {
+  store.setCell(EVENT_META_TABLE, event.id, EVENT_NAME_CELL, event.name)
+  store.setCell(EVENT_META_TABLE, event.id, EVENT_CREATED_CELL, event.created)
+}
+
+function writeEventSlots(
+  store: EventRoomStore,
+  event: Pick<AppEvent, 'id' | 'slotStartsUtcIso'>,
+): void {
+  store.setCell(EVENT_META_TABLE, event.id, EVENT_SLOT_STARTS_UTC_ISO_CELL, event.slotStartsUtcIso)
+}
+
+function writeParticipantNames(
+  store: EventRoomStore,
+  eventId: string,
+  participants: Participant[],
+): void {
+  store.setCell(
+    EVENT_META_TABLE,
+    eventId,
+    EVENT_PARTICIPANT_NAMES_CELL,
+    participants.map((participant) => participant.name),
+  )
+}
+
+function writeConfirmation(
+  store: EventRoomStore,
+  eventId: string,
+  confirmedBy?: string,
+  confirmedStartUtc?: string,
+): void {
+  if (confirmedBy?.trim() && confirmedStartUtc) {
+    store.setCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_BY_CELL, confirmedBy)
+    store.setCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_START_UTC_CELL, confirmedStartUtc)
+  } else {
+    store.delCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_BY_CELL, true)
+    store.delCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_START_UTC_CELL, true)
+  }
+}
+
+function syncParticipantAvailability(
+  store: EventRoomStore,
+  participants: Participant[],
+): void {
+  const nextParticipantNames = new Set(participants.map((participant) => participant.name))
+
+  if (store.hasTable(AVAILABILITY_TABLE)) {
+    store.getRowIds(AVAILABILITY_TABLE).forEach((rowId) => {
+      if (!nextParticipantNames.has(String(rowId))) {
+        store.delRow(AVAILABILITY_TABLE, rowId)
+      }
+    })
+  }
+
+  participants.forEach((participant) => {
+    const nextAvailabilityCellIds = new Set(Object.keys(participant.slots))
+
+    Object.entries(participant.slots).forEach(([slotStartUtcIso, slotValue]) => {
+      store.setCell(AVAILABILITY_TABLE, participant.name, slotStartUtcIso, slotValue)
+    })
+
+    if (store.hasRow(AVAILABILITY_TABLE, participant.name)) {
+      Object.keys(store.getRow(AVAILABILITY_TABLE, participant.name)).forEach((cellId) => {
+        if (!nextAvailabilityCellIds.has(cellId)) {
+          store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true)
+        }
+      })
+    }
+  })
 }
 
 function getRecentlyOpenedEvents(store: Store): RecentEventSummary[] {
@@ -296,72 +367,12 @@ export async function closeEventStore(eventId?: string): Promise<void> {
   eventRoomStorePromise = null
 }
 
-function writeNormalizedEvent(store: EventRoomStore, event: AppEvent): void {
-  store.transaction(() => {
-    store.setCell(EVENT_META_TABLE, event.id, EVENT_NAME_CELL, event.name)
-    store.setCell(EVENT_META_TABLE, event.id, EVENT_CREATED_CELL, event.created)
-    store.setCell(
-      EVENT_META_TABLE,
-      event.id,
-      EVENT_SLOT_STARTS_UTC_ISO_CELL,
-      event.slotStartsUtcIso,
-    )
-    store.setCell(
-      EVENT_META_TABLE,
-      event.id,
-      EVENT_PARTICIPANT_NAMES_CELL,
-      event.participants.map((participant) => participant.name),
-    )
-
-    if (event.confirmedBy?.trim() && event.confirmedStartUtc) {
-      store.setCell(EVENT_META_TABLE, event.id, EVENT_CONFIRMED_BY_CELL, event.confirmedBy)
-      store.setCell(
-        EVENT_META_TABLE,
-        event.id,
-        EVENT_CONFIRMED_START_UTC_CELL,
-        event.confirmedStartUtc,
-      )
-    } else {
-      store.delCell(EVENT_META_TABLE, event.id, EVENT_CONFIRMED_BY_CELL, true)
-      store.delCell(EVENT_META_TABLE, event.id, EVENT_CONFIRMED_START_UTC_CELL, true)
-    }
-
-    const nextParticipantNames = new Set(event.participants.map((participant) => participant.name))
-
-    if (store.hasTable(AVAILABILITY_TABLE)) {
-      store.getRowIds(AVAILABILITY_TABLE).forEach((rowId) => {
-        if (!nextParticipantNames.has(String(rowId))) {
-          store.delRow(AVAILABILITY_TABLE, rowId)
-        }
-      })
-    }
-
-    event.participants.forEach((participant) => {
-      const nextAvailabilityCellIds = new Set(Object.keys(participant.slots))
-
-      Object.entries(participant.slots).forEach(([slotStartUtcIso, slotValue]) => {
-        store.setCell(AVAILABILITY_TABLE, participant.name, slotStartUtcIso, slotValue)
-      })
-
-      if (store.hasRow(AVAILABILITY_TABLE, participant.name)) {
-        Object.keys(store.getRow(AVAILABILITY_TABLE, participant.name)).forEach((cellId) => {
-          if (!nextAvailabilityCellIds.has(cellId)) {
-            store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true)
-          }
-        })
-      }
-    })
-  })
-}
-
-async function pushEventToRoomStore(event: AppEvent): Promise<void> {
-  if (!eventRoomStorePromise || eventRoomId !== event.id) {
-    await openEventStore(event.id)
+async function requireWritableEventStore(eventId: string): Promise<EventRoomStore> {
+  if (!eventRoomStorePromise || eventRoomId !== eventId) {
+    await openEventStore(eventId)
   }
 
-  const store = await requireOpenEventRoomStore(event.id)
-
-  writeNormalizedEvent(store, event)
+  return requireOpenEventRoomStore(eventId)
 }
 
 export async function listRecentEvents(): Promise<RecentEventSummary[]> {
@@ -402,8 +413,54 @@ export async function touchRecentEvent(eventId: string): Promise<void> {
   })
 }
 
-export async function saveEvent(event: AppEvent): Promise<void> {
-  await pushEventToRoomStore(event)
+export async function createEvent(event: AppEvent): Promise<void> {
+  const store = await requireWritableEventStore(event.id)
+
+  store.transaction(() => {
+    writeEventMeta(store, event)
+    writeEventSlots(store, event)
+    writeParticipantNames(store, event.id, event.participants)
+    writeConfirmation(store, event.id, event.confirmedBy, event.confirmedStartUtc)
+    syncParticipantAvailability(store, event.participants)
+  })
+}
+
+export async function updateEventSettings(
+  eventId: string,
+  settings: Pick<AppEvent, 'name' | 'participants'>,
+): Promise<void> {
+  const store = await requireWritableEventStore(eventId)
+  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL) as number
+
+  store.transaction(() => {
+    writeEventMeta(store, {
+      id: eventId,
+      name: settings.name,
+      created,
+    })
+    writeParticipantNames(store, eventId, settings.participants)
+    syncParticipantAvailability(store, settings.participants)
+  })
+}
+
+export async function confirmEvent(
+  eventId: string,
+  confirmedBy: string,
+  confirmedStartUtc: string,
+): Promise<void> {
+  const store = await requireWritableEventStore(eventId)
+
+  store.transaction(() => {
+    writeConfirmation(store, eventId, confirmedBy, confirmedStartUtc)
+  })
+}
+
+export async function unconfirmEvent(eventId: string): Promise<void> {
+  const store = await requireWritableEventStore(eventId)
+
+  store.transaction(() => {
+    writeConfirmation(store, eventId)
+  })
 }
 
 export async function getEvent(id: string): Promise<AppEvent | undefined> {

@@ -15,9 +15,9 @@ import {
   type AppEvent,
 } from './event-helpers'
 import {
+  createEvent,
   listRecentEvents,
   pushRecentEvent,
-  saveEvent,
   setSelectedParticipantName,
   type RecentEventSummary,
 } from './db'
@@ -280,7 +280,7 @@ export default function Landing(props: Props) {
         slots: {},
       })),
     }
-    await saveEvent(event)
+    await createEvent(event)
     await setSelectedParticipantName(event.id, participantNames[0])
     await pushRecentEvent({ id: event.id, name: event.name, created: event.created })
     props.onOpenEvent(event.id)
