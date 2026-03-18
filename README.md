@@ -43,17 +43,13 @@ AppEvent {
   created: number
   confirmedBy?: string
   confirmedStartUtc?: string
-  dates: string[]
-  slotMinutes: number
-  defaultWindowStartMin: number
-  defaultWindowEndMin: number
-  defaultWindowTimezone: string
+  slotStartsUtcIso: string[]
   participants: Participant[]
 }
 
 Participant {
   name: string
-  slots: (0|1|2)[]
+  slots: Record<string, 1|2>
 }
 ```
 

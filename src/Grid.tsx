@@ -1,7 +1,7 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
-import { addMinutes, intlFormat, isValid, parseISO } from 'date-fns'
+import { addMinutes, intlFormat, parseISO } from 'date-fns'
 import {
   closeEventStore,
   getEvent,
@@ -28,6 +28,7 @@ import {
   buildDisplaySlots,
   buildDisplayTimes,
   getEventSlotCount,
+  getParticipantSlotValue,
   isEventConfirmed,
   type SlotValue,
   type Participant,
@@ -53,7 +54,7 @@ export default function Grid(props: Props) {
       return []
     }
 
-    return buildDisplaySlots(ev)
+    return buildDisplaySlots(ev.slotStartsUtcIso)
   })
   const days = createMemo(() => buildDisplayDays(displaySlots()))
   const times = createMemo(() => buildDisplayTimes(displaySlots()))
@@ -69,7 +70,7 @@ export default function Grid(props: Props) {
 
     return ev.participants.find((entry) => entry.name === name) ?? null
   })
-  const selectedSlots = createMemo(() => currentParticipant()?.slots ?? [])
+  const selectedSlots = createMemo(() => currentParticipant()?.slots ?? {})
 
   type ActiveModal = null | 'name-picker' | 'help' | 'confirm' | 'settings' | 'undo-confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
@@ -119,6 +120,8 @@ export default function Grid(props: Props) {
       return emptySummaryGroups()
     }
 
+    const slot = displaySlots()[slotIndex]!
+
     const participantNames = [...ev.participants.map((participant) => participant.name)].sort(
       (a, b) => {
         if (a === currentName()) {
@@ -136,7 +139,7 @@ export default function Grid(props: Props) {
 
     participantNames.forEach((name) => {
       const participant = ev.participants.find((entry) => entry.name === name)
-      const value = (participant?.slots[slotIndex] ?? 0) as SlotValue
+      const value = getParticipantSlotValue(participant, slot.startUtcIso)
       const displayName = name === currentName() ? 'You' : name
 
       if (value === 1) {
@@ -175,17 +178,24 @@ export default function Grid(props: Props) {
       return
     }
 
-    const prev = participant.slots[slotIndex] ?? 0
+    const slot = displaySlots()[slotIndex]!
+
+    const prev = getParticipantSlotValue(participant, slot.startUtcIso)
     const next = (prev + 1) % 3
 
     if (prev === next) {
       return
     }
 
-    const nextSlots = [...participant.slots]
-    nextSlots[slotIndex] = next as SlotValue
+    const nextSlots = { ...participant.slots }
 
-    await updateParticipantSlot(ev.id, name, slotIndex, next as SlotValue)
+    if (next === 0) {
+      delete nextSlots[slot.startUtcIso]
+    } else {
+      nextSlots[slot.startUtcIso] = next as SlotValue
+    }
+
+    await updateParticipantSlot(ev.id, name, slot.startUtcIso, next as SlotValue)
 
     const nextEvent: AppEvent = {
       ...ev,
@@ -239,16 +249,12 @@ export default function Grid(props: Props) {
       return
     }
 
-    const confirmedSlot = displaySlots().find((slot) => slot.slotIndex === slotIndex)
-
-    if (!confirmedSlot) {
-      return
-    }
+    const confirmedSlot = displaySlots()[slotIndex]!
 
     const updated: AppEvent = {
       ...ev,
       confirmedBy: confirmer,
-      confirmedStartUtc: new Date(confirmedSlot.startUtcMs).toISOString(),
+      confirmedStartUtc: confirmedSlot.startUtcIso,
     }
     await saveEvent(updated)
     setEvent(updated)
@@ -396,7 +402,7 @@ export default function Grid(props: Props) {
 
         const newParticipant: Participant = {
           name,
-          slots: new Array(getEventSlotCount(ev)).fill(0) as SlotValue[],
+          slots: {},
         }
 
         return newParticipant
@@ -493,14 +499,11 @@ export default function Grid(props: Props) {
       return null
     }
 
-    const startUtcDate = parseISO(ev.confirmedStartUtc!)
+    const confirmedStartUtc = ev.confirmedStartUtc!
+    const startUtcDate = parseISO(confirmedStartUtc)
     const startUtcMs = startUtcDate.getTime()
 
-    if (!isValid(startUtcDate)) {
-      return null
-    }
-
-    const confirmedSlot = displaySlots().find((slot) => slot.startUtcMs === startUtcMs)
+    const confirmedSlot = displaySlots().find((slot) => slot.startUtcIso === confirmedStartUtc)
     const endDate = addMinutes(startUtcDate, SLOT_DURATION)
     const dayLabel = intlFormat(startUtcDate, {
       weekday: 'long',
@@ -726,7 +729,7 @@ export default function Grid(props: Props) {
 
     const newP: Participant = {
       name: trimmed,
-      slots: new Array(getEventSlotCount(ev)).fill(0) as SlotValue[],
+      slots: {},
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)

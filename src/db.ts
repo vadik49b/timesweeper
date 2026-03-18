@@ -2,22 +2,17 @@ import { createMergeableStore } from 'tinybase/mergeable-store'
 import { createStore, type Store } from 'tinybase/store'
 import { createIndexedDbPersister } from 'tinybase/persisters/persister-indexed-db'
 import { createLocalPersister } from 'tinybase/persisters/persister-browser'
-import { isValid, parseISO } from 'date-fns'
 import {
   createWsSynchronizer,
   type WsSynchronizer,
 } from 'tinybase/synchronizers/synchronizer-ws-client'
 import ReconnectingWebSocket from 'reconnecting-websocket'
-import { getEventSlotCount, type AppEvent, type Participant, type SlotValue } from './event-helpers'
+import type { AppEvent, Participant, SlotValue } from './event-helpers'
 
 const EVENT_META_TABLE = 'eventMeta'
 const EVENT_NAME_CELL = 'name'
 const EVENT_CREATED_CELL = 'created'
-const EVENT_DATES_CELL = 'dates'
-const EVENT_SLOT_MINUTES_CELL = 'slotMinutes'
-const EVENT_DEFAULT_WINDOW_START_MIN_CELL = 'defaultWindowStartMin'
-const EVENT_DEFAULT_WINDOW_END_MIN_CELL = 'defaultWindowEndMin'
-const EVENT_DEFAULT_WINDOW_TIMEZONE_CELL = 'defaultWindowTimezone'
+const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
 const EVENT_CONFIRMED_BY_CELL = 'confirmedBy'
 const EVENT_CONFIRMED_START_UTC_CELL = 'confirmedStartUtc'
 const PARTICIPANTS_TABLE = 'participants'
@@ -56,20 +51,6 @@ function eventSyncUrl(eventId: string): string {
   url.pathname = `/api/events/${encodeURIComponent(eventId)}`
 
   return url.toString()
-}
-
-function slotCellId(slotIndex: number): string {
-  return `s${slotIndex}`
-}
-
-function parseSlotIndex(slotId: string): number | null {
-  if (!slotId.startsWith('s')) {
-    return null
-  }
-
-  const value = Number(slotId.slice(1))
-
-  return Number.isInteger(value) && value >= 0 ? value : null
 }
 
 async function createLocalStore(): Promise<Store> {
@@ -118,56 +99,16 @@ export async function setSelectedParticipantName(
   )
 }
 
-function readScheduleFromStore(
+function readSlotStartsUtcIsoFromStore(
   store: Store,
   eventId: string,
-): Pick<
-  AppEvent,
-  | 'dates'
-  | 'slotMinutes'
-  | 'defaultWindowStartMin'
-  | 'defaultWindowEndMin'
-  | 'defaultWindowTimezone'
-> | null {
-  const dates = store.getCell(EVENT_META_TABLE, eventId, EVENT_DATES_CELL)
-  const slotMinutes = store.getCell(EVENT_META_TABLE, eventId, EVENT_SLOT_MINUTES_CELL)
-  const defaultWindowStartMin = store.getCell(
-    EVENT_META_TABLE,
-    eventId,
-    EVENT_DEFAULT_WINDOW_START_MIN_CELL,
-  )
-  const defaultWindowEndMin = store.getCell(
-    EVENT_META_TABLE,
-    eventId,
-    EVENT_DEFAULT_WINDOW_END_MIN_CELL,
-  )
-  const defaultWindowTimezone = store.getCell(
-    EVENT_META_TABLE,
-    eventId,
-    EVENT_DEFAULT_WINDOW_TIMEZONE_CELL,
-  )
-  const parsedDates = Array.isArray(dates)
-    ? dates.filter((date): date is string => typeof date === 'string')
-    : null
-  const rawDatesLength = Array.isArray(dates) ? dates.length : -1
-
-  if (
-    !parsedDates ||
-    parsedDates.length !== rawDatesLength ||
-    typeof slotMinutes !== 'number' ||
-    typeof defaultWindowStartMin !== 'number' ||
-    typeof defaultWindowEndMin !== 'number' ||
-    typeof defaultWindowTimezone !== 'string'
-  ) {
-    return null
-  }
-
+): Pick<AppEvent, 'slotStartsUtcIso'> {
   return {
-    dates: parsedDates,
-    slotMinutes,
-    defaultWindowStartMin,
-    defaultWindowEndMin,
-    defaultWindowTimezone,
+    slotStartsUtcIso: store.getCell(
+      EVENT_META_TABLE,
+      eventId,
+      EVENT_SLOT_STARTS_UTC_ISO_CELL,
+    ) as string[],
   }
 }
 
@@ -178,22 +119,15 @@ function readConfirmedFieldsFromStore(
   const confirmedBy = store.getCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_BY_CELL)
   const confirmedStartUtc = store.getCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_START_UTC_CELL)
 
-  if (
-    typeof confirmedBy !== 'string' ||
-    !confirmedBy.trim() ||
-    typeof confirmedStartUtc !== 'string' ||
-    !isValid(parseISO(confirmedStartUtc))
-  ) {
-    return {}
-  }
-
-  return {
-    confirmedBy,
-    confirmedStartUtc,
-  }
+  return typeof confirmedBy === 'string' && typeof confirmedStartUtc === 'string'
+    ? {
+        confirmedBy,
+        confirmedStartUtc,
+      }
+    : {}
 }
 
-function readParticipantsFromStore(store: Store, slotCount: number): Participant[] {
+function readParticipantsFromStore(store: Store): Participant[] {
   if (!store.hasTable(PARTICIPANTS_TABLE)) {
     return []
   }
@@ -224,27 +158,11 @@ function readParticipantsFromStore(store: Store, slotCount: number): Participant
       return a.name.localeCompare(b.name)
     })
     .map((participant) => {
-      const slots = new Array(slotCount).fill(0) as SlotValue[]
-
-      if (store.hasRow(AVAILABILITY_TABLE, participant.rowId)) {
-        const availabilityRow = store.getRow(AVAILABILITY_TABLE, participant.rowId)
-
-        Object.entries(availabilityRow).forEach(([cellId, rawValue]) => {
-          const slotIndex = parseSlotIndex(cellId)
-
-          if (slotIndex === null || slotIndex >= slotCount) {
-            return
-          }
-
-          if (rawValue === 0 || rawValue === 1 || rawValue === 2) {
-            slots[slotIndex] = rawValue
-          }
-        })
-      }
-
       return {
         name: participant.name,
-        slots,
+        slots: store.hasRow(AVAILABILITY_TABLE, participant.rowId)
+          ? ({ ...store.getRow(AVAILABILITY_TABLE, participant.rowId) } as Participant['slots'])
+          : {},
       }
     })
 }
@@ -261,20 +179,15 @@ function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | 
     return undefined
   }
 
-  const schedule = readScheduleFromStore(store, eventId)
-
-  if (!schedule) {
-    return undefined
-  }
-
-  const participants = readParticipantsFromStore(store, getEventSlotCount(schedule))
+  const slotStartsUtcIso = readSlotStartsUtcIsoFromStore(store, eventId)
+  const participants = readParticipantsFromStore(store)
   const confirmed = readConfirmedFieldsFromStore(store, eventId)
 
   return {
     id: eventId,
     name,
     created,
-    ...schedule,
+    ...slotStartsUtcIso,
     ...confirmed,
     participants,
   }
@@ -413,29 +326,13 @@ export async function closeEventStore(eventId?: string): Promise<void> {
 
 function writeNormalizedEvent(store: EventRoomStore, event: AppEvent): void {
   store.transaction(() => {
-    const slotCount = getEventSlotCount(event)
-
     store.setCell(EVENT_META_TABLE, event.id, EVENT_NAME_CELL, event.name)
     store.setCell(EVENT_META_TABLE, event.id, EVENT_CREATED_CELL, event.created)
-    store.setCell(EVENT_META_TABLE, event.id, EVENT_DATES_CELL, event.dates)
-    store.setCell(EVENT_META_TABLE, event.id, EVENT_SLOT_MINUTES_CELL, event.slotMinutes)
     store.setCell(
       EVENT_META_TABLE,
       event.id,
-      EVENT_DEFAULT_WINDOW_START_MIN_CELL,
-      event.defaultWindowStartMin,
-    )
-    store.setCell(
-      EVENT_META_TABLE,
-      event.id,
-      EVENT_DEFAULT_WINDOW_END_MIN_CELL,
-      event.defaultWindowEndMin,
-    )
-    store.setCell(
-      EVENT_META_TABLE,
-      event.id,
-      EVENT_DEFAULT_WINDOW_TIMEZONE_CELL,
-      event.defaultWindowTimezone,
+      EVENT_SLOT_STARTS_UTC_ISO_CELL,
+      event.slotStartsUtcIso,
     )
 
     if (event.confirmedBy?.trim() && event.confirmedStartUtc) {
@@ -468,22 +365,11 @@ function writeNormalizedEvent(store: EventRoomStore, event: AppEvent): void {
       store.setCell(PARTICIPANTS_TABLE, participant.name, PARTICIPANT_NAME_CELL, participant.name)
       store.setCell(PARTICIPANTS_TABLE, participant.name, PARTICIPANT_ORDER_CELL, order)
 
-      const nextAvailabilityCellIds = new Set<string>()
+      const nextAvailabilityCellIds = new Set(Object.keys(participant.slots))
 
-      for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
-        const slotValue = participant.slots[slotIndex] ?? 0
-        const cellId = slotCellId(slotIndex)
-
-        nextAvailabilityCellIds.add(cellId)
-
-        if (slotValue === 0) {
-          store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true)
-
-          return
-        }
-
-        store.setCell(AVAILABILITY_TABLE, participant.name, cellId, slotValue)
-      }
+      Object.entries(participant.slots).forEach(([slotStartUtcIso, slotValue]) => {
+        store.setCell(AVAILABILITY_TABLE, participant.name, slotStartUtcIso, slotValue)
+      })
 
       if (store.hasRow(AVAILABILITY_TABLE, participant.name)) {
         Object.keys(store.getRow(AVAILABILITY_TABLE, participant.name)).forEach((cellId) => {
@@ -573,29 +459,20 @@ export async function subscribeEvent(
 export async function updateParticipantSlot(
   eventId: string,
   name: string,
-  slotIndex: number,
+  slotStartUtcIso: string,
   value: SlotValue,
 ): Promise<void> {
   const store = await requireOpenEventRoomStore(eventId)
-  const schedule = readScheduleFromStore(store, eventId)
 
-  if (!schedule) {
-    return
-  }
-
-  if (
-    !store.hasRow(PARTICIPANTS_TABLE, name) ||
-    slotIndex < 0 ||
-    slotIndex >= getEventSlotCount(schedule)
-  ) {
+  if (!store.hasRow(PARTICIPANTS_TABLE, name)) {
     return
   }
 
   if (value === 0) {
-    store.delCell(AVAILABILITY_TABLE, name, slotCellId(slotIndex), true)
+    store.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
 
     return
   }
 
-  store.setCell(AVAILABILITY_TABLE, name, slotCellId(slotIndex), value)
+  store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value)
 }

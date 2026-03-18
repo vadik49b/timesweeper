@@ -8,18 +8,19 @@ import {
   isValid,
   lightFormat,
   parse,
+  parseISO,
 } from 'date-fns'
 
 export const SLOT_DURATION = 30
 
 export type SlotValue = 0 | 1 | 2
 
-export interface EventScheduleFields {
+export interface SlotGenerationInput {
   dates: string[]
   slotMinutes: number
-  defaultWindowStartMin: number
-  defaultWindowEndMin: number
-  defaultWindowTimezone: string
+  windowStartMin: number
+  windowEndMin: number
+  timezone: string
 }
 
 export interface ParticipantSummaryGroups {
@@ -34,9 +35,11 @@ export interface ParticipantStatusRow {
   label: 'yes' | 'maybe' | 'no'
 }
 
+export type SlotMap = Record<string, SlotValue>
+
 export interface Participant {
   name: string
-  slots: SlotValue[]
+  slots: SlotMap
 }
 
 export interface DisplayDay {
@@ -52,7 +55,7 @@ export interface DisplayTime {
 
 export interface DisplaySlot {
   slotIndex: number
-  startUtcMs: number
+  startUtcIso: string
   dayKey: string
   dayLabel: string
   timeKey: string
@@ -65,11 +68,7 @@ export interface AppEvent {
   created: number
   confirmedBy?: string
   confirmedStartUtc?: string
-  dates: string[]
-  slotMinutes: number
-  defaultWindowStartMin: number
-  defaultWindowEndMin: number
-  defaultWindowTimezone: string
+  slotStartsUtcIso: string[]
   participants: Participant[]
 }
 
@@ -203,67 +202,82 @@ export function parseTimeStringToMinutes(value: string): number | null {
   return getHours(parsed) * 60 + getMinutes(parsed)
 }
 
-export function getEventSlotsPerDay(
-  event: Pick<EventScheduleFields, 'slotMinutes' | 'defaultWindowStartMin' | 'defaultWindowEndMin'>,
+export function getSlotsPerDay(
+  input: Pick<SlotGenerationInput, 'slotMinutes' | 'windowStartMin' | 'windowEndMin'>,
 ): number {
-  if (event.slotMinutes <= 0) {
+  if (input.slotMinutes <= 0) {
     return 0
   }
 
-  const duration = event.defaultWindowEndMin - event.defaultWindowStartMin
+  const duration = input.windowEndMin - input.windowStartMin
 
-  if (duration <= 0 || duration % event.slotMinutes !== 0) {
+  if (duration <= 0 || duration % input.slotMinutes !== 0) {
     return 0
   }
 
-  return duration / event.slotMinutes
+  return duration / input.slotMinutes
 }
 
-export function getEventSlotCount(
-  event: Pick<
-    EventScheduleFields,
-    'dates' | 'slotMinutes' | 'defaultWindowStartMin' | 'defaultWindowEndMin'
-  >,
-): number {
-  return event.dates.length * getEventSlotsPerDay(event)
-}
+export function buildSlotStartsUtcIso(input: SlotGenerationInput): string[] {
+  const slots: string[] = []
+  const slotsPerDay = getSlotsPerDay(input)
 
-export function buildDisplaySlots(event: EventScheduleFields): DisplaySlot[] {
-  const slots: DisplaySlot[] = []
-  const slotsPerDay = getEventSlotsPerDay(event)
-
-  event.dates.forEach((dateKey, dayIndex) => {
+  input.dates.forEach((dateKey) => {
     for (let offset = 0; offset < slotsPerDay; offset += 1) {
-      const minute = event.defaultWindowStartMin + offset * event.slotMinutes
-      const startUtcMs = zonedDateTimeToUtcMs(dateKey, minute, event.defaultWindowTimezone)
+      const minute = input.windowStartMin + offset * input.slotMinutes
+      const startUtcMs = zonedDateTimeToUtcMs(dateKey, minute, input.timezone)
 
       if (startUtcMs === null) {
         continue
       }
 
-      const slotIndex = dayIndex * slotsPerDay + offset
-      const date = new Date(startUtcMs)
-      const dayKey = lightFormat(date, 'yyyy-MM-dd')
-      const dayLabel = intlFormat(date, {
-        weekday: 'short',
-        day: 'numeric',
-      })
-      const timeKey = lightFormat(date, 'HH:mm')
-      const timeLabel = intlFormat(date, {
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-      const displaySlot: DisplaySlot = {
-        slotIndex,
-        startUtcMs,
-        dayKey,
-        dayLabel,
-        timeKey,
-        timeLabel,
-      }
-
-      slots.push(displaySlot)
+      slots.push(new Date(startUtcMs).toISOString())
     }
+  })
+
+  return slots
+}
+
+export function getEventSlotCount(event: Pick<AppEvent, 'slotStartsUtcIso'>): number {
+  return event.slotStartsUtcIso.length
+}
+
+export function getParticipantSlotValue(
+  participant: Pick<Participant, 'slots'> | null | undefined,
+  slotStartUtcIso: string,
+): SlotValue {
+  return (participant?.slots[slotStartUtcIso] ?? 0) as SlotValue
+}
+
+export function hasParticipantAvailability(participant: Pick<Participant, 'slots'>): boolean {
+  return Object.keys(participant.slots).length > 0
+}
+
+export function buildDisplaySlots(slotStartsUtcIso: string[]): DisplaySlot[] {
+  const slots: DisplaySlot[] = []
+
+  slotStartsUtcIso.forEach((slotStartUtcIso, slotIndex) => {
+    const date = parseISO(slotStartUtcIso)
+
+    const dayKey = lightFormat(date, 'yyyy-MM-dd')
+    const dayLabel = intlFormat(date, {
+      weekday: 'short',
+      day: 'numeric',
+    })
+    const timeKey = lightFormat(date, 'HH:mm')
+    const timeLabel = intlFormat(date, {
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+
+    slots.push({
+      slotIndex,
+      startUtcIso: slotStartUtcIso,
+      dayKey,
+      dayLabel,
+      timeKey,
+      timeLabel,
+    })
   })
 
   return slots
@@ -286,7 +300,7 @@ export function buildDisplayTimes(slots: DisplaySlot[]): DisplayTime[] {
   const timeMap = new Map<string, DisplayTime>()
 
   slots.forEach((slot) => {
-    const date = new Date(slot.startUtcMs)
+    const date = parseISO(slot.startUtcIso)
 
     timeMap.set(slot.timeKey, {
       key: slot.timeKey,

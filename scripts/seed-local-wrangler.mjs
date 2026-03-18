@@ -150,6 +150,22 @@ function buildDates(days) {
   return out
 }
 
+function buildSlotStartsUtcIso(dates, startMins, endMins) {
+  const slots = []
+
+  for (const dateKey of dates) {
+    for (let minute = startMins; minute < endMins; minute += SLOT_MINUTES) {
+      const hours = Math.floor(minute / 60)
+      const mins = minute % 60
+      const localDate = new Date(`${dateKey}T${pad2(hours)}:${pad2(mins)}:00`)
+
+      slots.push(localDate.toISOString())
+    }
+  }
+
+  return slots
+}
+
 function randomChoice(noRate, maybeRate) {
   const r = Math.random()
 
@@ -205,8 +221,16 @@ function makeName(index) {
   return `${f} ${l} ${suffix + 1}`
 }
 
-function buildParticipant(name, slotCount, noRate, maybeRate) {
-  const slots = Array.from({ length: slotCount }, () => randomChoice(noRate, maybeRate))
+function buildParticipant(name, slotStartsUtcIso, noRate, maybeRate) {
+  const slots = {}
+
+  for (const slotStartUtcIso of slotStartsUtcIso) {
+    const value = randomChoice(noRate, maybeRate)
+
+    if (value > 0) {
+      slots[slotStartUtcIso] = value
+    }
+  }
 
   return {
     name,
@@ -258,7 +282,7 @@ async function main() {
   }
 
   const dates = buildDates(config.days)
-  const slotCount = ((endMins - startMins) / SLOT_MINUTES) * dates.length
+  const slotStartsUtcIso = buildSlotStartsUtcIso(dates, startMins, endMins)
   const baseUrl = normalizeBaseUrl(config.baseUrl)
   const appUrl = normalizeBaseUrl(config.appUrl)
   const created = []
@@ -269,18 +293,16 @@ async function main() {
 
     for (let personIndex = 0; personIndex < config.participants; personIndex += 1) {
       const personName = makeName(eventIndex * config.participants + personIndex)
-      participants.push(buildParticipant(personName, slotCount, config.noRate, config.maybeRate))
+      participants.push(
+        buildParticipant(personName, slotStartsUtcIso, config.noRate, config.maybeRate),
+      )
     }
 
     const event = {
       id,
       name: `Load Test Event ${eventIndex + 1}`,
       created: Date.now(),
-      dates,
-      slotMinutes: SLOT_MINUTES,
-      defaultWindowStartMin: startMins,
-      defaultWindowEndMin: endMins,
-      defaultWindowTimezone: 'America/Mexico_City',
+      slotStartsUtcIso,
       participants,
     }
 

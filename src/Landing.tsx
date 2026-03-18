@@ -9,7 +9,7 @@ import {
 } from 'date-fns'
 import { nanoid } from 'nanoid'
 import {
-  getEventSlotCount,
+  buildSlotStartsUtcIso,
   parseTimeStringToMinutes,
   SLOT_DURATION,
   type AppEvent,
@@ -256,16 +256,15 @@ export default function Landing(props: Props) {
 
     setParticipants(participantNames)
     setValidationError('')
-    const schedule = {
+    const slotStartsUtcIso = buildSlotStartsUtcIso({
       dates,
       slotMinutes: SLOT_DURATION,
-      defaultWindowStartMin,
-      defaultWindowEndMin,
-      defaultWindowTimezone: localTimezone,
-    }
-    const slotCount = getEventSlotCount(schedule)
+      windowStartMin: defaultWindowStartMin,
+      windowEndMin: defaultWindowEndMin,
+      timezone: localTimezone,
+    })
 
-    if (slotCount <= 0) {
+    if (slotStartsUtcIso.length === 0) {
       setValidationError('Please choose a valid time range.')
 
       return
@@ -275,10 +274,10 @@ export default function Landing(props: Props) {
       id: nanoid(),
       name: eventName().trim(),
       created: Date.now(),
-      ...schedule,
+      slotStartsUtcIso,
       participants: participantNames.map((name) => ({
         name: name.trim(),
-        slots: new Array(slotCount).fill(0) as (0 | 1 | 2)[],
+        slots: {},
       })),
     }
     await saveEvent(event)

@@ -1,7 +1,13 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import ConfirmationTable from './ConfirmationTable'
-import type { AppEvent, DisplaySlot, SlotValue } from '../event-helpers'
+import {
+  getParticipantSlotValue,
+  hasParticipantAvailability,
+  type AppEvent,
+  type DisplaySlot,
+  type SlotValue,
+} from '../event-helpers'
 
 type SummaryCell = { name: string; value: SlotValue; isCurrent: boolean }
 export type SummaryGroups = { yes: string[]; maybe: string[]; no: string[] }
@@ -50,6 +56,12 @@ export default function ConfirmationSection(props: Props) {
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
 
   function peopleGroupsForSlot(slotIndex: number): SummaryGroups {
+    const slot = props.displaySlots[slotIndex]
+
+    if (!slot) {
+      return emptySummaryGroups()
+    }
+
     const participantNames = [
       ...props.event.participants.map((participant) => participant.name),
     ].sort((a, b) => {
@@ -68,7 +80,7 @@ export default function ConfirmationSection(props: Props) {
 
     participantNames.forEach((name) => {
       const participant = props.event.participants.find((entry) => entry.name === name)
-      const value = (participant?.slots[slotIndex] ?? 0) as SlotValue
+      const value = getParticipantSlotValue(participant, slot.startUtcIso)
       const displayName = name === props.currentName ? 'You' : name
 
       if (value === 1) {
@@ -145,7 +157,7 @@ export default function ConfirmationSection(props: Props) {
 
       const cells: SummaryCell[] = participantNames.map((name) => {
         const participant = props.event.participants.find((entry) => entry.name === name)
-        const value = (participant?.slots[slot.slotIndex] ?? 0) as SlotValue
+        const value = getParticipantSlotValue(participant, slot.startUtcIso)
 
         return {
           name,
@@ -285,15 +297,14 @@ export default function ConfirmationSection(props: Props) {
     return all.slice(0, SPLIT_ROWS_PREVIEW_COUNT)
   })
   const participantsWithAvailability = createMemo(() => {
-    return props.event.participants.filter((participant) =>
-      participant.slots.some((value) => value > 0),
-    ).length
+    return props.event.participants.filter((participant) => hasParticipantAvailability(participant))
+      .length
   })
   const canShowSuggestions = createMemo(() => participantsWithAvailability() >= 2)
   const suggestionsHelperText = createMemo(() => {
     const pending = props.event.participants
       .filter((participant) => participant.name !== props.currentName)
-      .filter((participant) => participant.slots.every((value) => value === 0))
+      .filter((participant) => !hasParticipantAvailability(participant))
       .map((participant) => participant.name)
 
     if (summarySplitRows().length === 0) {
