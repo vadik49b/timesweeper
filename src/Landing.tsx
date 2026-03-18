@@ -8,7 +8,12 @@ import {
   startOfToday,
 } from 'date-fns'
 import { nanoid } from 'nanoid'
-import { SLOT_DURATION, type AppEvent } from './event-helpers'
+import {
+  getEventSlotCount,
+  parseTimeStringToMinutes,
+  SLOT_DURATION,
+  type AppEvent,
+} from './event-helpers'
 import {
   listRecentEvents,
   pushRecentEvent,
@@ -193,22 +198,6 @@ export default function Landing(props: Props) {
     })
   })
 
-  function buildSlotStartsUtc(dates: string[], start: string, end: string): number[] {
-    const slotStartsUtc: number[] = []
-
-    dates.forEach((day) => {
-      let current = new Date(`${day}T${start}:00`)
-      const endDate = new Date(`${day}T${end}:00`)
-
-      while (current.getTime() < endDate.getTime()) {
-        slotStartsUtc.push(current.getTime())
-        current = addMinutes(current, SLOT_DURATION)
-      }
-    })
-
-    return slotStartsUtc
-  }
-
   async function create() {
     if (!eventName().trim()) {
       setValidationError('Please enter an event name.')
@@ -223,11 +212,19 @@ export default function Landing(props: Props) {
       return
     }
 
-    if (timeStart() >= timeEnd()) {
+    const defaultWindowStartMin = parseTimeStringToMinutes(timeStart())
+    const defaultWindowEndMin = parseTimeStringToMinutes(timeEnd())
+
+    if (
+      defaultWindowStartMin === null ||
+      defaultWindowEndMin === null ||
+      defaultWindowStartMin >= defaultWindowEndMin
+    ) {
       setValidationError('Please choose a valid time range (start must be before end).')
 
       return
     }
+
     const trimmedParticipants = participants().map((p) => p.trim())
     const participantNames = trimmedParticipants.filter(Boolean)
 
@@ -259,16 +256,29 @@ export default function Landing(props: Props) {
 
     setParticipants(participantNames)
     setValidationError('')
-    const slotStartsUtc = buildSlotStartsUtc(dates, timeStart(), timeEnd())
+    const schedule = {
+      dates,
+      slotMinutes: SLOT_DURATION,
+      defaultWindowStartMin,
+      defaultWindowEndMin,
+      defaultWindowTimezone: localTimezone,
+    }
+    const slotCount = getEventSlotCount(schedule)
+
+    if (slotCount <= 0) {
+      setValidationError('Please choose a valid time range.')
+
+      return
+    }
+
     const event: AppEvent = {
       id: nanoid(),
       name: eventName().trim(),
       created: Date.now(),
-      status: 'open',
-      slotStartsUtc,
+      ...schedule,
       participants: participantNames.map((name) => ({
         name: name.trim(),
-        slots: new Array(slotStartsUtc.length).fill(0) as (0 | 1 | 2)[],
+        slots: new Array(slotCount).fill(0) as (0 | 1 | 2)[],
       })),
     }
     await saveEvent(event)

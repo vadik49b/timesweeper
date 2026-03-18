@@ -41,22 +41,19 @@ AppEvent {
   id: string
   name: string
   created: number
-  status: 'open' | 'confirmed'
-  maxParticipants: number
   confirmedBy?: string
-  confirmedSlot?: { date: string; startTime: string; endTime: string }
+  confirmedStartUtc?: string
   dates: string[]
-  timeRange: { start: string; end: string }
+  slotMinutes: number
+  defaultWindowStartMin: number
+  defaultWindowEndMin: number
+  defaultWindowTimezone: string
   participants: Participant[]
 }
 
 Participant {
   name: string
-  timezone: string
   slots: (0|1|2)[]
-  visitedAt: number | null
-  updatedAt: number | null
-  version?: number
 }
 ```
 
@@ -104,10 +101,12 @@ npm run dev
 ## Cloudflare API
 
 The websocket backend lives in:
+
 - `worker/src/worker.ts`
 - `worker/wrangler.toml`
 
 Current transport model:
+
 - frontend builds the websocket URL from `VITE_WS_ORIGIN`
 - frontend connects to `/api/events/:eventId` over WebSocket
 - in local dev, `VITE_WS_ORIGIN` should be `http://127.0.0.1:8787`
@@ -115,10 +114,12 @@ Current transport model:
 - the Durable Object worker handles websocket traffic directly on that hostname
 
 Frontend env vars:
+
 - production: `VITE_WS_ORIGIN=https://api.timesweeper.app`
 - local dev: `VITE_WS_ORIGIN=http://127.0.0.1:8787`
 
 WebSocket messages:
+
 - `{ type: "event.updated", event }`
 - `{ type: "participant.updated", eventId, participantName, slots, updatedAt, version }`
 

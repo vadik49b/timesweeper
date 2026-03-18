@@ -1,7 +1,7 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
-import { addMinutes, intlFormat } from 'date-fns'
+import { addMinutes, intlFormat, isValid, parseISO } from 'date-fns'
 import {
   closeEventStore,
   getEvent,
@@ -24,7 +24,11 @@ import MineIcon from './icons/MineIcon'
 import {
   SLOT_DURATION,
   type AppEvent,
-  buildAvailabilityGridModel,
+  buildDisplayDays,
+  buildDisplaySlots,
+  buildDisplayTimes,
+  getEventSlotCount,
+  isEventConfirmed,
   type SlotValue,
   type Participant,
   participantStatusSummary,
@@ -42,25 +46,17 @@ export default function Grid(props: Props) {
   const [loadError, setLoadError] = createSignal<'none' | 'not-found' | 'network'>('none')
   const [newParticipantName, setNewParticipantName] = createSignal('')
 
-  const gridModel = createMemo(() => {
+  const displaySlots = createMemo(() => {
     const ev = event()
 
     if (!ev) {
-      return {
-        days: [],
-        times: [],
-        slots: [],
-        slotIndexByDayAndTime: {},
-      }
+      return []
     }
 
-    return buildAvailabilityGridModel(ev.slotStartsUtc)
+    return buildDisplaySlots(ev)
   })
-
-  const days = createMemo(() => gridModel().days)
-  const times = createMemo(() => gridModel().times)
-  const displaySlots = createMemo(() => gridModel().slots)
-  const slotIndexByDayAndTime = createMemo(() => gridModel().slotIndexByDayAndTime)
+  const days = createMemo(() => buildDisplayDays(displaySlots()))
+  const times = createMemo(() => buildDisplayTimes(displaySlots()))
 
   const [currentName, setCurrentName] = createSignal('')
   const currentParticipant = createMemo(() => {
@@ -239,15 +235,20 @@ export default function Grid(props: Props) {
 
     const slotIndex = confirmSlotIndex()
 
-    if (slotIndex === null || slotIndex < 0 || slotIndex >= ev.slotStartsUtc.length) {
+    if (slotIndex === null || slotIndex < 0 || slotIndex >= getEventSlotCount(ev)) {
+      return
+    }
+
+    const confirmedSlot = displaySlots().find((slot) => slot.slotIndex === slotIndex)
+
+    if (!confirmedSlot) {
       return
     }
 
     const updated: AppEvent = {
       ...ev,
-      status: 'confirmed',
       confirmedBy: confirmer,
-      confirmedSlotIndex: slotIndex,
+      confirmedStartUtc: new Date(confirmedSlot.startUtcMs).toISOString(),
     }
     await saveEvent(updated)
     setEvent(updated)
@@ -263,9 +264,8 @@ export default function Grid(props: Props) {
 
     const updated: AppEvent = {
       ...ev,
-      status: 'open',
       confirmedBy: undefined,
-      confirmedSlotIndex: undefined,
+      confirmedStartUtc: undefined,
     }
     await saveEvent(updated)
     setEvent(updated)
@@ -396,7 +396,7 @@ export default function Grid(props: Props) {
 
         const newParticipant: Participant = {
           name,
-          slots: new Array(ev.slotStartsUtc.length).fill(0) as SlotValue[],
+          slots: new Array(getEventSlotCount(ev)).fill(0) as SlotValue[],
         }
 
         return newParticipant
@@ -489,35 +489,31 @@ export default function Grid(props: Props) {
   const confirmedInfo = createMemo(() => {
     const ev = event()
 
-    if (
-      !ev ||
-      ev.status !== 'confirmed' ||
-      typeof ev.confirmedSlotIndex !== 'number' ||
-      ev.confirmedSlotIndex < 0
-    ) {
+    if (!ev || !isEventConfirmed(ev)) {
       return null
     }
 
-    const startUtcMs = ev.slotStartsUtc[ev.confirmedSlotIndex]
+    const startUtcDate = parseISO(ev.confirmedStartUtc!)
+    const startUtcMs = startUtcDate.getTime()
 
-    if (typeof startUtcMs !== 'number') {
+    if (!isValid(startUtcDate)) {
       return null
     }
 
-    const startDate = new Date(startUtcMs)
-    const endDate = addMinutes(startDate, SLOT_DURATION)
-    const dayLabel = intlFormat(startDate, {
+    const confirmedSlot = displaySlots().find((slot) => slot.startUtcMs === startUtcMs)
+    const endDate = addMinutes(startUtcDate, SLOT_DURATION)
+    const dayLabel = intlFormat(startUtcDate, {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
       year: 'numeric',
     })
-    const heroDayLabel = intlFormat(startDate, {
+    const heroDayLabel = intlFormat(startUtcDate, {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
     })
-    const start = intlFormat(startDate, {
+    const start = intlFormat(startUtcDate, {
       hour: 'numeric',
       minute: '2-digit',
     })
@@ -531,15 +527,21 @@ export default function Grid(props: Props) {
       heroDayLabel,
       start,
       end,
-      slotIndex: ev.confirmedSlotIndex,
+      slotIndex: confirmedSlot?.slotIndex ?? null,
       startUtcMs,
       endUtcMs: endDate.getTime(),
     }
   })
   const isConfirmed = createMemo(() => !!confirmedInfo())
-  const confirmedPeopleGroups = createMemo(() =>
-    confirmedInfo() ? peopleGroupsForSlot(confirmedInfo()!.slotIndex) : emptySummaryGroups(),
-  )
+  const confirmedPeopleGroups = createMemo(() => {
+    const info = confirmedInfo()
+
+    if (!info || info.slotIndex === null) {
+      return emptySummaryGroups()
+    }
+
+    return peopleGroupsForSlot(info.slotIndex)
+  })
 
   function summaryDetailsText() {
     const ev = event()
@@ -724,7 +726,7 @@ export default function Grid(props: Props) {
 
     const newP: Participant = {
       name: trimmed,
-      slots: new Array(ev.slotStartsUtc.length).fill(0) as SlotValue[],
+      slots: new Array(getEventSlotCount(ev)).fill(0) as SlotValue[],
     }
     const updated: AppEvent = { ...ev, participants: [...ev.participants, newP] }
     await saveEvent(updated)
@@ -1050,8 +1052,8 @@ export default function Grid(props: Props) {
                               <AvailabilityGrid
                                 days={days()}
                                 times={times()}
+                                displaySlots={displaySlots()}
                                 selectedSlots={selectedSlots()}
-                                slotIndexByDayAndTime={slotIndexByDayAndTime()}
                                 isConfirmed={isConfirmed()}
                                 onCycle={cycleCell}
                               />

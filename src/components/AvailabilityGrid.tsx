@@ -1,4 +1,5 @@
 import { For, Show } from 'solid-js'
+import type { DisplaySlot } from '../event-helpers'
 
 type Day = {
   key: string
@@ -13,8 +14,8 @@ type Time = {
 interface Props {
   days: Day[]
   times: Time[]
+  displaySlots: DisplaySlot[]
   selectedSlots: number[]
-  slotIndexByDayAndTime: Record<string, Record<string, number>>
   isConfirmed: boolean
   onCycle: (slotIndex: number) => void
 }
@@ -59,7 +60,11 @@ export default function AvailabilityGrid(props: Props) {
         {(time, timeIndex) => (
           <For each={props.days}>
             {(day, dayIndex) => {
-              const slotIndex = () => props.slotIndexByDayAndTime[day.key]?.[time.key]
+              const slot = () =>
+                props.displaySlots.find(
+                  (candidate) => candidate.dayKey === day.key && candidate.timeKey === time.key,
+                )
+              const slotIndex = () => slot()?.slotIndex
               const slotValue = () => {
                 const nextSlotIndex = slotIndex()
 

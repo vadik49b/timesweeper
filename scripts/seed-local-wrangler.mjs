@@ -210,10 +210,7 @@ function buildParticipant(name, slotCount, noRate, maybeRate) {
 
   return {
     name,
-    timezone: 'America/Mexico_City',
     slots,
-    updatedAt: Date.now() - Math.floor(Math.random() * 60_000),
-    version: 1,
   }
 }
 
@@ -279,13 +276,11 @@ async function main() {
       id,
       name: `Load Test Event ${eventIndex + 1}`,
       created: Date.now(),
-      status: 'open',
-      maxParticipants: Math.max(config.participants, 5),
       dates,
-      timeRange: {
-        start: config.start,
-        end: config.end,
-      },
+      slotMinutes: SLOT_MINUTES,
+      defaultWindowStartMin: startMins,
+      defaultWindowEndMin: endMins,
+      defaultWindowTimezone: 'America/Mexico_City',
       participants,
     }
 

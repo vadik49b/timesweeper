@@ -1,8 +1,26 @@
-import { intlFormat, lightFormat } from 'date-fns'
+import {
+  getDate,
+  getHours,
+  getMinutes,
+  getMonth,
+  getYear,
+  intlFormat,
+  isValid,
+  lightFormat,
+  parse,
+} from 'date-fns'
 
 export const SLOT_DURATION = 30
 
 export type SlotValue = 0 | 1 | 2
+
+export interface EventScheduleFields {
+  dates: string[]
+  slotMinutes: number
+  defaultWindowStartMin: number
+  defaultWindowEndMin: number
+  defaultWindowTimezone: string
+}
 
 export interface ParticipantSummaryGroups {
   yes: string[]
@@ -34,82 +52,262 @@ export interface DisplayTime {
 
 export interface DisplaySlot {
   slotIndex: number
+  startUtcMs: number
   dayKey: string
   dayLabel: string
   timeKey: string
   timeLabel: string
 }
 
-export interface AvailabilityGridModel {
-  days: DisplayDay[]
-  times: DisplayTime[]
-  slots: DisplaySlot[]
-  slotIndexByDayAndTime: Record<string, Record<string, number>>
-}
-
 export interface AppEvent {
   id: string
   name: string
   created: number
-  status: 'open' | 'confirmed'
   confirmedBy?: string
-  confirmedSlotIndex?: number
-  slotStartsUtc: number[]
+  confirmedStartUtc?: string
+  dates: string[]
+  slotMinutes: number
+  defaultWindowStartMin: number
+  defaultWindowEndMin: number
+  defaultWindowTimezone: string
   participants: Participant[]
 }
 
-export function buildAvailabilityGridModel(slotStartsUtc: number[]): AvailabilityGridModel {
-  const dayMap = new Map<string, DisplayDay>()
-  const timeMap = new Map<string, DisplayTime>()
-  const slots: DisplaySlot[] = []
-  const slotIndexByDayAndTime: Record<string, Record<string, number>> = {}
+type ZonedDateTimeParts = {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}
 
-  slotStartsUtc.forEach((startUtcMs, slotIndex) => {
-    const date = new Date(startUtcMs)
-    const dayKey = lightFormat(date, 'yyyy-MM-dd')
-    const dayLabel = intlFormat(date, {
-      weekday: 'short',
-      day: 'numeric',
-    })
-    const timeKey = lightFormat(date, 'HH:mm')
-    const timeLabel = intlFormat(date, {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-    const displaySlot: DisplaySlot = {
-      slotIndex,
-      dayKey,
-      dayLabel,
-      timeKey,
-      timeLabel,
+const zonedDateTimeFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function getZonedDateTimeFormatter(timeZone: string): Intl.DateTimeFormat {
+  const existing = zonedDateTimeFormatters.get(timeZone)
+
+  if (existing) {
+    return existing
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+
+  zonedDateTimeFormatters.set(timeZone, formatter)
+
+  return formatter
+}
+
+function parseDateKey(dateKey: string): { year: number; month: number; day: number } | null {
+  const parsed = parse(dateKey, 'yyyy-MM-dd', new Date())
+
+  if (!isValid(parsed) || lightFormat(parsed, 'yyyy-MM-dd') !== dateKey) {
+    return null
+  }
+
+  return {
+    year: getYear(parsed),
+    month: getMonth(parsed) + 1,
+    day: getDate(parsed),
+  }
+}
+
+function toUtcCivilMs(parts: ZonedDateTimeParts): number {
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second, 0)
+}
+
+function getZonedDateTimeParts(utcMs: number, timeZone: string): ZonedDateTimeParts {
+  const formatter = getZonedDateTimeFormatter(timeZone)
+  const parts = formatter.formatToParts(new Date(utcMs))
+  const values: Partial<ZonedDateTimeParts> = {}
+
+  parts.forEach((part) => {
+    if (
+      part.type === 'year' ||
+      part.type === 'month' ||
+      part.type === 'day' ||
+      part.type === 'hour' ||
+      part.type === 'minute' ||
+      part.type === 'second'
+    ) {
+      values[part.type] = Number(part.value)
     }
-
-    dayMap.set(dayKey, {
-      key: dayKey,
-      label: dayLabel,
-    })
-    timeMap.set(timeKey, {
-      key: timeKey,
-      label: timeLabel,
-      minutes: date.getHours() * 60 + date.getMinutes(),
-    })
-    slotIndexByDayAndTime[dayKey] ??= {}
-    slotIndexByDayAndTime[dayKey][timeKey] = slotIndex
-    slots.push(displaySlot)
   })
 
   return {
-    days: [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key)),
-    times: [...timeMap.values()].sort((a, b) => {
-      if (a.minutes !== b.minutes) {
-        return a.minutes - b.minutes
+    year: values.year ?? 0,
+    month: values.month ?? 1,
+    day: values.day ?? 1,
+    hour: values.hour ?? 0,
+    minute: values.minute ?? 0,
+    second: values.second ?? 0,
+  }
+}
+
+function zonedDateTimeToUtcMs(dateKey: string, minutes: number, timeZone: string): number | null {
+  const parsed = parseDateKey(dateKey)
+
+  if (!parsed) {
+    return null
+  }
+
+  const desired: ZonedDateTimeParts = {
+    year: parsed.year,
+    month: parsed.month,
+    day: parsed.day,
+    hour: Math.floor(minutes / 60),
+    minute: minutes % 60,
+    second: 0,
+  }
+
+  let utcMs = Date.UTC(
+    desired.year,
+    desired.month - 1,
+    desired.day,
+    desired.hour,
+    desired.minute,
+    desired.second,
+    0,
+  )
+
+  for (let i = 0; i < 4; i += 1) {
+    const actual = getZonedDateTimeParts(utcMs, timeZone)
+    const diffMs = toUtcCivilMs(desired) - toUtcCivilMs(actual)
+
+    if (diffMs === 0) {
+      return utcMs
+    }
+
+    utcMs += diffMs
+  }
+
+  return utcMs
+}
+
+export function parseTimeStringToMinutes(value: string): number | null {
+  const parsed = parse(value, 'HH:mm', new Date(2000, 0, 1))
+
+  if (!isValid(parsed) || lightFormat(parsed, 'HH:mm') !== value) {
+    return null
+  }
+
+  return getHours(parsed) * 60 + getMinutes(parsed)
+}
+
+export function getEventSlotsPerDay(
+  event: Pick<EventScheduleFields, 'slotMinutes' | 'defaultWindowStartMin' | 'defaultWindowEndMin'>,
+): number {
+  if (event.slotMinutes <= 0) {
+    return 0
+  }
+
+  const duration = event.defaultWindowEndMin - event.defaultWindowStartMin
+
+  if (duration <= 0 || duration % event.slotMinutes !== 0) {
+    return 0
+  }
+
+  return duration / event.slotMinutes
+}
+
+export function getEventSlotCount(
+  event: Pick<
+    EventScheduleFields,
+    'dates' | 'slotMinutes' | 'defaultWindowStartMin' | 'defaultWindowEndMin'
+  >,
+): number {
+  return event.dates.length * getEventSlotsPerDay(event)
+}
+
+export function buildDisplaySlots(event: EventScheduleFields): DisplaySlot[] {
+  const slots: DisplaySlot[] = []
+  const slotsPerDay = getEventSlotsPerDay(event)
+
+  event.dates.forEach((dateKey, dayIndex) => {
+    for (let offset = 0; offset < slotsPerDay; offset += 1) {
+      const minute = event.defaultWindowStartMin + offset * event.slotMinutes
+      const startUtcMs = zonedDateTimeToUtcMs(dateKey, minute, event.defaultWindowTimezone)
+
+      if (startUtcMs === null) {
+        continue
       }
 
-      return a.key.localeCompare(b.key)
-    }),
-    slots,
-    slotIndexByDayAndTime,
-  }
+      const slotIndex = dayIndex * slotsPerDay + offset
+      const date = new Date(startUtcMs)
+      const dayKey = lightFormat(date, 'yyyy-MM-dd')
+      const dayLabel = intlFormat(date, {
+        weekday: 'short',
+        day: 'numeric',
+      })
+      const timeKey = lightFormat(date, 'HH:mm')
+      const timeLabel = intlFormat(date, {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+      const displaySlot: DisplaySlot = {
+        slotIndex,
+        startUtcMs,
+        dayKey,
+        dayLabel,
+        timeKey,
+        timeLabel,
+      }
+
+      slots.push(displaySlot)
+    }
+  })
+
+  return slots
+}
+
+export function buildDisplayDays(slots: DisplaySlot[]): DisplayDay[] {
+  const dayMap = new Map<string, DisplayDay>()
+
+  slots.forEach((slot) => {
+    dayMap.set(slot.dayKey, {
+      key: slot.dayKey,
+      label: slot.dayLabel,
+    })
+  })
+
+  return [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key))
+}
+
+export function buildDisplayTimes(slots: DisplaySlot[]): DisplayTime[] {
+  const timeMap = new Map<string, DisplayTime>()
+
+  slots.forEach((slot) => {
+    const date = new Date(slot.startUtcMs)
+
+    timeMap.set(slot.timeKey, {
+      key: slot.timeKey,
+      label: slot.timeLabel,
+      minutes: date.getHours() * 60 + date.getMinutes(),
+    })
+  })
+
+  return [...timeMap.values()].sort((a, b) => {
+    if (a.minutes !== b.minutes) {
+      return a.minutes - b.minutes
+    }
+
+    return a.key.localeCompare(b.key)
+  })
+}
+
+export function isEventConfirmed(
+  event: Pick<AppEvent, 'confirmedBy' | 'confirmedStartUtc'>,
+): boolean {
+  return !!event.confirmedBy?.trim() && !!event.confirmedStartUtc
 }
 
 export function participantStatusRows(groups: ParticipantSummaryGroups): ParticipantStatusRow[] {
