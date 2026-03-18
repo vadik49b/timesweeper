@@ -5,6 +5,7 @@ import {
   intlFormat,
   isSameDay,
   lightFormat,
+  parseISO,
   startOfToday,
 } from 'date-fns'
 import { nanoid } from 'nanoid'
@@ -115,7 +116,7 @@ export default function Landing(props: Props) {
     }
 
     const labels = keys.map((ds) =>
-      intlFormat(new Date(`${ds}T00:00:00`), {
+      intlFormat(parseISO(ds), {
         weekday: 'short',
         day: 'numeric',
       }),
@@ -363,7 +364,7 @@ export default function Landing(props: Props) {
                     disabled={day.day === null || day.isPast}
                     aria-label={
                       day.ds
-                        ? intlFormat(new Date(`${day.ds}T00:00:00`), {
+                        ? intlFormat(parseISO(day.ds), {
                             weekday: 'long',
                             month: 'long',
                             day: 'numeric',

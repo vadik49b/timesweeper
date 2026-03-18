@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { addDays, addMinutes, getHours, getMinutes, isValid, lightFormat, parse } from 'date-fns'
+
 const SLOT_MINUTES = 30
 
 const DEFAULTS = {
@@ -111,29 +113,14 @@ function validateConfig(config) {
   }
 }
 
-function pad2(n) {
-  return String(n).padStart(2, '0')
-}
-
 function parseTimeToMinutes(hhmm) {
-  const match = /^(\d{2}):(\d{2})$/.exec(hhmm)
+  const parsed = parse(hhmm, 'HH:mm', new Date(2000, 0, 1))
 
-  if (!match) {
+  if (!isValid(parsed) || lightFormat(parsed, 'HH:mm') !== hhmm) {
     throw new Error(`Invalid time format: ${hhmm}`)
   }
 
-  const h = Number(match[1])
-  const m = Number(match[2])
-
-  if (h < 0 || h > 23 || m < 0 || m > 59) {
-    throw new Error(`Invalid time value: ${hhmm}`)
-  }
-
-  return h * 60 + m
-}
-
-function toDateString(date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+  return getHours(parsed) * 60 + getMinutes(parsed)
 }
 
 function buildDates(days) {
@@ -142,9 +129,7 @@ function buildDates(days) {
   start.setHours(0, 0, 0, 0)
 
   for (let i = 0; i < days; i += 1) {
-    const d = new Date(start)
-    d.setDate(start.getDate() + i)
-    out.push(toDateString(d))
+    out.push(lightFormat(addDays(start, i), 'yyyy-MM-dd'))
   }
 
   return out
@@ -154,12 +139,10 @@ function buildSlotStartsUtcIso(dates, startMins, endMins) {
   const slots = []
 
   for (const dateKey of dates) {
-    for (let minute = startMins; minute < endMins; minute += SLOT_MINUTES) {
-      const hours = Math.floor(minute / 60)
-      const mins = minute % 60
-      const localDate = new Date(`${dateKey}T${pad2(hours)}:${pad2(mins)}:00`)
+    const dayStart = parse(dateKey, 'yyyy-MM-dd', new Date())
 
-      slots.push(localDate.toISOString())
+    for (let minute = startMins; minute < endMins; minute += SLOT_MINUTES) {
+      slots.push(addMinutes(dayStart, minute).toISOString())
     }
   }
 

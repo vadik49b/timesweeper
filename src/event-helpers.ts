@@ -305,7 +305,7 @@ export function buildDisplayTimes(slots: DisplaySlot[]): DisplayTime[] {
     timeMap.set(slot.timeKey, {
       key: slot.timeKey,
       label: slot.timeLabel,
-      minutes: date.getHours() * 60 + date.getMinutes(),
+      minutes: getHours(date) * 60 + getMinutes(date),
     })
   })
 
