@@ -13,11 +13,9 @@ const EVENT_META_TABLE = 'eventMeta'
 const EVENT_NAME_CELL = 'name'
 const EVENT_CREATED_CELL = 'created'
 const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
+const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
 const EVENT_CONFIRMED_BY_CELL = 'confirmedBy'
 const EVENT_CONFIRMED_START_UTC_CELL = 'confirmedStartUtc'
-const PARTICIPANTS_TABLE = 'participants'
-const PARTICIPANT_NAME_CELL = 'name'
-const PARTICIPANT_ORDER_CELL = 'order'
 const AVAILABILITY_TABLE = 'availability'
 const RECENTLY_OPENED_EVENTS_VALUE = 'recentlyOpenedEvents'
 const SELECTED_PARTICIPANTS_TABLE = 'selectedParticipants'
@@ -112,6 +110,10 @@ function readSlotStartsUtcIsoFromStore(
   }
 }
 
+function readParticipantNamesFromStore(store: Store, eventId: string): string[] {
+  return store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]
+}
+
 function readConfirmedFieldsFromStore(
   store: Store,
   eventId: string,
@@ -127,66 +129,36 @@ function readConfirmedFieldsFromStore(
     : {}
 }
 
-function readParticipantsFromStore(store: Store): Participant[] {
-  if (!store.hasTable(PARTICIPANTS_TABLE)) {
-    return []
-  }
-
-  return store
-    .getRowIds(PARTICIPANTS_TABLE)
-    .map((rowId) => {
-      const name = store.getCell(PARTICIPANTS_TABLE, rowId, PARTICIPANT_NAME_CELL)
-      const order = store.getCell(PARTICIPANTS_TABLE, rowId, PARTICIPANT_ORDER_CELL)
-
-      return typeof name === 'string'
-        ? {
-            rowId: String(rowId),
-            name,
-            order: typeof order === 'number' ? order : Number.MAX_SAFE_INTEGER,
-          }
-        : null
-    })
-    .filter(
-      (participant): participant is { rowId: string; name: string; order: number } =>
-        participant !== null,
-    )
-    .sort((a, b) => {
-      if (a.order !== b.order) {
-        return a.order - b.order
-      }
-
-      return a.name.localeCompare(b.name)
-    })
-    .map((participant) => {
-      return {
-        name: participant.name,
-        slots: store.hasRow(AVAILABILITY_TABLE, participant.rowId)
-          ? ({ ...store.getRow(AVAILABILITY_TABLE, participant.rowId) } as Participant['slots'])
-          : {},
-      }
-    })
+function readParticipantsFromStore(store: Store, participantNames: string[]): Participant[] {
+  return participantNames.map((name) => {
+    return {
+      name,
+      slots: store.hasRow(AVAILABILITY_TABLE, name)
+        ? ({ ...store.getRow(AVAILABILITY_TABLE, name) } as Participant['slots'])
+        : {},
+    }
+  })
 }
 
 function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | undefined {
   if (!store.hasRow(EVENT_META_TABLE, eventId)) {
-    return undefined
+    return
   }
 
   const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_NAME_CELL)
   const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL)
 
-  if (typeof name !== 'string' || typeof created !== 'number') {
-    return undefined
-  }
-
   const slotStartsUtcIso = readSlotStartsUtcIsoFromStore(store, eventId)
-  const participants = readParticipantsFromStore(store)
+  const participants = readParticipantsFromStore(
+    store,
+    readParticipantNamesFromStore(store, eventId),
+  )
   const confirmed = readConfirmedFieldsFromStore(store, eventId)
 
   return {
     id: eventId,
-    name,
-    created,
+    name: name as string,
+    created: created as number,
     ...slotStartsUtcIso,
     ...confirmed,
     participants,
@@ -334,6 +306,12 @@ function writeNormalizedEvent(store: EventRoomStore, event: AppEvent): void {
       EVENT_SLOT_STARTS_UTC_ISO_CELL,
       event.slotStartsUtcIso,
     )
+    store.setCell(
+      EVENT_META_TABLE,
+      event.id,
+      EVENT_PARTICIPANT_NAMES_CELL,
+      event.participants.map((participant) => participant.name),
+    )
 
     if (event.confirmedBy?.trim() && event.confirmedStartUtc) {
       store.setCell(EVENT_META_TABLE, event.id, EVENT_CONFIRMED_BY_CELL, event.confirmedBy)
@@ -350,21 +328,15 @@ function writeNormalizedEvent(store: EventRoomStore, event: AppEvent): void {
 
     const nextParticipantNames = new Set(event.participants.map((participant) => participant.name))
 
-    if (store.hasTable(PARTICIPANTS_TABLE)) {
-      store.getRowIds(PARTICIPANTS_TABLE).forEach((rowId) => {
-        const participantName = String(rowId)
-
-        if (!nextParticipantNames.has(participantName)) {
-          store.delRow(PARTICIPANTS_TABLE, rowId)
+    if (store.hasTable(AVAILABILITY_TABLE)) {
+      store.getRowIds(AVAILABILITY_TABLE).forEach((rowId) => {
+        if (!nextParticipantNames.has(String(rowId))) {
           store.delRow(AVAILABILITY_TABLE, rowId)
         }
       })
     }
 
-    event.participants.forEach((participant, order) => {
-      store.setCell(PARTICIPANTS_TABLE, participant.name, PARTICIPANT_NAME_CELL, participant.name)
-      store.setCell(PARTICIPANTS_TABLE, participant.name, PARTICIPANT_ORDER_CELL, order)
-
+    event.participants.forEach((participant) => {
       const nextAvailabilityCellIds = new Set(Object.keys(participant.slots))
 
       Object.entries(participant.slots).forEach(([slotStartUtcIso, slotValue]) => {
@@ -464,7 +436,7 @@ export async function updateParticipantSlot(
 ): Promise<void> {
   const store = await requireOpenEventRoomStore(eventId)
 
-  if (!store.hasRow(PARTICIPANTS_TABLE, name)) {
+  if (!readParticipantNamesFromStore(store, eventId).includes(name)) {
     return
   }
 
