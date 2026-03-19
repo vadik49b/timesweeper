@@ -5,11 +5,13 @@ import { addMinutes, intlFormat, parseISO } from 'date-fns'
 import {
   closeEventStore,
   confirmEvent,
+  type EventSyncState,
   getEvent,
   getSelectedParticipantName,
   openEventStore,
   pushRecentEvent,
   setSelectedParticipantName,
+  subscribeEventSyncState,
   subscribeEvent,
   unconfirmEvent,
   updateEventSettings,
@@ -96,6 +98,8 @@ export default function Grid(props: Props) {
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
+  const [isBrowserOnline, setIsBrowserOnline] = createSignal(window.navigator.onLine)
+  const [eventSyncState, setEventSyncState] = createSignal<EventSyncState>('connecting')
 
   let shareInputRef!: HTMLInputElement
   const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
@@ -756,6 +760,7 @@ export default function Grid(props: Props) {
   // Global event listeners + initial load
   onMount(() => {
     let unsubscribe: (() => void) | null = null
+    let unsubscribeSyncState: (() => void) | null = null
     let isDisposed = false
     const loadingMessageTimer = window.setInterval(() => {
       if (!event()) {
@@ -787,12 +792,19 @@ export default function Grid(props: Props) {
     }
 
     makeEventListener(document, 'keydown', onKeyDown)
+    makeEventListener(window, 'online', () => setIsBrowserOnline(true))
+    makeEventListener(window, 'offline', () => setIsBrowserOnline(false))
+    unsubscribeSyncState = subscribeEventSyncState(setEventSyncState)
 
     onCleanup(() => {
       window.clearInterval(loadingMessageTimer)
 
       if (unsubscribe) {
         unsubscribe()
+      }
+
+      if (unsubscribeSyncState) {
+        unsubscribeSyncState()
       }
 
       closeEventStore(props.eventId).catch((error) => {
@@ -835,6 +847,21 @@ export default function Grid(props: Props) {
   })
 
   const loadingOverlayText = createMemo(() => LOADING_MESSAGES[loadingMessageIndex()])
+  const connectionBarText = createMemo(() => {
+    if (!localReady()) {
+      return ''
+    }
+
+    if (!isBrowserOnline()) {
+      return "Offline. Changes will sync when you're back online."
+    }
+
+    if (eventSyncState() === 'reconnecting') {
+      return 'Reconnecting...'
+    }
+
+    return ''
+  })
 
   return (
     <>
@@ -1357,6 +1384,9 @@ export default function Grid(props: Props) {
               </div>
             </Win95Dialog>
           </Show>
+        </Show>
+        <Show when={connectionBarText()}>
+          {(text) => <div class="grid-view__connection-bar">{text()}</div>}
         </Show>
       </div>
     </>

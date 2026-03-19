@@ -28,10 +28,19 @@ export interface RecentEventSummary {
   created: number
 }
 
+export type EventSyncState = 'connecting' | 'connected' | 'reconnecting'
+
 let eventRoomId: string | null = null
 let eventRoomStorePromise: Promise<EventRoomStore> | null = null
 let eventRoomSynchronizer: WsSynchronizer<ReconnectingWebSocket> | null = null
 let eventRoomSyncPromise: Promise<void> | null = null
+let eventSyncState: EventSyncState = 'connecting'
+const eventSyncStateListeners = new Set<(state: EventSyncState) => void>()
+
+function setEventSyncState(next: EventSyncState): void {
+  eventSyncState = next
+  eventSyncStateListeners.forEach((listener) => listener(next))
+}
 
 function eventSyncUrl(eventId: string): string {
   const origin = import.meta.env.VITE_WS_ORIGIN
@@ -225,6 +234,7 @@ async function stopEventRoomSync(): Promise<void> {
   }
 
   eventRoomSynchronizer = null
+  setEventSyncState('connecting')
 }
 
 async function startEventRoomSync(eventId: string, store: EventRoomStore): Promise<void> {
@@ -234,12 +244,22 @@ async function startEventRoomSync(eventId: string, store: EventRoomStore): Promi
     const ws = new ReconnectingWebSocket(eventSyncUrl(eventId), [], {
       maxRetries: Infinity,
     })
+    let hasConnected = false
+
+    ws.addEventListener('open', () => {
+      hasConnected = true
+      setEventSyncState('connected')
+    })
+    ws.addEventListener('close', () => {
+      setEventSyncState(hasConnected ? 'reconnecting' : 'connecting')
+    })
     const synchronizer = await createWsSynchronizer(store, ws)
 
     await synchronizer.startSync()
     eventRoomSynchronizer = synchronizer
   } catch (error) {
     eventRoomSynchronizer = null
+    setEventSyncState('reconnecting')
     console.error('Failed to start event room sync', error)
   }
 }
@@ -289,6 +309,7 @@ export async function openEventStore(eventId: string): Promise<void> {
 
     eventRoomId = eventId
     eventRoomStorePromise = loadEventRoomStore(eventId)
+    setEventSyncState('connecting')
   }
 
   const store = await eventRoomStorePromise
@@ -305,6 +326,18 @@ export async function closeEventStore(eventId?: string): Promise<void> {
 
   eventRoomId = null
   eventRoomStorePromise = null
+  setEventSyncState('connecting')
+}
+
+export function subscribeEventSyncState(
+  listener: (state: EventSyncState) => void,
+): () => void {
+  eventSyncStateListeners.add(listener)
+  listener(eventSyncState)
+
+  return () => {
+    eventSyncStateListeners.delete(listener)
+  }
 }
 
 async function requireWritableEventStore(eventId: string): Promise<EventRoomStore> {
