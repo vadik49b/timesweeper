@@ -1,4 +1,4 @@
-import { createSignal, createMemo, onMount, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createMemo, onMount, onCleanup, For, Index, Show } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
 import { addMinutes, intlFormat, parseISO } from 'date-fns'
@@ -92,7 +92,7 @@ export default function Grid(props: Props) {
   const [confirmSlotIndex, setConfirmSlotIndex] = createSignal<number | null>(null)
   const [settingsEventName, setSettingsEventName] = createSignal('')
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
-  const [settingsNewParticipantName, setSettingsNewParticipantName] = createSignal('')
+  const [settingsNewParticipantNames, setSettingsNewParticipantNames] = createSignal<string[]>([''])
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
@@ -257,7 +257,7 @@ export default function Grid(props: Props) {
 
     setSettingsEventName(ev.name)
     setSettingsParticipantNames(ev.participants.slice(1).map((participant) => participant.name))
-    setSettingsNewParticipantName('')
+    setSettingsNewParticipantNames([''])
     setShowAllSettingsParticipants(false)
     setDialogError('')
     setActiveModal('settings')
@@ -267,26 +267,24 @@ export default function Grid(props: Props) {
     setSettingsParticipantNames((prev) => prev.filter((_, i) => i !== index))
   }
 
-  function addSettingsParticipant() {
-    const trimmed = settingsNewParticipantName().trim()
+  function addSettingsParticipantRow() {
+    setSettingsNewParticipantNames((prev) => [...prev, ''])
+  }
 
-    if (!trimmed) {
-      setDialogError('Enter a name.')
+  function updateSettingsParticipantRow(index: number, value: string) {
+    setSettingsNewParticipantNames((prev) =>
+      prev.map((entry, entryIndex) => (entryIndex === index ? value : entry)),
+    )
+  }
 
-      return
-    }
+  function removeSettingsParticipantRow(index: number) {
+    setSettingsNewParticipantNames((prev) => {
+      if (prev.length === 1) {
+        return ['']
+      }
 
-    const organizer = event()?.participants[0]?.name ?? 'Unknown'
-    const duplicateName = findDuplicateName([trimmed], [organizer, ...settingsParticipantNames()])
-
-    if (duplicateName) {
-      setDialogError(`Duplicate name: "${duplicateName}". Use a unique name.`)
-
-      return
-    }
-
-    setSettingsParticipantNames((prev) => [...prev, trimmed])
-    setSettingsNewParticipantName('')
+      return prev.filter((_, entryIndex) => entryIndex !== index)
+    })
   }
 
   const visibleSettingsParticipantNames = createMemo(() => {
@@ -334,7 +332,7 @@ export default function Grid(props: Props) {
       return
     }
 
-    const nextParticipantNames = settingsParticipantNames()
+    const nextParticipantNames = [...settingsParticipantNames(), ...settingsNewParticipantNames()]
       .map((name) => name.trim())
       .filter(Boolean)
 
@@ -1214,40 +1212,68 @@ export default function Grid(props: Props) {
               <p class="settings__organizer">
                 Locked after event creation to keep everyone aligned.
               </p>
-              <Show when={settingsParticipantNames().length > 0}>
-                <>
-                  <p class="settings__label">Participants:</p>
-                  <div class="settings__participants-list">
-                    <table class="settings__participants-table">
-                      <thead>
+              <p class="settings__label">Participants:</p>
+              <div class="settings__participants-list">
+                <table class="settings__participants-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th class="settings__participants-action-col">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={visibleSettingsParticipantNames()}>
+                      {(participantName, index) => (
                         <tr>
-                          <th>Name</th>
-                          <th class="settings__participants-action-col">Action</th>
+                          <td class="settings__participant-name">{participantName}</td>
+                          <td class="settings__participant-action-cell">
+                            <Win95Button
+                              size="small"
+                              variant="toolbar"
+                              class="settings__participant-remove"
+                              onClick={() => removeSettingsParticipant(index())}
+                            >
+                              Remove
+                            </Win95Button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        <For each={visibleSettingsParticipantNames()}>
-                          {(participantName, index) => (
-                            <tr>
-                              <td class="settings__participant-name">{participantName}</td>
-                              <td class="settings__participant-action-cell">
-                                <Win95Button
-                                  size="small"
-                                  variant="toolbar"
-                                  class="settings__participant-remove"
-                                  onClick={() => removeSettingsParticipant(index())}
-                                >
-                                  Remove
-                                </Win95Button>
-                              </td>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              </Show>
+                      )}
+                    </For>
+                    <Index each={settingsNewParticipantNames()}>
+                      {(participantName, index) => (
+                        <tr>
+                          <td class="settings__participant-input-cell">
+                            <Win95Field
+                              kind="input"
+                              name={`settingsNewParticipantName${index}`}
+                              size="small"
+                              value={participantName()}
+                              placeholder="Name"
+                              wrapperClass="settings__participant-input"
+                              onInput={(value) => updateSettingsParticipantRow(index, value)}
+                            />
+                          </td>
+                          <td class="settings__participant-action-cell">
+                            <Win95Button
+                              size="small"
+                              variant="toolbar"
+                              class="settings__participant-remove"
+                              onClick={() => removeSettingsParticipantRow(index)}
+                            >
+                              Remove
+                            </Win95Button>
+                          </td>
+                        </tr>
+                      )}
+                    </Index>
+                  </tbody>
+                </table>
+              </div>
+              <div class="settings__participants-actions">
+                <Win95Button size="small" variant="toolbar" onClick={addSettingsParticipantRow}>
+                  Add another row
+                </Win95Button>
+              </div>
               <Show when={settingsParticipantNames().length > 5}>
                 <div class="settings__participants-toggle">
                   <Win95Button
@@ -1264,24 +1290,6 @@ export default function Grid(props: Props) {
                   </Win95Button>
                 </div>
               </Show>
-              <label class="settings__label" for="settings-new-participant-name">
-                Add participant:
-              </label>
-              <div class="settings__add-row">
-                <Win95Field
-                  kind="input"
-                  id="settings-new-participant-name"
-                  name="settingsNewParticipantName"
-                  size="small"
-                  value={settingsNewParticipantName()}
-                  placeholder="Name"
-                  wrapperClass="dialog__field settings__add-field"
-                  onInput={setSettingsNewParticipantName}
-                />
-                <Win95Button size="small" variant="toolbar" onClick={addSettingsParticipant}>
-                  Add
-                </Win95Button>
-              </div>
               <div class="dialog-buttons">
                 <Win95Button class="dialog-btn" onClick={saveSettings}>
                   Save
