@@ -28,31 +28,13 @@ interface Props {
   event: AppEvent
   currentName: string
   displaySlots: DisplaySlot[]
-  onReviewCandidates: (candidates: SummaryIntersectionTime[]) => void
+  onConfirmSlot: (slot: SummaryIntersectionTime) => void
 }
 
 const SPLIT_ROWS_PREVIEW_COUNT = 10
 
 export default function ConfirmationSection(props: Props) {
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
-
-  function timesByDayEntries(slots: SummaryIntersectionTime[]) {
-    const timesByDay = new Map<string, string[]>()
-
-    slots.forEach((slot) => {
-      const existing = timesByDay.get(slot.dayLabel)
-
-      if (existing) {
-        existing.push(slot.timeLabel)
-
-        return
-      }
-
-      timesByDay.set(slot.dayLabel, [slot.timeLabel])
-    })
-
-    return [...timesByDay.entries()]
-  }
 
   const summaryRows = createMemo<SummarySplitRow[]>(() => {
     if (props.displaySlots.length === 0) {
@@ -191,8 +173,7 @@ export default function ConfirmationSection(props: Props) {
             <div class="summary-table-wrap grid-view__panel-content--title-aligned">
               <ConfirmationTable
                 rows={visibleSummaryRows()}
-                onReview={(row) => props.onReviewCandidates(row.slots)}
-                timesByDayEntries={timesByDayEntries}
+                onConfirm={props.onConfirmSlot}
               />
               <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
                 <div class="summary-list__meta-row">

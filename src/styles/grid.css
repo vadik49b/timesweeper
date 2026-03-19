@@ -485,6 +485,21 @@
 .summary-slots-table__times-cell {
   min-width: var(--min-summary-column);
 }
+.summary-slots-table__date-cell,
+.summary-slots-table__time-cell {
+  white-space: nowrap;
+}
+.summary-slots-table__time-cell {
+  width: 1%;
+}
+.summary-slots-table__date {
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-xs);
+}
+.summary-slots-table__time-button {
+  width: 100%;
+  justify-content: flex-start;
+}
 .summary-slots-table__times-row + .summary-slots-table__times-row {
   margin-top: var(--space-075);
 }
@@ -507,12 +522,6 @@
   text-align: left;
   width: var(--summary-num-width);
   white-space: nowrap;
-}
-.summary-slots-table th.summary-slots-table__action-col,
-.summary-slots-table td.summary-slots-table__action-cell {
-  text-align: left;
-  white-space: nowrap;
-  width: 1%;
 }
 .summary-slots-mobile-list {
   display: grid;
@@ -541,6 +550,38 @@
   color: var(--black);
   margin-bottom: var(--space-150);
 }
+.summary-slots-mobile-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: var(--border-thin) solid var(--blo);
+  font-size: var(--fs-sm);
+}
+.summary-slots-mobile-table th,
+.summary-slots-mobile-table td {
+  border: var(--border-thin) solid var(--blo);
+  padding: var(--space-150);
+  vertical-align: top;
+  text-align: left;
+}
+.summary-slots-mobile-table__day-cell {
+  width: 1%;
+  white-space: nowrap;
+  background: var(--bg);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+.summary-slots-mobile-table__times-cell {
+  min-width: 0;
+}
+.summary-slots-mobile-table__time-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-100);
+}
+.summary-slots-mobile-table__time-button {
+  min-width: calc(var(--space-1000) + var(--space-100));
+  min-height: calc(var(--space-700) + var(--space-100));
+}
 .summary-slots-mobile-card .participant-status-list__row {
   display: flex;
   align-items: center;
@@ -549,13 +590,6 @@
 }
 .summary-slots-mobile-card__icon {
   margin-top: 0;
-}
-.summary-slots-mobile-card__footer {
-  margin-top: var(--space-300);
-  padding-top: var(--space-200);
-}
-.summary-slots-mobile-card__action {
-  min-height: var(--space-1100);
 }
 .summary-list__meta-row {
   display: flex;
@@ -764,17 +798,8 @@
 .confirm__lead {
   margin-bottom: var(--space-200);
 }
-.confirm__scope-note {
-  margin: 0 0 var(--space-200);
-  font-size: var(--fs-xs);
-  line-height: 1.2;
-  color: var(--bdk);
-}
-.confirm__label {
-  margin-bottom: var(--space-050);
-}
-.confirm__field--date-time {
-  margin-bottom: var(--space-250);
+.confirm__availability-label {
+  margin: var(--space-300) 0 var(--space-050);
 }
 .confirm__preview {
   margin-bottom: var(--space-250);

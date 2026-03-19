@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createMemo, onMount, onCleanup, For, Show } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
 import { addMinutes, intlFormat, parseISO } from 'date-fns'
@@ -21,7 +21,7 @@ import Win95Dialog from './components/Win95Dialog'
 import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import AvailabilityGrid from './components/AvailabilityGrid'
-import ConfirmationSection, { type SummaryIntersectionTime } from './components/ConfirmationSection'
+import ConfirmationSection from './components/ConfirmationSection'
 import ParticipantStatusList from './components/ParticipantStatusList'
 import MineIcon from './icons/MineIcon'
 import {
@@ -90,9 +90,6 @@ export default function Grid(props: Props) {
   type ActiveModal = null | 'name-picker' | 'help' | 'confirm' | 'settings' | 'undo-confirm'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [confirmSlotIndex, setConfirmSlotIndex] = createSignal<number | null>(null)
-  const [confirmCandidates, setConfirmCandidates] = createSignal<SummaryIntersectionTime[] | null>(
-    null,
-  )
   const [settingsEventName, setSettingsEventName] = createSignal('')
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
   const [settingsNewParticipantName, setSettingsNewParticipantName] = createSignal('')
@@ -191,7 +188,6 @@ export default function Grid(props: Props) {
     }
   }
   function openConfirm(slotIndex: number | null) {
-    setConfirmCandidates(null)
     setConfirmSlotIndex(slotIndex ?? displaySlots()[0]?.slotIndex ?? null)
     setActiveModal('confirm')
   }
@@ -419,13 +415,18 @@ export default function Grid(props: Props) {
   }
 
   const confirmSlotPreview = createMemo<ParticipantSummaryGroups>(() => {
-    const slotIndex = confirmSlotIndex()
+    const slot = displaySlots()[confirmSlotIndex() ?? -1]
 
-    if (slotIndex === null || slotIndex < 0) {
+    if (!slot) {
       return emptyParticipantSummaryGroups()
     }
 
-    return peopleGroupsForSlot(slotIndex)
+    return peopleGroupsForSlot(slot.slotIndex)
+  })
+  const confirmSlotText = createMemo(() => {
+    const slot = displaySlots()[confirmSlotIndex() ?? -1]
+
+    return slot ? `${slot.dayLabel} at ${slot.timeLabel}` : ''
   })
   const introContext = createMemo(() => {
     const ev = event()
@@ -725,34 +726,6 @@ export default function Grid(props: Props) {
     }
   }
 
-  const confirmDateTimeOptions = createMemo(() => {
-    const candidates = confirmCandidates()
-
-    if (!candidates || candidates.length === 0) {
-      return displaySlots().map((slot) => ({
-        value: String(slot.slotIndex),
-        label: `${slot.dayLabel} ${slot.timeLabel}`,
-      }))
-    }
-
-    return candidates.map((candidate) => ({
-      value: String(candidate.slotIndex),
-      label: `${candidate.dayLabel} ${candidate.timeLabel}`,
-    }))
-  })
-  const confirmDateTimeValue = createMemo(() =>
-    confirmSlotIndex() === null ? '' : String(confirmSlotIndex()),
-  )
-
-  function onConfirmDateTimeChange(next: string) {
-    const nextSlotIndex = Number(next)
-
-    if (!Number.isInteger(nextSlotIndex) || nextSlotIndex < 0) {
-      return
-    }
-
-    setConfirmSlotIndex(nextSlotIndex)
-  }
   const useParticipantSelect = createMemo(() => {
     const count = event()?.participants.length ?? 0
 
@@ -781,19 +754,6 @@ export default function Grid(props: Props) {
 
     selectParticipant(name)
   }
-
-  createEffect(() => {
-    const options = confirmDateTimeOptions()
-    const current = confirmDateTimeValue()
-
-    if (options.length === 0) {
-      return
-    }
-
-    if (!options.some((option) => option.value === current)) {
-      onConfirmDateTimeChange(options[0].value)
-    }
-  })
 
   // Global event listeners + initial load
   onMount(() => {
@@ -1024,13 +984,8 @@ export default function Grid(props: Props) {
                               event={loadedEvent()}
                               currentName={currentName()}
                               displaySlots={displaySlots()}
-                              onReviewCandidates={(candidates) => {
-                                const first = candidates[0]
-
-                                setConfirmCandidates(candidates)
-                                setConfirmSlotIndex(
-                                  first?.slotIndex ?? displaySlots()[0]?.slotIndex ?? null,
-                                )
+                              onConfirmSlot={(slot) => {
+                                setConfirmSlotIndex(slot.slotIndex)
                                 setActiveModal('confirm')
                               }}
                             />
@@ -1349,25 +1304,10 @@ export default function Grid(props: Props) {
               bodyClass="dialog-body--confirm"
               onClose={() => setActiveModal(null)}
             >
-              <p class="confirm__lead">Confirm this time for everyone?</p>
-              <Show when={(confirmCandidates()?.length ?? 0) > 1}>
-                <p class="confirm__scope-note">
-                  Choose one of {confirmCandidates()?.length ?? 0} matching time variants.
-                </p>
-              </Show>
-              <label class="confirm__label" for="confirm-date-time">
-                Date and time:
-              </label>
-              <Win95Field
-                kind="select"
-                id="confirm-date-time"
-                name="confirmDateTime"
-                size="small"
-                value={confirmDateTimeValue()}
-                options={confirmDateTimeOptions()}
-                wrapperClass="confirm__field confirm__field--date-time"
-                onChange={onConfirmDateTimeChange}
-              />
+              <p class="confirm__lead">
+                Confirm <strong>{confirmSlotText() || 'this time'}</strong> for everyone?
+              </p>
+              <p class="confirm__availability-label">Availability:</p>
               <div class="confirm__preview s">
                 <ParticipantStatusList groups={confirmSlotPreview()} />
               </div>

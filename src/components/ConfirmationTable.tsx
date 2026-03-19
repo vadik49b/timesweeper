@@ -14,14 +14,39 @@ type SummarySplitRow = {
   slots: SummaryIntersectionTime[]
 }
 
+type SummaryDayGroup = {
+  dayLabel: string
+  slots: SummaryIntersectionTime[]
+}
+
 interface Props {
   rows: SummarySplitRow[]
-  onReview: (row: SummarySplitRow) => void
-  timesByDayEntries: (slots: SummaryIntersectionTime[]) => Array<[string, string[]]>
+  onConfirm: (slot: SummaryIntersectionTime) => void
 }
 
 export default function ConfirmationTable(props: Props) {
   const [isDesktop, setIsDesktop] = createSignal(false)
+
+  function slotsByDay(slots: SummaryIntersectionTime[]): SummaryDayGroup[] {
+    const dayGroups: SummaryDayGroup[] = []
+
+    slots.forEach((slot) => {
+      const currentDay = dayGroups[dayGroups.length - 1]
+
+      if (currentDay?.dayLabel === slot.dayLabel) {
+        currentDay.slots.push(slot)
+
+        return
+      }
+
+      dayGroups.push({
+        dayLabel: slot.dayLabel,
+        slots: [slot],
+      })
+    })
+
+    return dayGroups
+  }
 
   onMount(() => {
     const desktopQuery = window.matchMedia('(min-width: 700px)')
@@ -53,26 +78,40 @@ export default function ConfirmationTable(props: Props) {
                   <ParticipantStatusList groups={splitRow.groups} />
                 </div>
                 <div class="summary-slots-mobile-card__section">
-                  <div class="summary-slots-mobile-card__label">Times</div>
-                  <For each={props.timesByDayEntries(splitRow.slots)}>
-                    {(dayGroup) => (
-                      <div class="summary-slots-table__times-row">
-                        <span class="summary-slots-table__times-day">{dayGroup[0]}:</span>{' '}
-                        <span class="summary-slots-table__times-list">
-                          {dayGroup[1].join(', ')}
-                        </span>
-                      </div>
-                    )}
-                  </For>
-                </div>
-                <div class="summary-slots-mobile-card__footer">
-                  <Win95Button
-                    fullWidth
-                    class="summary-slots-mobile-card__action"
-                    onClick={() => props.onReview(splitRow)}
-                  >
-                    Pick a time
-                  </Win95Button>
+                  <table class="summary-slots-mobile-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={slotsByDay(splitRow.slots)}>
+                        {(dayGroup) => (
+                          <tr>
+                            <th scope="row" class="summary-slots-mobile-table__day-cell">
+                              {dayGroup.dayLabel}
+                            </th>
+                            <td class="summary-slots-mobile-table__times-cell">
+                              <div class="summary-slots-mobile-table__time-list">
+                                <For each={dayGroup.slots}>
+                                  {(slot) => (
+                                    <Win95Button
+                                      size="small"
+                                      class="summary-slots-mobile-table__time-button"
+                                      onClick={() => props.onConfirm(slot)}
+                                    >
+                                      {slot.timeLabel}
+                                    </Win95Button>
+                                  )}
+                                </For>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -88,49 +127,67 @@ export default function ConfirmationTable(props: Props) {
               <th class="summary-slots-table__num">Yes</th>
               <th class="summary-slots-table__num">Maybe</th>
               <th class="summary-slots-table__num">No</th>
-              <th>Times</th>
-              <th class="summary-slots-table__action-col">Action</th>
+              <th>Date</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody>
             <For each={props.rows}>
-              {(splitRow) => (
-                <tr
-                  classList={{
-                    'summary-slots-table__row--best': splitRow.kind === 'best',
-                    'summary-slots-table__row--almost': splitRow.kind === 'almost',
-                    'summary-slots-table__row--partial': splitRow.kind === 'partial',
-                  }}
-                >
-                  <td class="summary-slots-table__people-cell">
-                    <ParticipantStatusList groups={splitRow.groups} />
-                  </td>
-                  <td class="summary-slots-table__num">{splitRow.yesCount}</td>
-                  <td class="summary-slots-table__num">{splitRow.maybeCount}</td>
-                  <td class="summary-slots-table__num">{splitRow.noCount}</td>
-                  <td class="summary-slots-table__times-cell">
-                    <For each={props.timesByDayEntries(splitRow.slots)}>
-                      {(dayGroup) => (
-                        <div class="summary-slots-table__times-row">
-                          <span class="summary-slots-table__times-day">{dayGroup[0]}:</span>{' '}
-                          <span class="summary-slots-table__times-list">
-                            {dayGroup[1].join(', ')}
-                          </span>
-                        </div>
-                      )}
-                    </For>
-                  </td>
-                  <td class="summary-slots-table__action-cell">
-                    <Win95Button
-                      size="small"
-                      variant="toolbar"
-                      onClick={() => props.onReview(splitRow)}
-                    >
-                      Pick a time
-                    </Win95Button>
-                  </td>
-                </tr>
-              )}
+              {(splitRow) => {
+                const dayGroups = slotsByDay(splitRow.slots)
+                const totalRows = splitRow.slots.length
+
+                return (
+                  <For each={dayGroups}>
+                    {(dayGroup, dayIndex) => (
+                      <For each={dayGroup.slots}>
+                        {(slot, slotIndex) => (
+                          <tr
+                            classList={{
+                              'summary-slots-table__row--best': splitRow.kind === 'best',
+                              'summary-slots-table__row--almost': splitRow.kind === 'almost',
+                              'summary-slots-table__row--partial': splitRow.kind === 'partial',
+                            }}
+                          >
+                            <Show when={dayIndex() === 0 && slotIndex() === 0}>
+                              <td class="summary-slots-table__people-cell" rowSpan={totalRows}>
+                                <ParticipantStatusList groups={splitRow.groups} />
+                              </td>
+                              <td class="summary-slots-table__num" rowSpan={totalRows}>
+                                {splitRow.yesCount}
+                              </td>
+                              <td class="summary-slots-table__num" rowSpan={totalRows}>
+                                {splitRow.maybeCount}
+                              </td>
+                              <td class="summary-slots-table__num" rowSpan={totalRows}>
+                                {splitRow.noCount}
+                              </td>
+                            </Show>
+                            <Show when={slotIndex() === 0}>
+                              <td
+                                class="summary-slots-table__date-cell"
+                                rowSpan={dayGroup.slots.length}
+                              >
+                                <span class="summary-slots-table__date">{dayGroup.dayLabel}</span>
+                              </td>
+                            </Show>
+                            <td class="summary-slots-table__time-cell">
+                              <Win95Button
+                                size="small"
+                                variant="toolbar"
+                                class="summary-slots-table__time-button"
+                                onClick={() => props.onConfirm(slot)}
+                              >
+                                {slot.timeLabel}
+                              </Win95Button>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    )}
+                  </For>
+                )
+              }}
             </For>
           </tbody>
         </table>
