@@ -1,8 +1,19 @@
 #!/usr/bin/env node
 
 import { addDays, addMinutes, getHours, getMinutes, isValid, lightFormat, parse } from 'date-fns'
+import { Status } from 'tinybase/persisters'
+import { createMergeableStore } from 'tinybase/mergeable-store'
+import { createWsSynchronizer } from 'tinybase/synchronizers/synchronizer-ws-client'
 
 const SLOT_MINUTES = 30
+const EVENT_META_TABLE = 'eventMeta'
+const EVENT_NAME_CELL = 'name'
+const EVENT_CREATED_CELL = 'created'
+const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
+const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
+const EVENT_CONFIRMED_BY_CELL = 'confirmedBy'
+const EVENT_CONFIRMED_START_UTC_CELL = 'confirmedStartUtc'
+const AVAILABILITY_TABLE = 'availability'
 
 const DEFAULTS = {
   baseUrl: 'http://127.0.0.1:8787',
@@ -17,13 +28,13 @@ const DEFAULTS = {
 }
 
 function showHelp() {
-  console.log(`Seed local Wrangler API with fake TimeSweeper events.
+  console.log(`Seed local Wrangler Durable Object rooms with fake TimeSweeper events.
 
 Usage:
   npm run seed:local -- [options]
 
 Options:
-  --base-url <url>        API origin (default: ${DEFAULTS.baseUrl})
+  --base-url <url>        Worker origin for WebSocket sync (default: ${DEFAULTS.baseUrl})
   --app-url <url>         App origin for printed links (default: ${DEFAULTS.appUrl})
   --events <n>            Number of events to create (default: ${DEFAULTS.events})
   --participants <n>      Participants per event (default: ${DEFAULTS.participants})
@@ -229,16 +240,96 @@ function normalizeBaseUrl(url) {
   return url.endsWith('/') ? url.slice(0, -1) : url
 }
 
-async function putEvent(baseUrl, event) {
-  const response = await fetch(`${baseUrl}/api/events/${encodeURIComponent(event.id)}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(event),
-  })
+function eventSyncUrl(baseUrl, eventId) {
+  const url = new URL(normalizeBaseUrl(baseUrl))
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    throw new Error(`PUT /api/events/${event.id} failed (${response.status}): ${body}`)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.pathname = `/api/events/${encodeURIComponent(eventId)}`
+
+  return url.toString()
+}
+
+function buildSeedTables(event) {
+  const eventMetaRow = {
+    [EVENT_NAME_CELL]: event.name,
+    [EVENT_CREATED_CELL]: event.created,
+    [EVENT_SLOT_STARTS_UTC_ISO_CELL]: event.slotStartsUtcIso,
+    [EVENT_PARTICIPANT_NAMES_CELL]: event.participants.map((participant) => participant.name),
+  }
+  const availabilityRows = {}
+
+  if (event.confirmedBy && event.confirmedStartUtc) {
+    eventMetaRow[EVENT_CONFIRMED_BY_CELL] = event.confirmedBy
+    eventMetaRow[EVENT_CONFIRMED_START_UTC_CELL] = event.confirmedStartUtc
+  }
+
+  for (const participant of event.participants) {
+    if (Object.keys(participant.slots).length > 0) {
+      availabilityRows[participant.name] = participant.slots
+    }
+  }
+
+  return {
+    [EVENT_META_TABLE]: {
+      [event.id]: eventMetaRow,
+    },
+    [AVAILABILITY_TABLE]: availabilityRows,
+  }
+}
+
+async function waitForIdle(synchronizer, timeoutMs = 5_000) {
+  if (synchronizer.getStatus() === Status.Idle) {
+    return
+  }
+
+  await new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      synchronizer.delListener(listenerId)
+      reject(new Error(`Sync did not become idle within ${timeoutMs}ms`))
+    }, timeoutMs)
+    const listenerId = synchronizer.addStatusListener((_synchronizer, status) => {
+      if (status === Status.Idle) {
+        clearTimeout(timeoutId)
+        synchronizer.delListener(listenerId)
+        resolve()
+      }
+    })
+  })
+}
+
+async function waitForSave(synchronizer, timeoutMs = 5_000) {
+  if (synchronizer.getStatus() === Status.Saving) {
+    await waitForIdle(synchronizer, timeoutMs)
+    return
+  }
+
+  await new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      synchronizer.delListener(listenerId)
+      reject(new Error(`Sync did not save within ${timeoutMs}ms`))
+    }, timeoutMs)
+    const listenerId = synchronizer.addStatusListener((_synchronizer, status) => {
+      if (status === Status.Saving) {
+        clearTimeout(timeoutId)
+        synchronizer.delListener(listenerId)
+        waitForIdle(synchronizer, timeoutMs).then(resolve, reject)
+      }
+    })
+  })
+}
+
+async function seedEvent(baseUrl, event) {
+  const store = createMergeableStore()
+  const webSocket = new WebSocket(eventSyncUrl(baseUrl, event.id))
+  const synchronizer = await createWsSynchronizer(store, webSocket)
+
+  try {
+    await synchronizer.startSync()
+    await waitForIdle(synchronizer)
+    store.setTables(buildSeedTables(event))
+    await waitForSave(synchronizer)
+  } finally {
+    await synchronizer.destroy()
   }
 }
 
@@ -289,19 +380,18 @@ async function main() {
       participants,
     }
 
-    await putEvent(baseUrl, event)
+    await seedEvent(baseUrl, event)
 
     created.push(event)
   }
 
-  console.log(
-    `Seeded ${created.length} event(s) on ${baseUrl} with ${config.participants} participants each.`,
-  )
+  console.log(`Seeded ${created.length} event(s) over TinyBase WS on ${baseUrl}.`)
+  console.log(`Each event has ${config.participants} participants and ${slotStartsUtcIso.length} slots.`)
 
   for (const event of created) {
     console.log(`- ${event.name}`)
-    console.log(`  API: ${baseUrl}/api/events/${event.id}`)
-    console.log(`  APP: ${appUrl}/e/${event.id}`)
+    console.log(`  Open: ${appUrl}/e/${event.id}`)
+    console.log(`  WS:  ${eventSyncUrl(baseUrl, event.id)}`)
   }
 }
 
