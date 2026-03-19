@@ -134,6 +134,7 @@ export default function ConfirmationSection(props: Props) {
       .filter((participant) => participant.name !== props.currentName)
       .filter((participant) => !hasParticipantAvailability(participant))
       .map((participant) => participant.name)
+    const actionHint = ' Pick one of the suggested times in the table to confirm it for everyone.'
 
     if (summaryRows().length === 0) {
       if (pending.length > 0) {
@@ -144,10 +145,10 @@ export default function ConfirmationSection(props: Props) {
     }
 
     if (pending.length === 0) {
-      return 'Suggestions update as participants continue filling availability.'
+      return `Suggestions update as participants continue filling availability.${actionHint}`
     }
 
-    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't marked availability yet.`
+    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't marked availability yet.${actionHint}`
   })
 
   return (

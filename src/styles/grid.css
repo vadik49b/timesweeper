@@ -578,7 +578,7 @@
 }
 .summary-slots-mobile-card .participant-status-list__row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-150);
   min-width: 0;
 }
