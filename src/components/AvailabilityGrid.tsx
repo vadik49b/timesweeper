@@ -1,6 +1,5 @@
 import { For, Show } from 'solid-js'
 import type { DisplayDay, DisplaySlot, DisplayTime, SlotMap } from '../event-helpers'
-import MineCellButton from './MineCellButton'
 
 interface Props {
   days: DisplayDay[]
@@ -63,17 +62,16 @@ export default function AvailabilityGrid(props: Props) {
               const hasSlot = () => slotIndex() !== undefined
 
               return (
-                <MineCellButton
-                  class={[
-                    'availability-grid__cell',
-                    slotValue() === 1 ? 'availability-grid__cell--yes mine-cell--open' : '',
-                    slotValue() === 2 ? 'availability-grid__cell--maybe mine-cell--pressed' : '',
-                    timeIndex() === 0 ? 'availability-grid__cell--first-time' : '',
-                    dayIndex() === 0 ? 'availability-grid__cell--first-day' : '',
-                    !hasSlot() ? 'availability-grid__cell--empty' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
+                <button
+                  type="button"
+                  classList={{
+                    'availability-grid__cell': true,
+                    'availability-grid__cell--yes': slotValue() === 1,
+                    'availability-grid__cell--maybe': slotValue() === 2,
+                    'availability-grid__cell--first-time': timeIndex() === 0,
+                    'availability-grid__cell--first-day': dayIndex() === 0,
+                    'availability-grid__cell--empty': !hasSlot(),
+                  }}
                   style={{
                     '--ti': String(timeIndex()),
                     '--di': String(dayIndex()),
@@ -102,7 +100,7 @@ export default function AvailabilityGrid(props: Props) {
                   <Show when={slotValue() === 2}>
                     <span class="availability-grid__icon">?</span>
                   </Show>
-                </MineCellButton>
+                </button>
               )
             }}
           </For>

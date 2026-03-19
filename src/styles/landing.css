@@ -73,10 +73,7 @@
   padding: var(--space-075) var(--space-100);
 }
 .landing__calendar {
-  display: grid;
-  width: 100%;
-  justify-items: center;
-  padding: var(--space-150) var(--space-200);
+  padding: var(--space-100);
   touch-action: manipulation;
 }
 .landing__date-summary {
@@ -84,7 +81,7 @@
   color: var(--blo);
   margin-top: var(--space-100);
   text-align: center;
-  width: 100%;
+  padding: var(--space-050) var(--space-100);
 }
 .landing__time-select {
   flex: 1;
@@ -98,35 +95,17 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-300);
-  width: calc(var(--size-cell) * 7);
 }
 .cal-header span {
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
 }
 .cal-nav {
-  position: relative;
-  width: var(--size-control);
-  min-width: var(--size-control);
-  height: var(--size-control);
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--fs-xs);
-  line-height: 1;
-  color: var(--black);
-}
-.cal-nav::before {
-  content: '';
-  position: absolute;
-  inset: calc((var(--size-control) - var(--size-cell)) / 2);
+  background: var(--bg);
 }
 .cal-grid {
   display: grid;
-  width: max-content;
-  grid-template-columns: repeat(7, var(--size-cell));
-  margin: 0 auto;
+  grid-template-columns: repeat(7, 1fr);
 }
 .cal-dow {
   text-align: center;
@@ -136,22 +115,56 @@
   font-weight: var(--fw-bold);
 }
 .cal-day {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  text-align: center;
+  font-family: var(--ui);
+  color: var(--black);
+  -webkit-text-fill-color: currentColor;
   font-size: var(--fs-xs);
+  padding: var(--space-075) 0;
+  cursor: pointer;
+  height: calc(var(--space-900) - var(--space-250));
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  touch-action: manipulation;
+}
+.cal-day:disabled {
+  cursor: default;
+}
+.cal-day.selected {
+  background: var(--navy);
+  color: var(--white);
 }
 .cal-day.past {
-  background: var(--bg);
+  color: var(--text-disabled);
+  cursor: default;
 }
 .cal-day.empty {
-  background: var(--bg);
+  cursor: default;
 }
 .cal-day.today {
   font-weight: var(--fw-bold);
 }
 
+/* Apply hover feedback only on pointer/hover-capable devices. */
+@media (hover: hover) and (pointer: fine) {
+  .cal-day:hover:not(.empty):not(.past) {
+    outline: var(--space-025) dotted var(--black);
+    outline-offset: var(--space-n075);
+  }
+}
+
 /* Mobile: make day cells easier to tap (touch target best practice). */
 @media (max-width: 700px) {
   .cal-day {
+    height: var(--size-cell);
     font-size: var(--fs-sm);
+    padding: 0;
   }
   .cal-dow {
     font-size: var(--fs-xs);
@@ -196,6 +209,7 @@
 /* Touch targets: keep classic proportions, slightly enlarge visuals, add invisible slop. */
 @media (pointer: coarse) {
   .win95-window__title-button,
+  .cal-nav,
   .win95-field__arrow,
   .p-rm {
     position: relative;
@@ -205,6 +219,10 @@
     width: var(--size-control);
     height: var(--size-control);
     font-size: var(--fs-xs);
+  }
+  .cal-nav {
+    font-size: var(--fs-xs);
+    padding: var(--space-050) var(--space-225);
   }
   .win95-field__arrow {
     width: var(--size-control);
@@ -216,6 +234,7 @@
   }
 
   .win95-window__title-button::before,
+  .cal-nav::before,
   .win95-field__arrow::before,
   .p-rm::before {
     content: '';

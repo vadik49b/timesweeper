@@ -26,7 +26,6 @@ import {
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
 import ErrorDialog from './components/ErrorDialog'
-import MineCellButton from './components/MineCellButton'
 import AppIcon from './icons/AppIcon'
 import FlagIcon from './icons/FlagIcon'
 
@@ -347,16 +346,15 @@ export default function Landing(props: Props) {
               <For each={DOWS}>{(d) => <div class="cal-dow">{d}</div>}</For>
               <For each={calDays()}>
                 {(day) => (
-                  <MineCellButton
-                    class={[
-                      'cal-day',
-                      day.day === null ? 'empty mine-cell--pressed mine-cell--blank' : '',
-                      day.isPast ? 'past mine-cell--pressed mine-cell--muted' : '',
-                      day.isToday ? 'today' : '',
-                      day.isSelected ? 'selected mine-cell--pressed' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
+                  <button
+                    type="button"
+                    classList={{
+                      'cal-day': true,
+                      empty: day.day === null,
+                      past: day.isPast,
+                      today: day.isToday,
+                      selected: day.isSelected,
+                    }}
                     disabled={day.day === null || day.isPast}
                     aria-label={
                       day.ds
@@ -372,7 +370,7 @@ export default function Landing(props: Props) {
                     onClick={() => day.ds && toggleDate(day.ds)}
                   >
                     {day.day ?? ''}
-                  </MineCellButton>
+                  </button>
                 )}
               </For>
             </div>

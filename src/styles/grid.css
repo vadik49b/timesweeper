@@ -296,54 +296,19 @@
   grid-column: calc(var(--di) + 2);
   grid-row: 1;
 }
-.mine-cell {
+.availability-grid__cell {
   appearance: none;
   -webkit-appearance: none;
-  box-sizing: border-box;
   width: var(--size-cell);
   height: var(--size-cell);
-  min-width: var(--size-cell);
-  min-height: var(--size-cell);
-  max-width: var(--size-cell);
-  max-height: var(--size-cell);
-  flex: 0 0 var(--size-cell);
-  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  text-align: center;
-  font-family: var(--ui);
-  color: var(--black);
-  -webkit-text-fill-color: currentColor;
   font-size: var(--fs-xs);
   background: var(--bg);
   border: var(--border-thick) solid;
   border-color: var(--white) var(--bdk) var(--bdk) var(--white);
-  touch-action: manipulation;
-}
-.mine-cell:disabled {
-  cursor: default;
-}
-.mine-cell--pressed {
-  border-style: solid;
-  border-color: var(--blo);
-  border-width: 0 var(--border-thin) var(--border-thin) 0;
-  background: var(--bg);
-}
-.mine-cell--open {
-  border-style: solid;
-  border-color: var(--blo);
-  border-width: 0 var(--border-thin) var(--border-thin) 0;
-  background: var(--cell-open);
-}
-.mine-cell--muted {
-  color: var(--text-disabled);
-}
-.mine-cell--blank {
-  color: transparent;
-}
-.availability-grid__cell {
   grid-column: calc(var(--di) + 2);
   grid-row: calc(var(--ti) + 2);
 }
@@ -355,12 +320,21 @@
   padding: var(--space-025);
 }
 .availability-grid__cell.availability-grid__cell--yes {
+  border-style: solid;
+  border-color: var(--blo);
+  border-width: 0 var(--border-thin) var(--border-thin) 0;
   background: var(--cell-open);
 }
 .availability-grid__cell.availability-grid__cell--yes .availability-grid__icon {
   color: var(--accent-success);
   font-size: var(--fs-xs);
   pointer-events: none;
+}
+.availability-grid__cell.availability-grid__cell--maybe {
+  border-style: solid;
+  border-color: var(--blo);
+  border-width: 0 var(--border-thin) var(--border-thin) 0;
+  background: var(--bg);
 }
 .availability-grid__cell.availability-grid__cell--maybe .availability-grid__icon {
   color: var(--accent-danger);
