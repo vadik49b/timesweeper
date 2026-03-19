@@ -482,6 +482,13 @@
   grid-template-columns: 1fr;
   row-gap: var(--space-100);
 }
+.summary-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-100) var(--space-200);
+  margin: 0 0 var(--space-150);
+}
 .summary-slots-table__times-cell {
   min-width: var(--min-summary-column);
 }
@@ -516,13 +523,6 @@
   gap: var(--space-150);
   min-width: 0;
 }
-
-.summary-slots-table th.summary-slots-table__num,
-.summary-slots-table td.summary-slots-table__num {
-  text-align: left;
-  width: var(--summary-num-width);
-  white-space: nowrap;
-}
 .summary-slots-mobile-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -543,12 +543,6 @@
 }
 .summary-slots-mobile-card__section + .summary-slots-mobile-card__section {
   margin-top: var(--space-350);
-}
-.summary-slots-mobile-card__label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
-  color: var(--black);
-  margin-bottom: var(--space-150);
 }
 .summary-slots-mobile-table {
   width: 100%;

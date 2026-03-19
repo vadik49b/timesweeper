@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import ParticipantStatusList from './ParticipantStatusList'
+import SummaryInline from './SummaryInline'
 import type { ParticipantSummaryGroups } from '../event-helpers'
 import type { SummaryIntersectionTime } from './ConfirmationSection'
 
@@ -68,13 +69,14 @@ export default function ConfirmationTable(props: Props) {
       fallback={
         <div class="summary-slots-mobile-list">
           <For each={props.rows}>
-            {(splitRow, index) => (
+            {(splitRow) => (
               <div class="summary-slots-mobile-card">
                 <div class="summary-slots-mobile-card__section">
-                  <div class="summary-slots-mobile-card__label">
-                    Option {index() + 1}: {splitRow.yesCount} yes, {splitRow.maybeCount} maybe,{' '}
-                    {splitRow.noCount} no
-                  </div>
+                  <SummaryInline
+                    yesCount={splitRow.yesCount}
+                    maybeCount={splitRow.maybeCount}
+                    noCount={splitRow.noCount}
+                  />
                   <ParticipantStatusList groups={splitRow.groups} />
                 </div>
                 <div class="summary-slots-mobile-card__section">
@@ -124,9 +126,6 @@ export default function ConfirmationTable(props: Props) {
           <thead>
             <tr>
               <th>Participants</th>
-              <th class="summary-slots-table__num">Yes</th>
-              <th class="summary-slots-table__num">Maybe</th>
-              <th class="summary-slots-table__num">No</th>
               <th>Date</th>
               <th>Time</th>
             </tr>
@@ -151,16 +150,12 @@ export default function ConfirmationTable(props: Props) {
                           >
                             <Show when={dayIndex() === 0 && slotIndex() === 0}>
                               <td class="summary-slots-table__people-cell" rowSpan={totalRows}>
+                                <SummaryInline
+                                  yesCount={splitRow.yesCount}
+                                  maybeCount={splitRow.maybeCount}
+                                  noCount={splitRow.noCount}
+                                />
                                 <ParticipantStatusList groups={splitRow.groups} />
-                              </td>
-                              <td class="summary-slots-table__num" rowSpan={totalRows}>
-                                {splitRow.yesCount}
-                              </td>
-                              <td class="summary-slots-table__num" rowSpan={totalRows}>
-                                {splitRow.maybeCount}
-                              </td>
-                              <td class="summary-slots-table__num" rowSpan={totalRows}>
-                                {splitRow.noCount}
                               </td>
                             </Show>
                             <Show when={slotIndex() === 0}>
