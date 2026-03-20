@@ -202,7 +202,7 @@ export default function Landing(props: Props) {
 
   async function create() {
     if (!eventName().trim()) {
-      setValidationError('Please enter an event name.')
+      setValidationError('Please enter a title.')
 
       return
     }
@@ -299,7 +299,7 @@ export default function Landing(props: Props) {
 
       <div class="form-card r">
         <div class="field">
-          <label for="event-name">Event name:</label>
+          <label for="event-name">Title:</label>
           <Win95Field
             kind="input"
             id="event-name"
@@ -314,7 +314,7 @@ export default function Landing(props: Props) {
         </div>
 
         <fieldset class="field landing__group">
-          <legend>Pick dates:</legend>
+          <legend>Which dates might work?</legend>
           <div class="landing__calendar s">
             <div class="cal-header">
               <Win95Button
@@ -446,7 +446,7 @@ export default function Landing(props: Props) {
           </Win95Button>
         </fieldset>
         <Win95Button fullWidth variant="cta" class="create-btn" onClick={create}>
-          <span class="hk">C</span>reate Event
+          <span class="hk">C</span>reate scheduling link
         </Win95Button>
       </div>
 
@@ -455,7 +455,7 @@ export default function Landing(props: Props) {
         <div class="how-steps r">
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">1</div>
-            <div class="how-text">Create an event and share the link with everyone</div>
+            <div class="how-text">Create a scheduling link and share it with everyone</div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">2</div>
@@ -471,18 +471,16 @@ export default function Landing(props: Props) {
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>
-            <div class="how-text">
-              Confirm a time — it's locked in and visible to everyone who opens the link
-            </div>
+            <div class="how-text">Confirm a time — it's locked in and visible to everyone</div>
           </div>
         </div>
       </div>
 
       <div class="landing-section">
-        <div class="section-title">Your recent events</div>
+        <div class="section-title">Your recent links</div>
         <div class="recent-panel r">
           {recentEvents().length === 0 ? (
-            <div class="empty-text recent-empty">No recent events</div>
+            <div class="empty-text recent-empty">No recent links</div>
           ) : (
             recentEvents().map((e) => (
               <a

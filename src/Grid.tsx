@@ -55,9 +55,9 @@ const EMPTY_DISPLAY: DisplayModel = {
 }
 
 const LOADING_MESSAGES = [
-  'Loading event...',
-  'Connecting to the event. First load on a new device can take a few seconds.',
-  'Still connecting. This can take a little longer on a new device.',
+  'Opening link...',
+  'Opening this link for the first time can take a few seconds.',
+  'Still opening. This can take a little longer on a new device.',
 ]
 
 export default function Grid(props: Props) {
@@ -322,7 +322,7 @@ export default function Grid(props: Props) {
     const nextEventName = settingsEventName().trim()
 
     if (!nextEventName) {
-      setDialogError('Event name is required.')
+      setDialogError('Title is required.')
 
       return
     }
@@ -331,7 +331,7 @@ export default function Grid(props: Props) {
     const organizerParticipant = ev.participants[0]
 
     if (!organizerParticipant) {
-      setDialogError('Organizer is missing from this event.')
+      setDialogError('Organizer is missing.')
 
       return
     }
@@ -434,17 +434,17 @@ export default function Grid(props: Props) {
     const ev = event()
 
     if (!ev) {
-      return 'Share the event link with anyone who needs to respond.'
+      return 'Share this link with anyone who needs to respond.'
     }
 
     const organizer = ev.participants[0]?.name ?? 'Unknown'
     const current = currentName()
 
     if (current && getNameKey(current) === getNameKey(organizer)) {
-      return `You are organizing "${ev.name}" event.`
+      return `You set up "${ev.name}".`
     }
 
-    return `${organizer} is organizing "${ev.name}" event.`
+    return `${organizer} set up "${ev.name}".`
   })
   const pageTitle = createMemo(() => {
     const ev = event()
@@ -523,8 +523,8 @@ export default function Grid(props: Props) {
     const people = ev.participants.map((participant) => participant.name).join(', ')
 
     return [
-      `Event: ${ev.name}`,
-      `Created by: ${createdBy}`,
+      `Title: ${ev.name}`,
+      `Set up by: ${createdBy}`,
       `When: ${info.dayLabel} ${info.start}-${info.end} (${localTimezone})`,
       `Participants: ${people}`,
     ].join('\n')
@@ -543,10 +543,10 @@ export default function Grid(props: Props) {
     const createdBy = ev.participants[0]?.name ?? 'Unknown'
     const people = ev.participants.map((participant) => participant.name).join(', ')
     const description = [
-      `Event: ${ev.name}`,
+      `Title: ${ev.name}`,
       `Status: confirmed`,
       `Link: ${pageUrl}`,
-      `Created by: ${createdBy}`,
+      `Set up by: ${createdBy}`,
       `When: ${info.dayLabel} ${info.start} (${localTimezone})`,
       `Participants (${ev.participants.length}): ${people}`,
     ].join('\n')
@@ -868,21 +868,21 @@ export default function Grid(props: Props) {
       <Title>{pageTitle()}</Title>
       <Meta
         name="description"
-        content="Share your availability for this event to help find a time that works for all."
+        content="Share your availability to help find a time that works for everyone."
       />
       <Meta property="og:type" content="website" />
       <Meta property="og:url" content={pageUrl} />
       <Meta property="og:title" content={pageTitle()} />
       <Meta
         property="og:description"
-        content="Share your availability for this event to help find a time that works for all."
+        content="Share your availability to help find a time that works for everyone."
       />
       <Meta property="og:image" content={pageImage} />
       <Meta name="twitter:card" content="summary_large_image" />
       <Meta name="twitter:title" content={pageTitle()} />
       <Meta
         name="twitter:description"
-        content="Share your availability for this event to help find a time that works for all."
+        content="Share your availability to help find a time that works for everyone."
       />
       <Meta name="twitter:image" content={pageImage} />
       <div class="grid-view">
@@ -938,7 +938,7 @@ export default function Grid(props: Props) {
                           </a>
                           ! {introContext()} Share this page with anyone who needs to respond. Fill
                           your availability. The app will suggest the best times. Once a good option
-                          exists, anyone can confirm the event time.
+                          exists, anyone can confirm a time.
                         </p>
                         <section class="grid-view__section">
                           <div class="grid-view__section-header">
@@ -948,7 +948,7 @@ export default function Grid(props: Props) {
                           </div>
                           <div class="grid-view__section-body grid-view__section-body--title">
                             <label for="share-link" class="share-panel__label">
-                              Event link:
+                              Link:
                             </label>
                             <div class="share-panel__link-row row">
                               <Win95Field
@@ -1037,7 +1037,7 @@ export default function Grid(props: Props) {
                           </div>
                           <div class="grid-view__confirmed-details"></div>
                           <p class="grid-view__confirmed-share-note">
-                            The event time is confirmed. You can share this page with everyone who
+                            The time is confirmed. You can share this page with everyone who
                             needs to see the final time.
                           </p>
                           <div class="grid-view__confirmed-actions grid-view__confirmed-actions--primary">
@@ -1067,24 +1067,24 @@ export default function Grid(props: Props) {
                           <div class="grid-view__confirmed-panel-body">
                             <div class="grid-view__confirmed-details">
                               <div>
-                                <b>Created by:</b> {event()?.participants[0]?.name ?? 'Unknown'}
+                                <b>Set up by:</b> {event()?.participants[0]?.name ?? 'Unknown'}
                               </div>
                               <div>
-                                <b>Time confirmed by:</b>{' '}
+                                <b>Confirmed by:</b>{' '}
                                 {event()?.confirmedBy?.trim() ||
                                   event()?.participants[0]?.name ||
                                   'Unknown'}
                               </div>
                             </div>
                             <div class="grid-view__confirmed-undo-copy">
-                              Availability is locked because the event time was confirmed. If plans
+                              Availability is locked because a time was confirmed. If plans
                               change, scheduling can be reopened.
                             </div>
                             <Win95Button
                               class="grid-view__confirmed-undo-btn"
                               onClick={() => setActiveModal('undo-confirm')}
                             >
-                              Undo confirmation
+                              Reopen scheduling
                             </Win95Button>
                           </div>
                         </div>
@@ -1113,8 +1113,8 @@ export default function Grid(props: Props) {
                 }
               >
                 <p class="participant-picker__lead">
-                  {event()?.participants[0]?.name ?? 'Unknown'} is organizing "
-                  {event()?.name ?? 'this event'}" and wants to know when you're available.
+                  {event()?.participants[0]?.name ?? 'Unknown'} set up "
+                  {event()?.name ?? 'this schedule'}" and wants to know when you're available.
                 </p>
                 <p class="participant-picker__label">Who are you?</p>
                 <Show
@@ -1195,7 +1195,7 @@ export default function Grid(props: Props) {
                 <b>3.</b> Check "Summary" to compare best and near-match slots
               </p>
               <p class="help__step">
-                <b>4.</b> Open "Share this event link" and send it to others
+                <b>4.</b> Copy the link and send it to others
               </p>
               <p class="help__step">
                 <b>5.</b> When everyone agrees, click <b>Confirm</b>
@@ -1215,13 +1215,13 @@ export default function Grid(props: Props) {
 
           <Show when={activeModal() === 'settings'}>
             <Win95Dialog
-              title="Event settings"
+              title="Edit details"
               class="dialog--settings"
               bodyClass="dialog-body--settings"
               onClose={() => setActiveModal(null)}
             >
               <label class="settings__label" for="settings-event-name">
-                Event name:
+                Title:
               </label>
               <Win95Field
                 kind="input"
@@ -1237,7 +1237,7 @@ export default function Grid(props: Props) {
               <p class="settings__organizer">{event()?.participants[0]?.name ?? 'Unknown'}</p>
               <p class="settings__label">Dates:</p>
               <p class="settings__organizer">
-                Locked after event creation to keep everyone aligned.
+                Locked after setup to keep everyone aligned.
               </p>
               <p class="settings__label">Participants:</p>
               <div class="settings__participants-list">
@@ -1364,19 +1364,19 @@ export default function Grid(props: Props) {
 
           <Show when={activeModal() === 'undo-confirm'}>
             <Win95Dialog
-              title="Undo confirmation"
+              title="Reopen scheduling"
               class="dialog--confirm"
               bodyClass="dialog-body--confirm"
               onClose={() => setActiveModal(null)}
             >
-              <p class="confirm__lead">Reopen scheduling for this event?</p>
+              <p class="confirm__lead">Reopen scheduling?</p>
               <p class="confirm__note">
                 The confirmed page will go away and everyone will be able to edit availability
                 again.
               </p>
               <div class="dialog-buttons">
                 <Win95Button class="dialog-btn" onClick={undoConfirmedTime}>
-                  Undo confirmation
+                  Reopen scheduling
                 </Win95Button>
                 <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
                   Cancel
