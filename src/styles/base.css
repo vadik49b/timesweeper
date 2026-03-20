@@ -57,7 +57,14 @@
   --fs-lg: 22px;
   --fs-xl: 26px;
   --fs-hero: 42px;
-  --fs-display-title: clamp(34px, 5vw, 56px);
+  --fs-display-title-xl: 56px;
+  --fs-display-title-lg: 48px;
+  --fs-display-title-md: 40px;
+  --fs-display-title-sm: 34px;
+  --fs-display-title: var(--fs-display-title-xl);
+  --fs-confirmed-when-lg: 36px;
+  --fs-confirmed-when-md: 30px;
+  --fs-confirmed-when-sm: 24px;
   --fw-regular: 400;
   --fw-bold: 700;
   --space-0: 0;
