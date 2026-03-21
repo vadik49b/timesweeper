@@ -876,7 +876,6 @@ export default function Grid(props: Props) {
             <Win95Dialog
               title="Edit details"
               class="dialog--settings"
-              bodyClass="dialog-body--settings"
               onClose={() => setActiveModal(null)}
             >
               <label class="settings__label" for="settings-event-name">

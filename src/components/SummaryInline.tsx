@@ -45,9 +45,5 @@ export default function SummaryInline(props: Props) {
   const phrase = summaryPhrase(props)
   const text = phrase ? `${phrase}: ${countsText}` : `Summary: ${countsText}`
 
-  return (
-    <div class="summary-inline">
-      <span>{text}</span>
-    </div>
-  )
+  return <p class="summary-inline">{text}</p>
 }

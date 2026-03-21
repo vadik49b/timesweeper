@@ -98,7 +98,7 @@ export default function OverlapTable(props: Props) {
                             <th scope="row" class="summary-slots-mobile-table__day-cell">
                               {dayGroup.dayLabel}
                             </th>
-                            <td class="summary-slots-mobile-table__times-cell">
+                            <td>
                               <div class="summary-slots-mobile-table__time-list">
                                 <For each={dayGroup.slots}>
                                   {(slot, slotIndex) => (
@@ -142,15 +142,9 @@ export default function OverlapTable(props: Props) {
                 return (
                   <For each={dayGroups}>
                     {(dayGroup, dayIndex) => (
-                      <tr
-                        classList={{
-                          'summary-slots-table__row--best': splitRow.kind === 'best',
-                          'summary-slots-table__row--almost': splitRow.kind === 'almost',
-                          'summary-slots-table__row--partial': splitRow.kind === 'partial',
-                        }}
-                      >
+                      <tr>
                         <Show when={dayIndex() === 0}>
-                          <td class="summary-slots-table__people-cell" rowSpan={totalRows}>
+                          <td rowSpan={totalRows}>
                             <SummaryInline
                               yesCount={splitRow.yesCount}
                               maybeCount={splitRow.maybeCount}
@@ -159,10 +153,10 @@ export default function OverlapTable(props: Props) {
                             <ParticipantStatusList groups={splitRow.groups} />
                           </td>
                         </Show>
-                        <td class="summary-slots-table__date-cell">
+                        <td>
                           <span class="summary-slots-table__date">{dayGroup.dayLabel}</span>
                         </td>
-                        <td class="summary-slots-table__time-cell">
+                        <td>
                           <span class="summary-slots-table__time-text">
                             <For each={dayGroup.slots}>
                               {(slot, slotIndex) => (
