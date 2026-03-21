@@ -180,9 +180,9 @@ export default function ConfirmationSection(props: Props) {
                     >
                       <Show
                         when={showAllSummaryRows()}
-                        fallback={`Show all ${summaryRows().length} groups`}
+                        fallback={`Show all ${summaryRows().length} overlaps`}
                       >
-                        Show fewer groups
+                        Show fewer overlaps
                       </Show>
                     </Win95Button>
                   </div>
