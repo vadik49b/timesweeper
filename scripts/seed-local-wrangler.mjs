@@ -11,8 +11,6 @@ const EVENT_NAME_CELL = 'name'
 const EVENT_CREATED_CELL = 'created'
 const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
 const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
-const EVENT_CONFIRMED_BY_CELL = 'confirmedBy'
-const EVENT_CONFIRMED_START_UTC_CELL = 'confirmedStartUtc'
 const AVAILABILITY_TABLE = 'availability'
 
 const DEFAULTS = {
@@ -257,11 +255,6 @@ function buildSeedTables(event) {
     [EVENT_PARTICIPANT_NAMES_CELL]: event.participants.map((participant) => participant.name),
   }
   const availabilityRows = {}
-
-  if (event.confirmedBy && event.confirmedStartUtc) {
-    eventMetaRow[EVENT_CONFIRMED_BY_CELL] = event.confirmedBy
-    eventMetaRow[EVENT_CONFIRMED_START_UTC_CELL] = event.confirmedStartUtc
-  }
 
   for (const participant of event.participants) {
     if (Object.keys(participant.slots).length > 0) {

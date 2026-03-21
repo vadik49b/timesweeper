@@ -6,7 +6,6 @@ interface Props {
   times: DisplayTime[]
   slotByDayTime: Record<string, DisplaySlot | undefined>
   selectedSlots: SlotMap
-  isConfirmed: boolean
   onCycle: (slotIndex: number) => void
 }
 
@@ -83,7 +82,7 @@ export default function AvailabilityGrid(props: Props) {
                         )}. Activate to cycle.`
                       : `${day.label} at ${time.label}. No availability slot here.`
                   }
-                  disabled={props.isConfirmed || !hasSlot()}
+                  disabled={!hasSlot()}
                   onClick={() => {
                     const nextSlotIndex = slotIndex()
 

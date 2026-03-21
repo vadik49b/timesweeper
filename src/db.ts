@@ -13,8 +13,6 @@ const EVENT_NAME_CELL = 'name'
 const EVENT_CREATED_CELL = 'created'
 const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
 const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
-const EVENT_CONFIRMED_BY_CELL = 'confirmedBy'
-const EVENT_CONFIRMED_START_UTC_CELL = 'confirmedStartUtc'
 const AVAILABILITY_TABLE = 'availability'
 const RECENT_EVENTS_STORAGE_KEY = 'timesweeper-recent-events'
 const SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX = 'timesweeper-selected-participant:'
@@ -82,21 +80,6 @@ function readParticipantNamesFromStore(store: Store, eventId: string): string[] 
   return (store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]) ?? []
 }
 
-function readConfirmedFieldsFromStore(
-  store: Store,
-  eventId: string,
-): Pick<AppEvent, 'confirmedBy' | 'confirmedStartUtc'> {
-  const confirmedBy = store.getCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_BY_CELL)
-  const confirmedStartUtc = store.getCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_START_UTC_CELL)
-
-  return typeof confirmedBy === 'string' && typeof confirmedStartUtc === 'string'
-    ? {
-        confirmedBy,
-        confirmedStartUtc,
-      }
-    : {}
-}
-
 function readParticipantsFromStore(store: Store, participantNames: string[]): Participant[] {
   return participantNames.map((name) => {
     return {
@@ -121,14 +104,12 @@ function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | 
     store,
     readParticipantNamesFromStore(store, eventId),
   )
-  const confirmed = readConfirmedFieldsFromStore(store, eventId)
 
   return {
     id: eventId,
     name: name as string,
     created: created as number,
     ...slotStartsUtcIso,
-    ...confirmed,
     participants,
   }
 }
@@ -159,21 +140,6 @@ function writeParticipantNames(
     EVENT_PARTICIPANT_NAMES_CELL,
     participants.map((participant) => participant.name),
   )
-}
-
-function writeConfirmation(
-  store: EventRoomStore,
-  eventId: string,
-  confirmedBy?: string,
-  confirmedStartUtc?: string,
-): void {
-  if (confirmedBy?.trim() && confirmedStartUtc) {
-    store.setCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_BY_CELL, confirmedBy)
-    store.setCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_START_UTC_CELL, confirmedStartUtc)
-  } else {
-    store.delCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_BY_CELL, true)
-    store.delCell(EVENT_META_TABLE, eventId, EVENT_CONFIRMED_START_UTC_CELL, true)
-  }
 }
 
 function syncParticipantAvailability(store: EventRoomStore, participants: Participant[]): void {
@@ -363,7 +329,6 @@ export async function createEvent(event: AppEvent): Promise<void> {
     writeEventMeta(store, event)
     writeEventSlots(store, event)
     writeParticipantNames(store, event.id, event.participants)
-    writeConfirmation(store, event.id, event.confirmedBy, event.confirmedStartUtc)
     syncParticipantAvailability(store, event.participants)
   })
 }
@@ -383,26 +348,6 @@ export async function updateEventSettings(
     })
     writeParticipantNames(store, eventId, settings.participants)
     syncParticipantAvailability(store, settings.participants)
-  })
-}
-
-export async function confirmEvent(
-  eventId: string,
-  confirmedBy: string,
-  confirmedStartUtc: string,
-): Promise<void> {
-  const store = await requireWritableEventStore(eventId)
-
-  store.transaction(() => {
-    writeConfirmation(store, eventId, confirmedBy, confirmedStartUtc)
-  })
-}
-
-export async function unconfirmEvent(eventId: string): Promise<void> {
-  const store = await requireWritableEventStore(eventId)
-
-  store.transaction(() => {
-    writeConfirmation(store, eventId)
   })
 }
 

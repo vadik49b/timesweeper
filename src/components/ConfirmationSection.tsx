@@ -28,7 +28,6 @@ interface Props {
   event: AppEvent
   currentName: string
   displaySlots: DisplaySlot[]
-  onConfirmSlot: (slot: SummaryIntersectionTime) => void
 }
 
 const SPLIT_ROWS_PREVIEW_COUNT = 10
@@ -134,7 +133,6 @@ export default function ConfirmationSection(props: Props) {
       .filter((participant) => participant.name !== props.currentName)
       .filter((participant) => !hasParticipantAvailability(participant))
       .map((participant) => participant.name)
-    const actionHint = ' Pick one of the suggested times in the table to confirm it for everyone.'
 
     if (summaryRows().length === 0) {
       if (pending.length > 0) {
@@ -145,17 +143,17 @@ export default function ConfirmationSection(props: Props) {
     }
 
     if (pending.length === 0) {
-      return `Suggestions update as participants continue filling availability.${actionHint}`
+      return 'Suggestions update as participants continue filling availability.'
     }
 
-    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't marked availability yet.${actionHint}`
+    return `Suggestions update as participants continue filling availability. ${pending.join(', ')} haven't marked availability yet.`
   })
 
   return (
     <section class="grid-view__section">
       <div class="grid-view__section-header">
         <span class="grid-view__section-number">3.</span>
-        <span>Confirm time</span>
+        <span>Compare best overlaps</span>
         <hr />
       </div>
       <div class="grid-view__section-body">
@@ -172,10 +170,7 @@ export default function ConfirmationSection(props: Props) {
             }
           >
             <div class="summary-table-wrap grid-view__panel-content--title-aligned">
-              <ConfirmationTable
-                rows={visibleSummaryRows()}
-                onConfirm={props.onConfirmSlot}
-              />
+              <ConfirmationTable rows={visibleSummaryRows()} />
               <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
                 <div class="summary-list__meta-row">
                   <div class="summary-list__toggle-row">

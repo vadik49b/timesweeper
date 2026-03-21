@@ -41,8 +41,6 @@ AppEvent {
   id: string
   name: string
   created: number
-  confirmedBy?: string
-  confirmedStartUtc?: string
   slotStartsUtcIso: string[]
   participants: Participant[]
 }
@@ -57,8 +55,8 @@ Participant {
 
 - Win95 visual system with raised/sunken surfaces, status bar, and function bar
 - Landing page creates events with name, date picker, time range, and participant list
-- Grid page supports in-place availability editing, suggestions, share/help dialogs, and confirmation flow
-- Keyboard shortcuts: `F1` / `U` undo, `F3` / `S` share, `F5` confirm dialog, `Ctrl/Cmd+Z` undo
+- Grid page supports in-place availability editing, overlap suggestions, and share/help dialogs
+- Keyboard shortcuts: `F1` / `U` undo, `F3` / `S` share, `Ctrl/Cmd+Z` undo
 
 ## Code Style
 

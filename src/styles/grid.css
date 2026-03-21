@@ -511,26 +511,22 @@
   overflow-x: auto;
 }
 .summary-slots-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   border: var(--border-thin) solid var(--blo);
   font-size: var(--fs-sm);
-  min-width: var(--min-summary-table);
 }
 .summary-slots-table th,
 .summary-slots-table td {
   border: var(--border-thin) solid var(--blo);
-  padding: calc(var(--space-100) + var(--space-025)) var(--space-150);
+  padding: calc(var(--space-100) + var(--space-025)) var(--space-200);
   text-align: left;
   vertical-align: top;
 }
 .summary-slots-table th {
   background: var(--bg);
   font-weight: var(--fw-bold);
-  white-space: nowrap;
-}
-.summary-slots-table__people-cell {
-  min-width: var(--min-summary-column);
 }
 .participant-status-list {
   white-space: normal;
@@ -545,32 +541,11 @@
   gap: var(--space-100) var(--space-200);
   margin: 0 0 var(--space-150);
 }
-.summary-slots-table__times-cell {
-  min-width: var(--min-summary-column);
-}
-.summary-slots-table__date-cell,
-.summary-slots-table__time-cell {
-  white-space: nowrap;
-}
-.summary-slots-table__time-cell {
-  width: 1%;
-}
 .summary-slots-table__date {
   font-weight: var(--fw-bold);
   font-size: var(--fs-xs);
 }
-.summary-slots-table__time-button {
-  width: 100%;
-  justify-content: flex-start;
-}
-.summary-slots-table__times-row + .summary-slots-table__times-row {
-  margin-top: var(--space-075);
-}
-.summary-slots-table__times-day {
-  font-weight: var(--fw-bold);
-  font-size: var(--fs-xs);
-}
-.summary-slots-table__times-list {
+.summary-slots-table__time-text {
   font-size: var(--fs-xs);
   overflow-wrap: anywhere;
 }
@@ -609,28 +584,23 @@
 .summary-slots-mobile-table th,
 .summary-slots-mobile-table td {
   border: var(--border-thin) solid var(--blo);
-  padding: var(--space-150);
+  padding: var(--space-150) var(--space-200);
   vertical-align: top;
   text-align: left;
 }
 .summary-slots-mobile-table__day-cell {
-  width: 1%;
-  white-space: nowrap;
   background: var(--bg);
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
-}
-.summary-slots-mobile-table__times-cell {
-  min-width: 0;
 }
 .summary-slots-mobile-table__time-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-100);
 }
-.summary-slots-mobile-table__time-button {
-  min-width: calc(var(--space-1000) + var(--space-100));
-  min-height: calc(var(--space-700) + var(--space-100));
+.summary-slots-mobile-table__time-text {
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
 }
 .summary-slots-mobile-card .participant-status-list__row {
   display: flex;

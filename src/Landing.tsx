@@ -466,12 +466,12 @@ export default function Landing(props: Props) {
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">3</div>
             <div class="how-text">
-              See suggested times as participants keep filling in their availability
+              As people respond, the app shows the times that work best
             </div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>
-            <div class="how-text">Confirm a time — it's locked in and visible to everyone</div>
+            <div class="how-text">Review the best overlaps the app suggests</div>
           </div>
         </div>
       </div>

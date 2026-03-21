@@ -73,8 +73,6 @@ export interface AppEvent {
   id: string
   name: string
   created: number
-  confirmedBy?: string
-  confirmedStartUtc?: string
   slotStartsUtcIso: string[]
   participants: Participant[]
 }
@@ -390,12 +388,6 @@ export function buildDisplayModel(slotStartsUtcIso: string[]): DisplayModel {
     }),
     slotByDayTime,
   }
-}
-
-export function isEventConfirmed(
-  event: Pick<AppEvent, 'confirmedBy' | 'confirmedStartUtc'>,
-): boolean {
-  return !!event.confirmedBy?.trim() && !!event.confirmedStartUtc
 }
 
 export function participantStatusRows(groups: ParticipantSummaryGroups): ParticipantStatusRow[] {

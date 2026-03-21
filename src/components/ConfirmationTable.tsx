@@ -1,5 +1,4 @@
 import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
-import Win95Button from './Win95Button'
 import ParticipantStatusList from './ParticipantStatusList'
 import SummaryInline from './SummaryInline'
 import type { ParticipantSummaryGroups } from '../event-helpers'
@@ -22,11 +21,17 @@ type SummaryDayGroup = {
 
 interface Props {
   rows: SummarySplitRow[]
-  onConfirm: (slot: SummaryIntersectionTime) => void
 }
 
 export default function ConfirmationTable(props: Props) {
   const [isDesktop, setIsDesktop] = createSignal(false)
+
+  function formatSlotTime(slot: SummaryIntersectionTime): string {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(slot.startUtcIso))
+  }
 
   function slotsByDay(slots: SummaryIntersectionTime[]): SummaryDayGroup[] {
     const dayGroups: SummaryDayGroup[] = []
@@ -97,14 +102,13 @@ export default function ConfirmationTable(props: Props) {
                             <td class="summary-slots-mobile-table__times-cell">
                               <div class="summary-slots-mobile-table__time-list">
                                 <For each={dayGroup.slots}>
-                                  {(slot) => (
-                                    <Win95Button
-                                      size="small"
-                                      class="summary-slots-mobile-table__time-button"
-                                      onClick={() => props.onConfirm(slot)}
-                                    >
-                                      {slot.timeLabel}
-                                    </Win95Button>
+                                  {(slot, slotIndex) => (
+                                    <span class="summary-slots-mobile-table__time-text">
+                                      <Show when={slotIndex() > 0}>
+                                        <span>, </span>
+                                      </Show>
+                                      <span>{formatSlotTime(slot)}</span>
+                                    </span>
                                   )}
                                 </For>
                               </div>
@@ -134,51 +138,46 @@ export default function ConfirmationTable(props: Props) {
             <For each={props.rows}>
               {(splitRow) => {
                 const dayGroups = slotsByDay(splitRow.slots)
-                const totalRows = splitRow.slots.length
+                const totalRows = dayGroups.length
 
                 return (
                   <For each={dayGroups}>
                     {(dayGroup, dayIndex) => (
-                      <For each={dayGroup.slots}>
-                        {(slot, slotIndex) => (
-                          <tr
-                            classList={{
-                              'summary-slots-table__row--best': splitRow.kind === 'best',
-                              'summary-slots-table__row--almost': splitRow.kind === 'almost',
-                              'summary-slots-table__row--partial': splitRow.kind === 'partial',
-                            }}
-                          >
-                            <Show when={dayIndex() === 0 && slotIndex() === 0}>
-                              <td class="summary-slots-table__people-cell" rowSpan={totalRows}>
-                                <SummaryInline
-                                  yesCount={splitRow.yesCount}
-                                  maybeCount={splitRow.maybeCount}
-                                  noCount={splitRow.noCount}
-                                />
-                                <ParticipantStatusList groups={splitRow.groups} />
-                              </td>
-                            </Show>
-                            <Show when={slotIndex() === 0}>
-                              <td
-                                class="summary-slots-table__date-cell"
-                                rowSpan={dayGroup.slots.length}
-                              >
-                                <span class="summary-slots-table__date">{dayGroup.dayLabel}</span>
-                              </td>
-                            </Show>
-                            <td class="summary-slots-table__time-cell">
-                              <Win95Button
-                                size="small"
-                                variant="toolbar"
-                                class="summary-slots-table__time-button"
-                                onClick={() => props.onConfirm(slot)}
-                              >
-                                {slot.timeLabel}
-                              </Win95Button>
-                            </td>
-                          </tr>
-                        )}
-                      </For>
+                      <tr
+                        classList={{
+                          'summary-slots-table__row--best': splitRow.kind === 'best',
+                          'summary-slots-table__row--almost': splitRow.kind === 'almost',
+                          'summary-slots-table__row--partial': splitRow.kind === 'partial',
+                        }}
+                      >
+                        <Show when={dayIndex() === 0}>
+                          <td class="summary-slots-table__people-cell" rowSpan={totalRows}>
+                            <SummaryInline
+                              yesCount={splitRow.yesCount}
+                              maybeCount={splitRow.maybeCount}
+                              noCount={splitRow.noCount}
+                            />
+                            <ParticipantStatusList groups={splitRow.groups} />
+                          </td>
+                        </Show>
+                        <td class="summary-slots-table__date-cell">
+                          <span class="summary-slots-table__date">{dayGroup.dayLabel}</span>
+                        </td>
+                        <td class="summary-slots-table__time-cell">
+                          <span class="summary-slots-table__time-text">
+                            <For each={dayGroup.slots}>
+                              {(slot, slotIndex) => (
+                                <>
+                                  <Show when={slotIndex() > 0}>
+                                    <span>, </span>
+                                  </Show>
+                                  <span>{formatSlotTime(slot)}</span>
+                                </>
+                              )}
+                            </For>
+                          </span>
+                        </td>
+                      </tr>
                     )}
                   </For>
                 )
