@@ -299,6 +299,10 @@ export function getOrderedParticipants(
   })
 }
 
+export function formatParticipantDisplayName(name: string, currentName: string): string {
+  return name === currentName ? `${name} (you)` : name
+}
+
 export function emptyParticipantSummaryGroups(): ParticipantSummaryGroups {
   return {
     yes: [],
@@ -316,7 +320,7 @@ export function getParticipantSummaryGroups(
 
   getOrderedParticipants(event.participants, currentName).forEach((participant) => {
     const value = getParticipantSlotValue(participant, slotStartUtcIso)
-    const displayName = participant.name === currentName ? 'You' : participant.name
+    const displayName = formatParticipantDisplayName(participant.name, currentName)
 
     if (value === 1) {
       groups.yes.push(displayName)

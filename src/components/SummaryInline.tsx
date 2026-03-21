@@ -33,7 +33,7 @@ function summaryPhrase(props: Props) {
     return 'Could work for everyone'
   }
 
-  if (props.noCount === 1 && props.maybeCount === 0) {
+  if (total >= 4 && props.noCount === 1 && props.maybeCount === 0) {
     return 'Works for almost everyone'
   }
 

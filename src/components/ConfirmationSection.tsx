@@ -3,6 +3,7 @@ import Win95Button from './Win95Button'
 import ConfirmationTable from './ConfirmationTable'
 import {
   emptyParticipantSummaryGroups,
+  formatParticipantDisplayName,
   getParticipantSlotValue,
   getOrderedParticipants,
   hasParticipantAvailability,
@@ -49,7 +50,7 @@ export default function ConfirmationSection(props: Props) {
 
       orderedParticipants.forEach((participant) => {
         const value = getParticipantSlotValue(participant, slot.startUtcIso)
-        const displayName = participant.name === props.currentName ? 'You' : participant.name
+        const displayName = formatParticipantDisplayName(participant.name, props.currentName)
 
         key += String(value)
 

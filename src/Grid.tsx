@@ -1,7 +1,9 @@
 import { createSignal, createMemo, onMount, onCleanup, For, Index, Show } from 'solid-js'
+import type { JSX } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
 import {
+  clearSelectedParticipantName,
   closeEventStore,
   type EventSyncState,
   getEvent,
@@ -53,7 +55,6 @@ export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
   const [localReady, setLocalReady] = createSignal(false)
   const [loadingMessageIndex, setLoadingMessageIndex] = createSignal(0)
-  const [newParticipantName, setNewParticipantName] = createSignal('')
 
   const display = createMemo(() => {
     const ev = event()
@@ -249,12 +250,6 @@ export default function Grid(props: Props) {
       .map((name) => name.trim())
       .filter(Boolean)
 
-    if (nextParticipantNames.length < 1) {
-      setDialogError('Add at least one participant before saving.')
-
-      return
-    }
-
     const duplicateName = findDuplicateName(nextParticipantNames, [organizer])
 
     if (duplicateName) {
@@ -293,12 +288,6 @@ export default function Grid(props: Props) {
         ?.name ??
       updatedParticipants[0]?.name ??
       ''
-
-    if (!nextSelected) {
-      setDialogError('At least 2 participants are required.')
-
-      return
-    }
 
     await applyUpdatedEvent(updated, nextSelected)
     setActiveModal(null)
@@ -371,10 +360,17 @@ export default function Grid(props: Props) {
     setActiveModal(null)
   }
 
-  async function addParticipantFromPicker() {
-    const trimmed = newParticipantName().trim()
+  async function addParticipantFromPicker(
+    submitEvent: SubmitEvent & { currentTarget: HTMLFormElement },
+  ) {
+    submitEvent.preventDefault()
+
+    const formData = new FormData(submitEvent.currentTarget)
+    const trimmed = String(formData.get('newParticipantName') ?? '').trim()
 
     if (!trimmed) {
+      setDialogError('Enter your name.')
+
       return
     }
 
@@ -401,7 +397,6 @@ export default function Grid(props: Props) {
       participants: [...ev.participants, { name: trimmed, slots: {} }],
     }
     await applyUpdatedEvent(updated, trimmed)
-    setNewParticipantName('')
     setShowExistingNames(false)
     setActiveModal(null)
   }
@@ -436,6 +431,20 @@ export default function Grid(props: Props) {
 
     if (!previous) {
       initializeSelectedParticipant(next)
+
+      return
+    }
+
+    const selected = currentName()
+    const stillExists = selected
+      ? next.participants.some((participant) => participant.name === selected)
+      : false
+
+    if (!stillExists) {
+      clearSelectedParticipantName(next.id)
+      setCurrentName('')
+      setShowExistingNames(false)
+      setActiveModal('name-picker')
     }
   }
 
@@ -567,6 +576,13 @@ export default function Grid(props: Props) {
     }
 
     return ''
+  })
+  const canCloseNamePicker = createMemo(() => {
+    if (!event()) {
+      return true
+    }
+
+    return !!currentName()
   })
 
   return (
@@ -725,7 +741,10 @@ export default function Grid(props: Props) {
             <Win95Dialog
               title="Who dis?"
               class="dialog--name-picker"
-              onClose={() => (event() ? setActiveModal(null) : goToLanding())}
+              onClose={
+                canCloseNamePicker() ? () => (event() ? setActiveModal(null) : goToLanding()) : undefined
+              }
+              showCloseButton={canCloseNamePicker()}
             >
               <Show
                 when={event()}
@@ -742,29 +761,33 @@ export default function Grid(props: Props) {
                 <label class="participant-picker__label" for="new-participant-name">
                   Your name:
                 </label>
-                <Win95Field
-                  kind="input"
-                  id="new-participant-name"
-                  name="newParticipantName"
-                  value={newParticipantName()}
-                  wrapperClass="dialog__field"
-                  onInput={setNewParticipantName}
-                />
-                <div class="dialog-buttons participant-picker__actions">
-                  <Show when={(event()?.participants.length ?? 0) > 0}>
-                    <button
-                      type="button"
-                      class="participant-picker__toggle"
-                      aria-expanded={showExistingNames()}
-                      onClick={() => setShowExistingNames(!showExistingNames())}
-                    >
-                      I added my name here before
-                    </button>
-                  </Show>
-                  <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
-                    Join
-                  </Win95Button>
-                </div>
+                <form
+                  onSubmit={
+                    addParticipantFromPicker as JSX.EventHandler<HTMLFormElement, SubmitEvent>
+                  }
+                >
+                  <Win95Field
+                    kind="input"
+                    id="new-participant-name"
+                    name="newParticipantName"
+                    wrapperClass="dialog__field"
+                  />
+                  <div class="dialog-buttons participant-picker__actions">
+                    <Show when={(event()?.participants.length ?? 0) > 0}>
+                      <button
+                        type="button"
+                        class="participant-picker__toggle"
+                        aria-expanded={showExistingNames()}
+                        onClick={() => setShowExistingNames(!showExistingNames())}
+                      >
+                        I added my name here before
+                      </button>
+                    </Show>
+                    <Win95Button class="dialog-btn" type="submit">
+                      Join
+                    </Win95Button>
+                  </div>
+                </form>
                 <Show when={showExistingNames() && (event()?.participants.length ?? 0) > 0}>
                   <div class="participant-picker__existing">
                     <Show

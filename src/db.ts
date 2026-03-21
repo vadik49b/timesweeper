@@ -63,6 +63,10 @@ export function setSelectedParticipantName(eventId: string, participantName: str
   localStorage.setItem(`${SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX}${eventId}`, participantName)
 }
 
+export function clearSelectedParticipantName(eventId: string): void {
+  localStorage.removeItem(`${SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX}${eventId}`)
+}
+
 function readSlotStartsUtcIsoFromStore(
   store: Store,
   eventId: string,
