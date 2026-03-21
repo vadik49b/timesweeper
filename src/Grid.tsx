@@ -2,6 +2,7 @@ import { createSignal, createMemo, onMount, onCleanup, For, Index, Show } from '
 import type { JSX } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
+import './styles/grid.css'
 import {
   clearSelectedParticipantName,
   closeEventStore,

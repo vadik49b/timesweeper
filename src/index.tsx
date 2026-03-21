@@ -3,8 +3,6 @@ import { render } from 'solid-js/web'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { MetaProvider } from '@solidjs/meta'
 import './styles/base.css'
-import './styles/grid.css'
-import './styles/landing.css'
 import App from './App.tsx'
 
 const root = document.getElementById('root')
