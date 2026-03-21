@@ -17,7 +17,7 @@ interface BaseProps {
 interface InputProps extends BaseProps {
   kind: 'input'
   type?: 'text' | 'url'
-  value: string
+  value?: string
   placeholder?: string
   readOnly?: boolean
   autoFocus?: boolean
@@ -28,9 +28,9 @@ interface InputProps extends BaseProps {
 
 interface SelectProps extends BaseProps {
   kind: 'select'
-  value: string
+  value?: string
   options: Option[]
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
   selectRef?: (el: HTMLSelectElement) => void
 }
 
@@ -79,7 +79,7 @@ export default function Win95Field(props: Props) {
               id={props.id}
               name={props.name}
               type={props.kind === 'input' ? (props.type ?? 'text') : 'text'}
-              value={props.kind === 'input' ? props.value : ''}
+              value={props.kind === 'input' ? (props.value ?? '') : ''}
               placeholder={props.kind === 'input' ? props.placeholder : ''}
               readOnly={props.kind === 'input' ? props.readOnly : false}
               autofocus={props.kind === 'input' ? props.autoFocus : false}
@@ -102,8 +102,8 @@ export default function Win95Field(props: Props) {
               class={['win95-field__control', props.controlClass].filter(Boolean).join(' ')}
               id={props.id}
               name={props.name}
-              value={props.kind === 'select' ? props.value : ''}
-              onChange={(e) => props.kind === 'select' && props.onChange(e.currentTarget.value)}
+              value={props.kind === 'select' ? (props.value ?? '') : ''}
+              onChange={(e) => props.kind === 'select' && props.onChange?.(e.currentTarget.value)}
             >
               <For each={props.kind === 'select' ? props.options : []}>
                 {(option) => <option value={option.value}>{option.label}</option>}

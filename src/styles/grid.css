@@ -890,6 +890,35 @@
   line-height: 1.4;
   font-weight: var(--fw-regular);
 }
+.participant-picker__actions {
+  align-items: center;
+  justify-content: space-between;
+}
+.participant-picker__toggle {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--black);
+  font-family: var(--ui);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: var(--border-thin);
+  text-underline-offset: var(--space-050);
+  cursor: pointer;
+}
+.participant-picker__toggle:hover {
+  text-decoration-style: solid;
+}
+.participant-picker__toggle:focus-visible {
+  outline: var(--space-025) dotted var(--bdk);
+  outline-offset: var(--space-025);
+}
+.participant-picker__existing {
+  margin-top: var(--space-300);
+}
 .participant-picker__list {
   display: flex;
   flex-wrap: wrap;

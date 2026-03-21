@@ -452,7 +452,15 @@ body {
 
 .error-dialog__actions {
   justify-content: center;
-  margin-top: var(--space-400);
+  margin-top: var(--space-350);
+}
+
+.dialog-body--error > .dialog-buttons:last-child {
+  position: static;
+  bottom: auto;
+  margin: var(--space-350) 0 0;
+  padding: 0;
+  background: transparent;
 }
 
 .copy-status {

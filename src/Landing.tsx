@@ -1,4 +1,5 @@
 import { createSignal, createMemo, onMount, For, Show } from 'solid-js'
+import type { JSX } from 'solid-js'
 import {
   addMinutes,
   getDaysInMonth,
@@ -58,10 +59,6 @@ export default function Landing(props: Props) {
   const [calYear, setCalYear] = createSignal(today.getFullYear())
   const [calMonth, setCalMonth] = createSignal(today.getMonth())
   const [selectedDates, setSelectedDates] = createSignal<Record<string, boolean>>({})
-  const [organizerName, setOrganizerName] = createSignal('')
-  const [eventName, setEventName] = createSignal('')
-  const [timeStart, setTimeStart] = createSignal('10:00')
-  const [timeEnd, setTimeEnd] = createSignal('18:00')
   const [recentEvents, setRecentEvents] = createSignal<RecentEventSummary[]>([])
   const [validationError, setValidationError] = createSignal('')
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -156,8 +153,16 @@ export default function Landing(props: Props) {
     }
   }
 
-  async function create() {
-    if (!eventName().trim()) {
+  async function create(submitEvent: SubmitEvent & { currentTarget: HTMLFormElement }) {
+    submitEvent.preventDefault()
+
+    const formData = new FormData(submitEvent.currentTarget)
+    const title = String(formData.get('eventName') ?? '').trim()
+    const organizer = String(formData.get('organizerName') ?? '').trim()
+    const timeStart = String(formData.get('timeStart') ?? '')
+    const timeEnd = String(formData.get('timeEnd') ?? '')
+
+    if (!title) {
       setValidationError('Please enter a title.')
 
       return
@@ -170,8 +175,8 @@ export default function Landing(props: Props) {
       return
     }
 
-    const defaultWindowStartMin = parseTimeStringToMinutes(timeStart())
-    const defaultWindowEndMin = parseTimeStringToMinutes(timeEnd())
+    const defaultWindowStartMin = parseTimeStringToMinutes(timeStart)
+    const defaultWindowEndMin = parseTimeStringToMinutes(timeEnd)
 
     if (
       defaultWindowStartMin === null ||
@@ -182,8 +187,6 @@ export default function Landing(props: Props) {
 
       return
     }
-
-    const organizer = organizerName().trim()
 
     if (!organizer) {
       setValidationError('Enter your name')
@@ -205,9 +208,9 @@ export default function Landing(props: Props) {
       return
     }
 
-    const event: AppEvent = {
+    const createdEvent: AppEvent = {
       id: nanoid(),
-      name: eventName().trim(),
+      name: title,
       created: Date.now(),
       slotStartsUtcIso,
       participants: [
@@ -217,10 +220,10 @@ export default function Landing(props: Props) {
         },
       ],
     }
-    await createEvent(event)
-    setSelectedParticipantName(event.id, organizer)
-    pushRecentEvent({ id: event.id, name: event.name, created: event.created })
-    props.onOpenEvent(event.id)
+    await createEvent(createdEvent)
+    setSelectedParticipantName(createdEvent.id, organizer)
+    pushRecentEvent({ id: createdEvent.id, name: createdEvent.name, created: createdEvent.created })
+    props.onOpenEvent(createdEvent.id)
   }
 
   return (
@@ -239,19 +242,17 @@ export default function Landing(props: Props) {
         </p>
       </div>
 
-      <div class="form-card r">
+      <form class="form-card r" onSubmit={create as JSX.EventHandler<HTMLFormElement, SubmitEvent>}>
         <div class="field">
           <label for="event-name">Title:</label>
           <Win95Field
             kind="input"
             id="event-name"
             name="eventName"
-            value={eventName()}
             placeholder="e.g. Game Night, Intro Call"
             autoFocus
             wrapperClass="landing__event-name"
             controlClass="landing__text-input-control"
-            onInput={setEventName}
           />
         </div>
 
@@ -328,10 +329,9 @@ export default function Landing(props: Props) {
               id="time-start"
               name="timeStart"
               size="small"
-              value={timeStart()}
+              value="10:00"
               options={TIMES}
               wrapperClass="landing__time-select"
-              onChange={setTimeStart}
             />
             <span>to</span>
             <Win95Field
@@ -339,10 +339,9 @@ export default function Landing(props: Props) {
               id="time-end"
               name="timeEnd"
               size="small"
-              value={timeEnd()}
+              value="18:00"
               options={TIMES}
               wrapperClass="landing__time-select"
-              onChange={setTimeEnd}
             />
           </div>
         </div>
@@ -353,20 +352,14 @@ export default function Landing(props: Props) {
             kind="input"
             id="organizer-name"
             name="organizerName"
-            value={organizerName()}
-            placeholder="Your name"
             wrapperClass="landing__event-name"
             controlClass="landing__text-input-control"
-            onInput={setOrganizerName}
           />
-          <div class="landing__date-summary">
-            Other people can add themselves later from the link.
-          </div>
         </div>
-        <Win95Button fullWidth variant="cta" class="create-btn" onClick={create}>
+        <Win95Button fullWidth variant="cta" class="create-btn" type="submit">
           <span class="hk">C</span>reate scheduling link
         </Win95Button>
-      </div>
+      </form>
 
       <div class="landing-section">
         <div class="how-title">How it works</div>

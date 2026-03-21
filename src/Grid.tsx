@@ -84,6 +84,7 @@ export default function Grid(props: Props) {
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
   const [settingsNewParticipantNames, setSettingsNewParticipantNames] = createSignal<string[]>([''])
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
+  const [showExistingNames, setShowExistingNames] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
   const [isBrowserOnline, setIsBrowserOnline] = createSignal(window.navigator.onLine)
@@ -366,6 +367,7 @@ export default function Grid(props: Props) {
 
     setSelectedParticipantName(ev.id, name)
     setCurrentName(name)
+    setShowExistingNames(false)
     setActiveModal(null)
   }
 
@@ -400,6 +402,7 @@ export default function Grid(props: Props) {
     }
     await applyUpdatedEvent(updated, trimmed)
     setNewParticipantName('')
+    setShowExistingNames(false)
     setActiveModal(null)
   }
 
@@ -409,8 +412,10 @@ export default function Grid(props: Props) {
 
     if (savedName && exists) {
       setCurrentName(savedName)
+      setShowExistingNames(false)
       setActiveModal(null)
     } else {
+      setShowExistingNames(false)
       setActiveModal('name-picker')
     }
   }
@@ -734,59 +739,71 @@ export default function Grid(props: Props) {
                   {event()?.participants[0]?.name ?? 'Unknown'} set up "
                   {event()?.name ?? 'this schedule'}" and wants to know when you're available.
                 </p>
-                <p class="participant-picker__label">Who are you?</p>
-                <Show
-                  when={useParticipantSelect()}
-                  fallback={
-                    <div class="participant-picker__list">
-                      <For each={event()?.participants ?? []}>
-                        {(participant) => (
-                          <Win95Button
-                            size="small"
-                            class={`dialog-btn participant-picker__item${
-                              currentName() === participant.name
-                                ? ' participant-picker__item--selected'
-                                : ''
-                            }`}
-                            onClick={() => {
-                              selectParticipant(participant.name)
-                            }}
-                          >
-                            {participant.name}
-                          </Win95Button>
-                        )}
-                      </For>
-                    </div>
-                  }
-                >
-                  <Win95Field
-                    kind="select"
-                    id="participant-picker-select"
-                    name="participantPicker"
-                    size="small"
-                    value={currentName() || ''}
-                    options={participantPickerOptions()}
-                    wrapperClass="dialog__field participant-picker__select-field"
-                    onChange={onParticipantPickerChange}
-                  />
-                </Show>
                 <label class="participant-picker__label" for="new-participant-name">
-                  Not on the list?
+                  Your name:
                 </label>
                 <Win95Field
                   kind="input"
                   id="new-participant-name"
                   name="newParticipantName"
                   value={newParticipantName()}
-                  placeholder="Enter your name"
                   wrapperClass="dialog__field"
                   onInput={setNewParticipantName}
                 />
-                <div class="dialog-buttons">
+                <div class="dialog-buttons participant-picker__actions">
+                  <Show when={(event()?.participants.length ?? 0) > 0}>
+                    <button
+                      type="button"
+                      class="participant-picker__toggle"
+                      aria-expanded={showExistingNames()}
+                      onClick={() => setShowExistingNames(!showExistingNames())}
+                    >
+                      I added my name here before
+                    </button>
+                  </Show>
                   <Win95Button class="dialog-btn" onClick={addParticipantFromPicker}>
                     Join
                   </Win95Button>
                 </div>
+                <Show when={showExistingNames() && (event()?.participants.length ?? 0) > 0}>
+                  <div class="participant-picker__existing">
+                    <Show
+                      when={useParticipantSelect()}
+                      fallback={
+                        <div class="participant-picker__list">
+                          <For each={event()?.participants ?? []}>
+                            {(participant) => (
+                              <Win95Button
+                                size="small"
+                                class={`dialog-btn participant-picker__item${
+                                  currentName() === participant.name
+                                    ? ' participant-picker__item--selected'
+                                    : ''
+                                }`}
+                                onClick={() => {
+                                  selectParticipant(participant.name)
+                                }}
+                              >
+                                {participant.name}
+                              </Win95Button>
+                            )}
+                          </For>
+                        </div>
+                      }
+                    >
+                      <Win95Field
+                        kind="select"
+                        id="participant-picker-select"
+                        name="participantPicker"
+                        size="small"
+                        value={currentName() || ''}
+                        options={participantPickerOptions()}
+                        wrapperClass="dialog__field participant-picker__select-field"
+                        onChange={onParticipantPickerChange}
+                      />
+                    </Show>
+                  </div>
+                </Show>
               </Show>
             </Win95Dialog>
           </Show>

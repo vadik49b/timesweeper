@@ -6,9 +6,10 @@ interface Props {
   variant?: 'default' | 'toolbar' | 'icon' | 'cta'
   fullWidth?: boolean
   disabled?: boolean
+  type?: 'button' | 'submit' | 'reset'
   title?: string
   ariaLabel?: string
-  onClick: JSX.EventHandlerUnion<HTMLButtonElement, MouseEvent>
+  onClick?: JSX.EventHandlerUnion<HTMLButtonElement, MouseEvent>
   children: JSX.Element
 }
 
@@ -27,7 +28,7 @@ export default function Win95Button(props: Props) {
 
   return (
     <button
-      type="button"
+      type={props.type ?? 'button'}
       class={className()}
       onClick={props.onClick}
       disabled={props.disabled}
