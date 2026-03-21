@@ -22,7 +22,7 @@ import Win95Dialog from './components/Win95Dialog'
 import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import AvailabilityGrid from './components/AvailabilityGrid'
-import ConfirmationSection from './components/ConfirmationSection'
+import OverlapSection from './components/OverlapSection'
 import MineIcon from './icons/MineIcon'
 import {
   type AppEvent,
@@ -722,7 +722,7 @@ export default function Grid(props: Props) {
 
                     <Show when={event()}>
                       {(loadedEvent) => (
-                        <ConfirmationSection
+                        <OverlapSection
                           event={loadedEvent()}
                           currentName={currentName()}
                           displaySlots={displaySlots()}

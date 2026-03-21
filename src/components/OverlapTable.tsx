@@ -1,8 +1,7 @@
 import { createSignal, onCleanup, onMount, For, Show } from 'solid-js'
 import ParticipantStatusList from './ParticipantStatusList'
 import SummaryInline from './SummaryInline'
-import type { ParticipantSummaryGroups } from '../event-helpers'
-import type { SummaryIntersectionTime } from './ConfirmationSection'
+import type { DisplaySlot, ParticipantSummaryGroups } from '../event-helpers'
 
 type SummarySplitRow = {
   key: string
@@ -11,29 +10,29 @@ type SummarySplitRow = {
   maybeCount: number
   noCount: number
   kind: 'best' | 'almost' | 'partial'
-  slots: SummaryIntersectionTime[]
+  slots: DisplaySlot[]
 }
 
 type SummaryDayGroup = {
   dayLabel: string
-  slots: SummaryIntersectionTime[]
+  slots: DisplaySlot[]
 }
 
 interface Props {
   rows: SummarySplitRow[]
 }
 
-export default function ConfirmationTable(props: Props) {
+export default function OverlapTable(props: Props) {
   const [isDesktop, setIsDesktop] = createSignal(false)
 
-  function formatSlotTime(slot: SummaryIntersectionTime): string {
+  function formatSlotTime(slot: DisplaySlot): string {
     return new Intl.DateTimeFormat(undefined, {
       hour: 'numeric',
       minute: '2-digit',
     }).format(new Date(slot.startUtcIso))
   }
 
-  function slotsByDay(slots: SummaryIntersectionTime[]): SummaryDayGroup[] {
+  function slotsByDay(slots: DisplaySlot[]): SummaryDayGroup[] {
     const dayGroups: SummaryDayGroup[] = []
 
     slots.forEach((slot) => {

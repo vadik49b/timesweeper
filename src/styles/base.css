@@ -35,9 +35,8 @@
   --landing-max: 420px;
   --max-grid-shell: 1100px;
   --max-dialog-help: 380px;
-  --max-dialog-confirm: 340px;
+  --max-dialog-error: 340px;
   --max-dialog-name-picker: 360px;
-  --max-dialog-confirmed: 460px;
   --max-field-share: 312px;
   --min-summary-table: 560px;
   --min-summary-column: 220px;
@@ -46,7 +45,6 @@
   --title-shadow-soft: 1px 1px 0 var(--navy);
   --window-shadow: 2px 2px 0 var(--black);
   --overlay-dialog: rgba(192, 192, 192, 0.35);
-  --overlay-confirmed: rgba(192, 192, 192, 0.72);
   --text-disabled: #a0a0a0;
   --text-link-hover: #a0a0ff;
   --text-footer: #a0c0c0;
@@ -62,9 +60,6 @@
   --fs-display-title-md: 40px;
   --fs-display-title-sm: 34px;
   --fs-display-title: var(--fs-display-title-xl);
-  --fs-confirmed-when-lg: 36px;
-  --fs-confirmed-when-md: 30px;
-  --fs-confirmed-when-sm: 24px;
   --fw-regular: 400;
   --fw-bold: 700;
   --space-0: 0;
@@ -347,7 +342,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--overlay-confirmed);
+  background: var(--overlay-dialog);
   z-index: 100;
   display: flex;
   justify-content: center;
@@ -404,8 +399,8 @@ body {
 }
 
 .dialog--error {
-  width: min(var(--max-dialog-confirm), calc(100vw - var(--space-400)));
-  max-width: var(--max-dialog-confirm);
+  width: min(var(--max-dialog-error), calc(100vw - var(--space-400)));
+  max-width: var(--max-dialog-error);
 }
 
 @media (max-width: 700px) {

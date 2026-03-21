@@ -1,6 +1,6 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import Win95Button from './Win95Button'
-import ConfirmationTable from './ConfirmationTable'
+import OverlapTable from './OverlapTable'
 import {
   emptyParticipantSummaryGroups,
   formatParticipantDisplayName,
@@ -12,7 +12,7 @@ import {
   type ParticipantSummaryGroups,
 } from '../event-helpers'
 
-export type SummaryIntersectionTime = DisplaySlot
+type SummaryIntersectionTime = DisplaySlot
 type SummarySplitRow = {
   key: string
   groups: ParticipantSummaryGroups
@@ -33,7 +33,7 @@ interface Props {
 
 const SPLIT_ROWS_PREVIEW_COUNT = 10
 
-export default function ConfirmationSection(props: Props) {
+export default function OverlapSection(props: Props) {
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
 
   const summaryRows = createMemo<SummarySplitRow[]>(() => {
@@ -171,7 +171,7 @@ export default function ConfirmationSection(props: Props) {
             }
           >
             <div class="summary-table-wrap grid-view__panel-content--title-aligned">
-              <ConfirmationTable rows={visibleSummaryRows()} />
+              <OverlapTable rows={visibleSummaryRows()} />
               <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
                 <div class="summary-list__meta-row">
                   <div class="summary-list__toggle-row">
