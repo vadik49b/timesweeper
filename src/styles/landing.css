@@ -86,10 +86,6 @@
 .landing__time-select {
   flex: 1;
 }
-.landing__participant-field {
-  flex: 1;
-}
-
 .cal-header {
   display: flex;
   align-items: center;
@@ -179,39 +175,11 @@
   font-size: var(--fs-xs);
 }
 
-.participant-row {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-100);
-  margin-bottom: var(--space-100);
-}
-
-.participant-row button {
-  margin-bottom: var(--space-050);
-}
-
-.participant-row__field {
-  flex: 1;
-}
-
-
-.participant-row__label {
-  display: block;
-  font-size: var(--fs-xs);
-  margin-bottom: var(--space-050);
-  font-weight: var(--fw-bold);
-}
-
-.p-rm {
-  background: var(--bg);
-}
-
 /* Touch targets: keep classic proportions, slightly enlarge visuals, add invisible slop. */
 @media (pointer: coarse) {
   .win95-window__title-button,
   .cal-nav,
-  .win95-field__arrow,
-  .p-rm {
+  .win95-field__arrow {
     position: relative;
   }
 
@@ -228,15 +196,10 @@
     width: var(--size-control);
     font-size: var(--fs-xxs);
   }
-  .p-rm {
-    font-size: var(--fs-xs);
-    padding: var(--space-050) calc(var(--space-200) - var(--space-025));
-  }
 
   .win95-window__title-button::before,
   .cal-nav::before,
-  .win95-field__arrow::before,
-  .p-rm::before {
+  .win95-field__arrow::before {
     content: '';
     position: absolute;
     inset: var(--space-n225);
@@ -246,10 +209,6 @@
   .win95-field__arrow::before {
     inset: var(--space-n225) var(--space-n150);
   }
-}
-.add-btn {
-  background: var(--bg);
-  margin-top: var(--space-100);
 }
 
 .create-btn {

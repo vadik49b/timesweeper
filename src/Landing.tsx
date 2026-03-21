@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect, onMount, For, Index, Show } from 'solid-js'
+import { createSignal, createMemo, onMount, For, Show } from 'solid-js'
 import {
   addMinutes,
   getDaysInMonth,
@@ -11,7 +11,6 @@ import {
 import { nanoid } from 'nanoid'
 import {
   buildSlotStartsUtcIso,
-  findDuplicateName,
   parseTimeStringToMinutes,
   SLOT_DURATION,
   type AppEvent,
@@ -59,14 +58,12 @@ export default function Landing(props: Props) {
   const [calYear, setCalYear] = createSignal(today.getFullYear())
   const [calMonth, setCalMonth] = createSignal(today.getMonth())
   const [selectedDates, setSelectedDates] = createSignal<Record<string, boolean>>({})
-  const [participants, setParticipants] = createSignal(['', ''])
+  const [organizerName, setOrganizerName] = createSignal('')
   const [eventName, setEventName] = createSignal('')
   const [timeStart, setTimeStart] = createSignal('10:00')
   const [timeEnd, setTimeEnd] = createSignal('18:00')
   const [recentEvents, setRecentEvents] = createSignal<RecentEventSummary[]>([])
-  const [pendingParticipantFocus, setPendingParticipantFocus] = createSignal<number | null>(null)
   const [validationError, setValidationError] = createSignal('')
-  const participantInputRefs: HTMLInputElement[] = []
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   onMount(() => {
@@ -159,47 +156,6 @@ export default function Landing(props: Props) {
     }
   }
 
-  function addParticipant() {
-    const nextIndex = participants().length
-    setParticipants([...participants(), ''])
-    setPendingParticipantFocus(nextIndex)
-  }
-
-  function removeParticipant(i: number) {
-    if (i === 0 || participants().length <= 1) {
-      return
-    }
-
-    setParticipants(participants().filter((_, idx) => idx !== i))
-  }
-
-  function updateParticipant(i: number, val: string) {
-    const next = [...participants()]
-    next[i] = val
-    setParticipants(next)
-  }
-
-  createEffect(() => {
-    const idx = pendingParticipantFocus()
-
-    if (idx === null) {
-      return
-    }
-
-    participants()
-    queueMicrotask(() => {
-      const input = participantInputRefs[idx]
-
-      if (!input) {
-        return
-      }
-
-      input.focus()
-      input.select()
-      setPendingParticipantFocus(null)
-    })
-  })
-
   async function create() {
     if (!eventName().trim()) {
       setValidationError('Please enter a title.')
@@ -227,29 +183,13 @@ export default function Landing(props: Props) {
       return
     }
 
-    const trimmedParticipants = participants().map((p) => p.trim())
-    const participantNames = trimmedParticipants.filter(Boolean)
-    const duplicateName = findDuplicateName(participantNames)
+    const organizer = organizerName().trim()
 
-    if (!trimmedParticipants[0]) {
+    if (!organizer) {
       setValidationError('Enter your name')
 
       return
     }
-
-    if (participantNames.length < 2) {
-      setValidationError('Please add at least one other participant.')
-
-      return
-    }
-
-    if (duplicateName) {
-      setValidationError(`Duplicate name: "${duplicateName}". Use unique names.`)
-
-      return
-    }
-
-    setParticipants(participantNames)
     setValidationError('')
     const slotStartsUtcIso = buildSlotStartsUtcIso({
       dates,
@@ -270,13 +210,15 @@ export default function Landing(props: Props) {
       name: eventName().trim(),
       created: Date.now(),
       slotStartsUtcIso,
-      participants: participantNames.map((name) => ({
-        name,
-        slots: {},
-      })),
+      participants: [
+        {
+          name: organizer,
+          slots: {},
+        },
+      ],
     }
     await createEvent(event)
-    setSelectedParticipantName(event.id, participantNames[0])
+    setSelectedParticipantName(event.id, organizer)
     pushRecentEvent({ id: event.id, name: event.name, created: event.created })
     props.onOpenEvent(event.id)
   }
@@ -405,46 +347,22 @@ export default function Landing(props: Props) {
           </div>
         </div>
 
-        <fieldset class="field landing__group">
-          <legend>Participants</legend>
-          <Index each={participants()}>
-            {(p, i) => (
-              <div class="participant-row">
-                <div class="participant-row__field">
-                  <label class="participant-row__label" for={`participant-${i}`}>
-                    {i === 0 ? 'You' : `Participant ${i + 1}`}
-                  </label>
-                  <Win95Field
-                    kind="input"
-                    id={`participant-${i}`}
-                    name={`participant-${i}`}
-                    value={p()}
-                    placeholder="Name"
-                    wrapperClass="landing__participant-field"
-                    controlClass="landing__text-input-control"
-                    inputRef={(el) => {
-                      participantInputRefs[i] = el
-                    }}
-                    onInput={(value) => updateParticipant(i, value)}
-                  />
-                </div>
-                {i > 0 && (
-                  <Win95Button
-                    size="small"
-                    variant="icon"
-                    class="p-rm"
-                    onClick={() => removeParticipant(i)}
-                  >
-                    x <span class="sr-only">Remove participant {i + 1}</span>
-                  </Win95Button>
-                )}
-              </div>
-            )}
-          </Index>
-          <Win95Button size="small" variant="toolbar" class="add-btn" onClick={addParticipant}>
-            <span class="hk">A</span>dd participant
-          </Win95Button>
-        </fieldset>
+        <div class="field">
+          <label for="organizer-name">Your name:</label>
+          <Win95Field
+            kind="input"
+            id="organizer-name"
+            name="organizerName"
+            value={organizerName()}
+            placeholder="Your name"
+            wrapperClass="landing__event-name"
+            controlClass="landing__text-input-control"
+            onInput={setOrganizerName}
+          />
+          <div class="landing__date-summary">
+            Other people can add themselves later from the link.
+          </div>
+        </div>
         <Win95Button fullWidth variant="cta" class="create-btn" onClick={create}>
           <span class="hk">C</span>reate scheduling link
         </Win95Button>
