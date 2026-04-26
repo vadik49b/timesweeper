@@ -1,4 +1,4 @@
-import { createSignal, createMemo, onMount, onCleanup, For, Index, Show } from 'solid-js'
+import { createSignal, createMemo, onMount, onCleanup, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
@@ -24,7 +24,11 @@ import ErrorDialog from './components/ErrorDialog'
 import AvailabilityLegend from './components/AvailabilityLegend'
 import AvailabilityGrid from './components/AvailabilityGrid'
 import OverlapSection from './components/OverlapSection'
+import GridSection from './components/GridSection'
+import DialogActions from './components/DialogActions'
+import SettingsDialog from './components/SettingsDialog'
 import MineIcon from './icons/MineIcon'
+import { DISPLAY_TIMEZONE_STORAGE_KEY, getTimezoneOptions } from './timezone-options'
 import {
   type AppEvent,
   buildDisplayModel,
@@ -51,34 +55,6 @@ const LOADING_MESSAGES = [
   'Opening this link for the first time can take a few seconds.',
   'Still opening. This can take a little longer on a new device.',
 ]
-const DISPLAY_TIMEZONE_STORAGE_KEY = 'timesweeper-display-timezone'
-
-function getTimezoneOptions(selectedTimezone: string): { value: string; label: string }[] {
-  const supportedValuesOf = Intl.supportedValuesOf as ((key: 'timeZone') => string[]) | undefined
-  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const timezones = supportedValuesOf ? supportedValuesOf('timeZone') : [browserTimezone]
-
-  return [...new Set([browserTimezone, selectedTimezone, ...timezones])]
-    .map((timezone) => ({
-      value: timezone,
-      label: formatTimezoneOptionLabel(timezone),
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label))
-}
-
-function formatTimezoneOptionLabel(timezone: string): string {
-  const offset =
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      timeZoneName: 'shortOffset',
-    })
-      .formatToParts(new Date())
-      .find((part) => part.type === 'timeZoneName')?.value ?? 'GMT'
-  const parts = timezone.split('/')
-  const city = parts[parts.length - 1]?.replaceAll('_', ' ') ?? timezone.replaceAll('_', ' ')
-
-  return `${city} — ${offset}`
-}
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
@@ -706,67 +682,57 @@ export default function Grid(props: Props) {
                       ! {introContext()} Share this page with anyone who needs to respond. Fill your
                       availability. The app will show the strongest overlaps.
                     </p>
-                    <section class="grid-view__section">
-                      <div class="grid-view__section-header">
-                        <span class="grid-view__section-number">1.</span>
-                        <span>Share the link with everyone</span>
-                        <hr />
-                      </div>
-                      <div class="grid-view__section-body grid-view__section-body--title">
-                        <label for="share-link" class="share-panel__label">
-                          Link:
-                        </label>
-                        <div class="share-panel__link-row row">
-                          <Win95Field
-                            kind="input"
-                            id="share-link"
-                            name="shareLink"
-                            type="url"
-                            size="small"
-                            value={pageUrl}
-                            readOnly
-                            wrapperClass="dialog__field share-panel__field"
-                            inputRef={(el) => {
-                              shareInputRef = el
-                            }}
-                            onClick={() => shareInputRef.select()}
-                          />
-                          <Win95Button
-                            size="small"
-                            variant="toolbar"
-                            class="share-panel__copy-btn"
-                            onClick={() => copyLink(pageUrl)}
-                          >
-                            <span class="hk">C</span>opy
-                          </Win95Button>
-                          <div class="copy-status" aria-live="polite">
-                            {copyStatus()}
-                          </div>
+                    <GridSection
+                      number={1}
+                      title="Share the link with everyone"
+                      bodyClass="grid-view__section-body--title"
+                    >
+                      <label for="share-link" class="share-panel__label">
+                        Link:
+                      </label>
+                      <div class="share-panel__link-row row">
+                        <Win95Field
+                          kind="input"
+                          id="share-link"
+                          name="shareLink"
+                          type="url"
+                          size="small"
+                          value={pageUrl}
+                          readOnly
+                          wrapperClass="dialog__field share-panel__field"
+                          inputRef={(el) => {
+                            shareInputRef = el
+                          }}
+                          onClick={() => shareInputRef.select()}
+                        />
+                        <Win95Button
+                          size="small"
+                          variant="toolbar"
+                          class="share-panel__copy-btn"
+                          onClick={() => copyLink(pageUrl)}
+                        >
+                          <span class="hk">C</span>opy
+                        </Win95Button>
+                        <div class="copy-status" aria-live="polite">
+                          {copyStatus()}
                         </div>
                       </div>
-                    </section>
+                    </GridSection>
 
-                    <section class="grid-view__section">
-                      <div class="grid-view__section-header">
-                        <span class="grid-view__section-number">2.</span>
-                        <span>Mark your availability</span>
-                        <hr />
+                    <GridSection number={2} title="Mark your availability">
+                      <div class="grid-view__legend">
+                        <AvailabilityLegend withLabels />
                       </div>
-                      <div class="grid-view__section-body">
-                        <div class="grid-view__legend">
-                          <AvailabilityLegend withLabels />
-                        </div>
-                        <div class="availability-grid-wrap">
-                          <AvailabilityGrid
-                            days={days()}
-                            times={times()}
-                            slotByDayTime={slotByDayTime()}
-                            selectedSlots={selectedSlots()}
-                            onCycle={cycleCell}
-                          />
-                        </div>
+                      <div class="availability-grid-wrap">
+                        <AvailabilityGrid
+                          days={days()}
+                          times={times()}
+                          slotByDayTime={slotByDayTime()}
+                          selectedSlots={selectedSlots()}
+                          onCycle={cycleCell}
+                        />
                       </div>
-                    </section>
+                    </GridSection>
 
                     <Show when={event()}>
                       {(loadedEvent) => (
@@ -822,7 +788,7 @@ export default function Grid(props: Props) {
                     name="newParticipantName"
                     wrapperClass="dialog__field"
                   />
-                  <div class="dialog-buttons participant-picker__actions">
+                  <DialogActions class="participant-picker__actions">
                     <Show when={(event()?.participants.length ?? 0) > 0}>
                       <button
                         type="button"
@@ -836,7 +802,7 @@ export default function Grid(props: Props) {
                     <Win95Button class="dialog-btn" type="submit">
                       Join
                     </Win95Button>
-                  </div>
+                  </DialogActions>
                 </form>
                 <Show when={showExistingNames() && (event()?.participants.length ?? 0) > 0}>
                   <div class="participant-picker__existing">
@@ -913,124 +879,33 @@ export default function Grid(props: Props) {
                 <br />
                 <span class="help__key-line">F3 / S — Focus share link</span>
               </p>
-              <div class="dialog-buttons">
+              <DialogActions>
                 <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
                   OK
                 </Win95Button>
-              </div>
+              </DialogActions>
             </Win95Dialog>
           </Show>
 
           <Show when={activeModal() === 'settings'}>
-            <Win95Dialog
-              title="Edit details"
-              class="dialog--settings"
-              onClose={() => setActiveModal(null)}
-            >
-              <label class="settings__label" for="settings-event-name">
-                Title:
-              </label>
-              <Win95Field
-                kind="input"
-                id="settings-event-name"
-                name="settingsEventName"
-                value={settingsEventName()}
-                wrapperClass="dialog__field"
-                onInput={setSettingsEventName}
-              />
-              <label class="settings__label" for="settings-organizer-name">
-                Organizer:
-              </label>
-              <p class="settings__organizer">{event()?.participants[0]?.name ?? 'Unknown'}</p>
-              <p class="settings__label">Dates:</p>
-              <p class="settings__organizer">Locked after setup to keep everyone aligned.</p>
-              <p class="settings__label">Participants:</p>
-              <div class="settings__participants-list">
-                <table class="settings__participants-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th class="settings__participants-action-col">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={visibleSettingsParticipantNames()}>
-                      {(participantName, index) => (
-                        <tr>
-                          <td class="settings__participant-name">{participantName}</td>
-                          <td class="settings__participant-action-cell">
-                            <Win95Button
-                              size="small"
-                              variant="toolbar"
-                              class="settings__participant-remove"
-                              onClick={() => removeSettingsParticipant(index())}
-                            >
-                              Remove
-                            </Win95Button>
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                    <Index each={settingsNewParticipantNames()}>
-                      {(participantName, index) => (
-                        <tr>
-                          <td class="settings__participant-input-cell">
-                            <Win95Field
-                              kind="input"
-                              name={`settingsNewParticipantName${index}`}
-                              size="small"
-                              value={participantName()}
-                              placeholder="Name"
-                              wrapperClass="settings__participant-input"
-                              onInput={(value) => updateSettingsParticipantRow(index, value)}
-                            />
-                          </td>
-                          <td class="settings__participant-action-cell">
-                            <Win95Button
-                              size="small"
-                              variant="toolbar"
-                              class="settings__participant-remove"
-                              onClick={() => removeSettingsParticipantRow(index)}
-                            >
-                              Remove
-                            </Win95Button>
-                          </td>
-                        </tr>
-                      )}
-                    </Index>
-                  </tbody>
-                </table>
-              </div>
-              <div class="settings__participants-actions">
-                <Win95Button size="small" variant="toolbar" onClick={addSettingsParticipantRow}>
-                  Add another row
-                </Win95Button>
-              </div>
-              <Show when={settingsParticipantNames().length > 5}>
-                <div class="settings__participants-toggle">
-                  <Win95Button
-                    size="small"
-                    variant="toolbar"
-                    onClick={() => setShowAllSettingsParticipants(!showAllSettingsParticipants())}
-                  >
-                    <Show
-                      when={showAllSettingsParticipants()}
-                      fallback={`Show all ${settingsParticipantNames().length} participants`}
-                    >
-                      Show fewer participants
-                    </Show>
-                  </Win95Button>
-                </div>
-              </Show>
-              <div class="dialog-buttons">
-                <Win95Button class="dialog-btn" onClick={saveSettings}>
-                  Save
-                </Win95Button>
-                <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
-                  Cancel
-                </Win95Button>
-              </div>
-            </Win95Dialog>
+            <SettingsDialog
+              eventName={settingsEventName()}
+              organizerName={event()?.participants[0]?.name ?? 'Unknown'}
+              participantNames={settingsParticipantNames()}
+              visibleParticipantNames={visibleSettingsParticipantNames()}
+              newParticipantNames={settingsNewParticipantNames()}
+              showAllParticipants={showAllSettingsParticipants()}
+              onEventNameInput={setSettingsEventName}
+              onRemoveParticipant={removeSettingsParticipant}
+              onAddParticipantRow={addSettingsParticipantRow}
+              onUpdateParticipantRow={updateSettingsParticipantRow}
+              onRemoveParticipantRow={removeSettingsParticipantRow}
+              onToggleAllParticipants={() =>
+                setShowAllSettingsParticipants(!showAllSettingsParticipants())
+              }
+              onSave={saveSettings}
+              onCancel={() => setActiveModal(null)}
+            />
           </Show>
 
           <Show when={!!dialogError()}>

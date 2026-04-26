@@ -1,6 +1,7 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import Win95Button from './Win95Button'
 import OverlapTable from './OverlapTable'
+import GridSection from './GridSection'
 import {
   emptyParticipantSummaryGroups,
   formatParticipantDisplayName,
@@ -151,48 +152,41 @@ export default function OverlapSection(props: Props) {
   })
 
   return (
-    <section class="grid-view__section">
-      <div class="grid-view__section-header">
-        <span class="grid-view__section-number">3.</span>
-        <span>Compare best overlaps</span>
-        <hr />
-      </div>
-      <div class="grid-view__section-body">
-        <p class="grid-view__suggestions-helper grid-view__panel-content--title-aligned">
-          {suggestionsHelperText()}
-        </p>
-        <Show when={canShowSuggestions()} fallback={<></>}>
-          <Show
-            when={summaryRows().length > 0}
-            fallback={
-              <div class="empty-text grid-view__panel-content--title-aligned">
-                No candidate times yet
-              </div>
-            }
-          >
-            <div class="summary-table-wrap grid-view__panel-content--title-aligned">
-              <OverlapTable rows={visibleSummaryRows()} />
-              <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
-                <div class="summary-list__meta-row">
-                  <div class="summary-list__toggle-row">
-                    <Win95Button
-                      size="small"
-                      onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
-                    >
-                      <Show
-                        when={showAllSummaryRows()}
-                        fallback={`Show all ${summaryRows().length} overlaps`}
-                      >
-                        Show fewer overlaps
-                      </Show>
-                    </Win95Button>
-                  </div>
-                </div>
-              </Show>
+    <GridSection number={3} title="Compare best overlaps">
+      <p class="grid-view__suggestions-helper grid-view__panel-content--title-aligned">
+        {suggestionsHelperText()}
+      </p>
+      <Show when={canShowSuggestions()} fallback={<></>}>
+        <Show
+          when={summaryRows().length > 0}
+          fallback={
+            <div class="empty-text grid-view__panel-content--title-aligned">
+              No candidate times yet
             </div>
-          </Show>
+          }
+        >
+          <div class="summary-table-wrap grid-view__panel-content--title-aligned">
+            <OverlapTable rows={visibleSummaryRows()} />
+            <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
+              <div class="summary-list__meta-row">
+                <div class="summary-list__toggle-row">
+                  <Win95Button
+                    size="small"
+                    onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
+                  >
+                    <Show
+                      when={showAllSummaryRows()}
+                      fallback={`Show all ${summaryRows().length} overlaps`}
+                    >
+                      Show fewer overlaps
+                    </Show>
+                  </Win95Button>
+                </div>
+              </div>
+            </Show>
+          </div>
         </Show>
-      </div>
-    </section>
+      </Show>
+    </GridSection>
   )
 }

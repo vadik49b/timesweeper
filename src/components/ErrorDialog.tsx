@@ -1,5 +1,6 @@
 import Win95Button from './Win95Button'
 import Win95Dialog from './Win95Dialog'
+import DialogActions from './DialogActions'
 
 interface Props {
   message: string
@@ -21,11 +22,11 @@ export default function ErrorDialog(props: Props) {
         </span>
         <p class="error-dialog__text">{props.message}</p>
       </div>
-      <div class="dialog-buttons error-dialog__actions">
+      <DialogActions class="error-dialog__actions">
         <Win95Button class="dialog-btn" onClick={props.onClose}>
           OK
         </Win95Button>
-      </div>
+      </DialogActions>
     </Win95Dialog>
   )
 }
