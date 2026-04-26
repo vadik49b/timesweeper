@@ -564,6 +564,39 @@ export default function Grid(props: Props) {
 
     const initialize = async () => {
       try {
+        await openEventStore(props.eventId)
+
+        if (isDisposed) {
+          return
+        }
+
+        unsubscribe = await subscribeEvent(props.eventId, (next) => {
+          if (!next) {
+            return
+          }
+
+          if (!hasAcceptedStoreEvent && eventSyncState() === 'connecting') {
+            return
+          }
+
+          hasAcceptedStoreEvent = true
+          applyLoadedEvent(next)
+        })
+
+        const localEvent = await getEvent(props.eventId)
+
+        if (isDisposed) {
+          return
+        }
+
+        if (localEvent) {
+          hasAcceptedStoreEvent = true
+          applyLoadedEvent(localEvent)
+          setLocalReady(true)
+
+          return
+        }
+
         const initialEvent = await getEventJson(props.eventId)
 
         if (isDisposed) {
@@ -583,25 +616,6 @@ export default function Grid(props: Props) {
 
         applyLoadedEvent(initialEvent)
         setLocalReady(true)
-
-        await openEventStore(props.eventId)
-
-        if (isDisposed) {
-          return
-        }
-
-        unsubscribe = await subscribeEvent(props.eventId, (next) => {
-          if (!next) {
-            return
-          }
-
-          if (!hasAcceptedStoreEvent && eventSyncState() === 'connecting') {
-            return
-          }
-
-          hasAcceptedStoreEvent = true
-          applyLoadedEvent(next)
-        })
       } catch {
         if (isDisposed) {
           return
