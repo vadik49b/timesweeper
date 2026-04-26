@@ -90,7 +90,7 @@ npm run dev
 
 3. Open `http://localhost:5173`
 
-`npm run dev` sets `VITE_WS_ORIGIN=http://127.0.0.1:8787`, so the frontend connects directly to Wrangler and dev matches production transport behavior.
+`npm run dev` sets `VITE_WS_ORIGIN=http://127.0.0.1:8787`, so the frontend connects directly to Wrangler for WebSocket sync. The Vite dev server also proxies `/api/*` to `http://127.0.0.1:8787`, so local HTTP routes like event preview reads hit the same Worker.
 
 ## Cloudflare API
 
@@ -103,6 +103,7 @@ Current transport model:
 
 - frontend builds the websocket URL from `VITE_WS_ORIGIN`
 - frontend connects to `/api/events/:eventId` over WebSocket
+- frontend uses same-origin `/api/*` HTTP routes for lightweight event reads such as previews
 - frontend also persists the local TinyBase mergeable store in `localStorage` so CRDT metadata survives reloads between sync sessions
 - in local dev, `VITE_WS_ORIGIN` should be `http://127.0.0.1:8787`
 - in production, the Worker is attached directly to `api.timesweeper.app`
@@ -112,6 +113,10 @@ Frontend env vars:
 
 - production: `VITE_WS_ORIGIN=https://api.timesweeper.app`
 - local dev: `VITE_WS_ORIGIN=http://127.0.0.1:8787`
+
+Frontend dev proxy:
+
+- local `vite` dev server proxies `/api/*` to `http://127.0.0.1:8787`
 
 WebSocket messages:
 
