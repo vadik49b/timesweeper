@@ -95,7 +95,6 @@ export default function Grid(props: Props) {
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
   const [settingsNewParticipantNames, setSettingsNewParticipantNames] = createSignal<string[]>([''])
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
-  const [showExistingNames, setShowExistingNames] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
   const [isBrowserOnline, setIsBrowserOnline] = createSignal(window.navigator.onLine)
@@ -230,7 +229,11 @@ export default function Grid(props: Props) {
       name: updated.name,
       participants: updated.participants,
     })
-    setSelectedParticipantName(updated.id, nextSelected)
+    if (nextSelected) {
+      setSelectedParticipantName(updated.id, nextSelected)
+    } else {
+      clearSelectedParticipantName(updated.id)
+    }
     pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
     setEvent(updated)
     setCurrentName(nextSelected)
@@ -299,12 +302,10 @@ export default function Grid(props: Props) {
     const selectedKey = getNameKey(currentName())
     const nextSelected =
       updatedParticipants.find((participant) => getNameKey(participant.name) === selectedKey)
-        ?.name ??
-      updatedParticipants[0]?.name ??
-      ''
+        ?.name ?? ''
 
     await applyUpdatedEvent(updated, nextSelected)
-    setActiveModal(null)
+    setActiveModal(nextSelected ? null : 'name-picker')
   }
 
   async function copyLink(url: string) {
@@ -370,7 +371,6 @@ export default function Grid(props: Props) {
 
     setSelectedParticipantName(ev.id, name)
     setCurrentName(name)
-    setShowExistingNames(false)
     setActiveModal(null)
   }
 
@@ -411,7 +411,6 @@ export default function Grid(props: Props) {
       participants: [...ev.participants, { name: trimmed, slots: {} }],
     }
     await applyUpdatedEvent(updated, trimmed)
-    setShowExistingNames(false)
     setActiveModal(null)
   }
 
@@ -421,10 +420,8 @@ export default function Grid(props: Props) {
 
     if (savedName && exists) {
       setCurrentName(savedName)
-      setShowExistingNames(false)
       setActiveModal(null)
     } else {
-      setShowExistingNames(false)
       setActiveModal('name-picker')
     }
   }
@@ -457,7 +454,6 @@ export default function Grid(props: Props) {
     if (!stillExists) {
       clearSelectedParticipantName(next.id)
       setCurrentName('')
-      setShowExistingNames(false)
       setActiveModal('name-picker')
     }
   }
@@ -753,7 +749,7 @@ export default function Grid(props: Props) {
 
           <Show when={activeModal() === 'name-picker'}>
             <Win95Dialog
-              title="Who dis?"
+              title="Choose your name"
               class="dialog--name-picker"
               onClose={
                 canCloseNamePicker()
@@ -774,38 +770,9 @@ export default function Grid(props: Props) {
                   {event()?.participants[0]?.name ?? 'Unknown'} set up "
                   {event()?.name ?? 'this schedule'}" and wants to know when you're available.
                 </p>
-                <label class="participant-picker__label" for="new-participant-name">
-                  Your name:
-                </label>
-                <form
-                  onSubmit={
-                    addParticipantFromPicker as JSX.EventHandler<HTMLFormElement, SubmitEvent>
-                  }
-                >
-                  <Win95Field
-                    kind="input"
-                    id="new-participant-name"
-                    name="newParticipantName"
-                    wrapperClass="dialog__field"
-                  />
-                  <DialogActions class="participant-picker__actions">
-                    <Show when={(event()?.participants.length ?? 0) > 0}>
-                      <button
-                        type="button"
-                        class="participant-picker__toggle"
-                        aria-expanded={showExistingNames()}
-                        onClick={() => setShowExistingNames(!showExistingNames())}
-                      >
-                        I added my name here before
-                      </button>
-                    </Show>
-                    <Win95Button class="dialog-btn" type="submit">
-                      Join
-                    </Win95Button>
-                  </DialogActions>
-                </form>
-                <Show when={showExistingNames() && (event()?.participants.length ?? 0) > 0}>
+                <Show when={(event()?.participants.length ?? 0) > 0}>
                   <div class="participant-picker__existing">
+                    <p class="participant-picker__label">Continue as:</p>
                     <Show
                       when={useParticipantSelect()}
                       fallback={
@@ -843,6 +810,28 @@ export default function Grid(props: Props) {
                     </Show>
                   </div>
                 </Show>
+                <div class="participant-picker__new">
+                  <label class="participant-picker__label" for="new-participant-name">
+                    New here?
+                  </label>
+                  <form
+                    onSubmit={
+                      addParticipantFromPicker as JSX.EventHandler<HTMLFormElement, SubmitEvent>
+                    }
+                  >
+                    <Win95Field
+                      kind="input"
+                      id="new-participant-name"
+                      name="newParticipantName"
+                      wrapperClass="dialog__field"
+                    />
+                    <DialogActions class="participant-picker__actions">
+                      <Win95Button class="dialog-btn" type="submit">
+                        Join as new participant
+                      </Win95Button>
+                    </DialogActions>
+                  </form>
+                </div>
               </Show>
             </Win95Dialog>
           </Show>

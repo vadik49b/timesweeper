@@ -96,7 +96,7 @@
   --title-shadow-strong: 2px 2px 0 var(--navy);
   --title-shadow-soft: 1px 1px 0 var(--navy);
   --window-shadow: 2px 2px 0 var(--black);
-  --overlay-dialog: rgba(192, 192, 192, 0.35);
+  --overlay-dialog: rgba(64, 64, 64, 0.68);
   --text-disabled: #a0a0a0;
   --text-link-hover: #a0a0ff;
   --text-footer: #a0c0c0;
