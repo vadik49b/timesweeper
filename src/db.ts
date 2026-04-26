@@ -40,17 +40,30 @@ function setEventSyncState(next: EventSyncState): void {
   eventSyncStateListeners.forEach((listener) => listener(next))
 }
 
-function eventSyncUrl(eventId: string): string {
-  const origin = import.meta.env.VITE_WS_ORIGIN
+function getApiOrigin(): string {
+  const origin = import.meta.env.VITE_API_ORIGIN
 
   if (!origin) {
-    throw new Error('Missing VITE_WS_ORIGIN')
+    throw new Error('Missing VITE_API_ORIGIN')
   }
 
+  return origin
+}
+
+function eventSyncUrl(eventId: string): string {
+  const origin = getApiOrigin()
   const url = new URL(origin)
 
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.pathname = `/api/events/${encodeURIComponent(eventId)}`
+
+  return url.toString()
+}
+
+function eventJsonUrl(eventId: string): string {
+  const url = new URL(getApiOrigin())
+
+  url.pathname = `/api/events/${encodeURIComponent(eventId)}/json`
 
   return url.toString()
 }
@@ -330,7 +343,7 @@ export function pushRecentEvent(summary: RecentEventSummary): void {
 }
 
 export async function getEventJson(eventId: string): Promise<AppEvent | null> {
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/json`)
+  const response = await fetch(eventJsonUrl(eventId))
 
   if (response.status === 404) {
     return null

@@ -107,16 +107,36 @@ export class EventRoom extends WsServerDurableObject<Env> {
       const eventId = url.searchParams.get('eventId')
 
       if (!eventId) {
-        return Response.json({ error: 'Missing eventId' }, { status: 400 })
+        return Response.json(
+          { error: 'Missing eventId' },
+          {
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+            },
+            status: 400,
+          },
+        )
       }
 
       const preview = await readEventJson(this.ctx.storage.sql, eventId)
 
       if (!preview) {
-        return Response.json({ error: 'Event not found' }, { status: 404 })
+        return Response.json(
+          { error: 'Event not found' },
+          {
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+            },
+            status: 404,
+          },
+        )
       }
 
-      return Response.json(preview)
+      return Response.json(preview, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+      })
     }
 
     return super.fetch(request)

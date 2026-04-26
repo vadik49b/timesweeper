@@ -4,14 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "VITE_WS_ORIGIN=http://127.0.0.1:8787 vite",
+    "dev": "VITE_API_ORIGIN=http://127.0.0.1:8787 vite",
     "dev:api": "wrangler dev -c worker/wrangler.toml",
     "seed:local": "node scripts/seed-local-wrangler.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "format": "prettier --write src/ && prettier --write worker/src",
     "deploy:api": "wrangler deploy -c worker/wrangler.toml",
-    "deploy:fe": "VITE_WS_ORIGIN=https://api.timesweeper.app npm run build && wrangler pages deploy dist --project-name timesweeper",
+    "deploy:fe": "VITE_API_ORIGIN=https://api.timesweeper.app npm run build && wrangler pages deploy dist --project-name timesweeper",
     "deploy": "npm run deploy:api && npm run deploy:fe"
   },
   "dependencies": {

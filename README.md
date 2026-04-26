@@ -90,7 +90,7 @@ npm run dev
 
 3. Open `http://localhost:5173`
 
-`npm run dev` sets `VITE_WS_ORIGIN=http://127.0.0.1:8787`, so the frontend connects directly to Wrangler for WebSocket sync. The Vite dev server also proxies `/api/*` to `http://127.0.0.1:8787`, so local HTTP routes like event preview reads hit the same Worker.
+`npm run dev` sets `VITE_API_ORIGIN=http://127.0.0.1:8787`, so the frontend talks directly to Wrangler for both HTTP event JSON reads and WebSocket sync.
 
 ## Cloudflare API
 
@@ -101,22 +101,18 @@ The websocket backend lives in:
 
 Current transport model:
 
-- frontend builds the websocket URL from `VITE_WS_ORIGIN`
+- frontend builds both HTTP event JSON URLs and websocket URLs from `VITE_API_ORIGIN`
 - frontend connects to `/api/events/:eventId` over WebSocket
-- frontend uses same-origin `/api/*` HTTP routes for lightweight event reads such as previews
+- frontend fetches `/api/events/:eventId/json` from the API origin for initial event bootstrap
 - frontend also persists the local TinyBase mergeable store in `localStorage` so CRDT metadata survives reloads between sync sessions
-- in local dev, `VITE_WS_ORIGIN` should be `http://127.0.0.1:8787`
+- in local dev, `VITE_API_ORIGIN` should be `http://127.0.0.1:8787`
 - in production, the Worker is attached directly to `api.timesweeper.app`
 - the Durable Object worker handles websocket traffic directly on that hostname
 
 Frontend env vars:
 
-- production: `VITE_WS_ORIGIN=https://api.timesweeper.app`
-- local dev: `VITE_WS_ORIGIN=http://127.0.0.1:8787`
-
-Frontend dev proxy:
-
-- local `vite` dev server proxies `/api/*` to `http://127.0.0.1:8787`
+- production: `VITE_API_ORIGIN=https://api.timesweeper.app`
+- local dev: `VITE_API_ORIGIN=http://127.0.0.1:8787`
 
 WebSocket messages:
 
@@ -141,7 +137,7 @@ This publishes the Worker using the custom domain declared in [`worker/wrangler.
 
 ## Deploy Frontend
 
-`npm run deploy:fe` builds the frontend locally with `VITE_WS_ORIGIN=https://api.timesweeper.app` and then uploads `dist/` to Cloudflare Pages.
+`npm run deploy:fe` builds the frontend locally with `VITE_API_ORIGIN=https://api.timesweeper.app` and then uploads `dist/` to Cloudflare Pages.
 
 ## Deploy from Laptop (No GitHub Required)
 
