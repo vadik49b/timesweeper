@@ -21,6 +21,18 @@ function statusLabel(value: number | undefined): string {
   return 'no'
 }
 
+function nextStatusLabel(value: number | undefined): string {
+  if (value === 1) {
+    return 'maybe'
+  }
+
+  if (value === 2) {
+    return 'no'
+  }
+
+  return 'yes'
+}
+
 export default function AvailabilityGrid(props: Props) {
   return (
     <div
@@ -59,6 +71,16 @@ export default function AvailabilityGrid(props: Props) {
                   : props.selectedSlots[nextSlot.startUtcIso]
               }
               const hasSlot = () => slotIndex() !== undefined
+              const cellLabel = () =>
+                hasSlot()
+                  ? `${day.label} at ${time.label}. Your availability is ${statusLabel(
+                      slotValue(),
+                    )}. Click to mark ${nextStatusLabel(slotValue())}.`
+                  : `${day.label} at ${time.label}. No availability slot here.`
+              const cellTitle = () =>
+                hasSlot()
+                  ? `${day.label}, ${time.label}: mark ${nextStatusLabel(slotValue())}`
+                  : `${day.label}, ${time.label}: no slot`
 
               return (
                 <button
@@ -75,13 +97,8 @@ export default function AvailabilityGrid(props: Props) {
                     '--ti': String(timeIndex()),
                     '--di': String(dayIndex()),
                   }}
-                  aria-label={
-                    hasSlot()
-                      ? `${day.label} at ${time.label}. Current status: ${statusLabel(
-                          slotValue(),
-                        )}. Activate to cycle.`
-                      : `${day.label} at ${time.label}. No availability slot here.`
-                  }
+                  aria-label={cellLabel()}
+                  title={cellTitle()}
                   disabled={!hasSlot()}
                   onClick={() => {
                     const nextSlotIndex = slotIndex()
