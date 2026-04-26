@@ -65,7 +65,7 @@ export default function Grid(props: Props) {
     localStorage.getItem(DISPLAY_TIMEZONE_STORAGE_KEY) ||
       Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
-  const timezoneOptions = createMemo(() => getTimezoneOptions(displayTimezone()))
+  const timezoneOptions = () => getTimezoneOptions(displayTimezone())
 
   const display = createMemo(() => {
     const ev = event()
@@ -78,7 +78,7 @@ export default function Grid(props: Props) {
   const slotByDayTime = () => display().slotByDayTime
 
   const [currentName, setCurrentName] = createSignal('')
-  const currentParticipant = createMemo(() => {
+  const currentParticipant = () => {
     const ev = event()
     const name = currentName()
 
@@ -87,8 +87,8 @@ export default function Grid(props: Props) {
     }
 
     return ev.participants.find((entry) => entry.name === name) ?? null
-  })
-  const selectedSlots = createMemo(() => currentParticipant()?.slots ?? {})
+  }
+  const selectedSlots = () => currentParticipant()?.slots ?? {}
 
   type ActiveModal = null | 'name-picker' | 'help' | 'settings'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
@@ -217,7 +217,7 @@ export default function Grid(props: Props) {
     })
   }
 
-  const visibleSettingsParticipantNames = createMemo(() => {
+  const visibleSettingsParticipantNames = () => {
     const all = settingsParticipantNames()
 
     if (showAllSettingsParticipants()) {
@@ -225,7 +225,7 @@ export default function Grid(props: Props) {
     }
 
     return all.slice(0, 5)
-  })
+  }
 
   async function applyUpdatedEvent(updated: AppEvent, nextSelected: string) {
     await updateEventSettings(updated.id, {
@@ -332,7 +332,7 @@ export default function Grid(props: Props) {
     }
   }
 
-  const introContext = createMemo(() => {
+  const introContext = () => {
     const ev = event()
 
     if (!ev) {
@@ -347,8 +347,8 @@ export default function Grid(props: Props) {
     }
 
     return `${organizer} set up "${ev.name}".`
-  })
-  const pageTitle = createMemo(() => {
+  }
+  const pageTitle = () => {
     const ev = event()
 
     if (!ev) {
@@ -356,7 +356,7 @@ export default function Grid(props: Props) {
     }
 
     return `${ev.name} — TimeSweeper`
-  })
+  }
   const pageImage = `${window.location.origin}/anti-tank-mine-logo.png`
 
   function selectParticipant(name: string) {
@@ -461,12 +461,12 @@ export default function Grid(props: Props) {
     }
   }
 
-  const useParticipantSelect = createMemo(() => {
+  const useParticipantSelect = () => {
     const count = event()?.participants.length ?? 0
 
     return count > 5
-  })
-  const participantPickerOptions = createMemo(() => {
+  }
+  const participantPickerOptions = () => {
     const ev = event()
 
     if (!ev) {
@@ -480,7 +480,7 @@ export default function Grid(props: Props) {
         label: participant.name,
       })),
     ]
-  })
+  }
 
   function onParticipantPickerChange(name: string) {
     if (!name) {
@@ -631,29 +631,14 @@ export default function Grid(props: Props) {
     initialize().catch(() => {})
   })
 
-  const loadingOverlayText = createMemo(() => LOADING_MESSAGES[loadingMessageIndex()])
-  const connectionBarText = createMemo(() => {
-    if (!localReady()) {
-      return ''
-    }
-
-    if (!isBrowserOnline()) {
-      return "Offline. Changes will sync when you're back online."
-    }
-
-    if (eventSyncState() === 'reconnecting') {
-      return 'Reconnecting...'
-    }
-
-    return ''
-  })
-  const canCloseNamePicker = createMemo(() => {
+  const loadingOverlayText = () => LOADING_MESSAGES[loadingMessageIndex()]
+  const canCloseNamePicker = () => {
     if (!event()) {
       return true
     }
 
     return !!currentName()
-  })
+  }
 
   return (
     <>
@@ -776,6 +761,11 @@ export default function Grid(props: Props) {
                         <span>Click squares to mark your availability:</span>
                         <AvailabilityLegend withLabels />
                       </p>
+                      <Show when={localReady() && !isBrowserOnline()}>
+                        <p class="grid-view__suggestions-helper">
+                          You're offline. Changes will sync when you're back online.
+                        </p>
+                      </Show>
                       <div class="availability-grid-wrap">
                         <AvailabilityGrid
                           days={days()}
@@ -967,9 +957,6 @@ export default function Grid(props: Props) {
               goToLanding()
             }}
           />
-        </Show>
-        <Show when={connectionBarText()}>
-          {(text) => <div class="grid-view__connection-bar">{text()}</div>}
         </Show>
       </div>
     </>
