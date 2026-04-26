@@ -329,6 +329,20 @@ export function pushRecentEvent(summary: RecentEventSummary): void {
   pushRecentSummary(summary)
 }
 
+export async function getEventJson(eventId: string): Promise<AppEvent | null> {
+  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/json`)
+
+  if (response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to load event JSON (${response.status})`)
+  }
+
+  return (await response.json()) as AppEvent
+}
+
 export async function createEvent(event: AppEvent): Promise<void> {
   const store = await requireWritableEventStore(event.id)
 

@@ -8,17 +8,26 @@ import {
 
 const EVENT_META_TABLE = 'eventMeta'
 const EVENT_NAME_CELL = 'name'
+const EVENT_CREATED_CELL = 'created'
+const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
 const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
-const PREVIEW_ROUTE_SUFFIX = '/preview'
+const AVAILABILITY_TABLE = 'availability'
 
 interface Env {
   EVENT_ROOMS: DurableObjectNamespace<EventRoom>
 }
 
-interface EventPreview {
+interface EventParticipant {
+  name: string
+  slots: Record<string, 1 | 2>
+}
+
+interface EventJson {
   id: string
   name: string
-  organizerName: string | null
+  created: number
+  slotStartsUtcIso: string[]
+  participants: EventParticipant[]
 }
 
 const wsFetch = getWsServerDurableObjectFetch('EVENT_ROOMS')
@@ -27,8 +36,8 @@ function createEventRoomPersister(sqlStorage: SqlStorage, uniqueId?: string) {
   return createDurableObjectSqlStoragePersister(createMergeableStore(uniqueId), sqlStorage)
 }
 
-function matchEventPreviewPath(pathname: string): string | null {
-  const route = pathname.match(/^\/api\/events\/([^/]+)\/preview$/)
+function matchEventJsonPath(pathname: string): string | null {
+  const route = pathname.match(/^\/api\/events\/([^/]+)\/json$/)
 
   if (!route) {
     return null
@@ -41,10 +50,10 @@ function eventRoomPath(eventId: string): string {
   return `api/events/${encodeURIComponent(eventId)}`
 }
 
-async function readEventPreview(
+async function readEventJson(
   sqlStorage: SqlStorage,
   eventId: string,
-): Promise<EventPreview | null> {
+): Promise<EventJson | null> {
   const persister = createEventRoomPersister(sqlStorage, `preview-${eventId}`)
   const store = persister.getStore() as MergeableStore
 
@@ -55,17 +64,34 @@ async function readEventPreview(
   }
 
   const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_NAME_CELL)
+  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL)
+  const slotStartsUtcIso = store.getCell(
+    EVENT_META_TABLE,
+    eventId,
+    EVENT_SLOT_STARTS_UTC_ISO_CELL,
+  )
   const participantNames =
     (store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]) ?? []
 
-  if (typeof name !== 'string') {
+  if (
+    typeof name !== 'string' ||
+    typeof created !== 'number' ||
+    !Array.isArray(slotStartsUtcIso)
+  ) {
     return null
   }
 
   return {
     id: eventId,
     name,
-    organizerName: participantNames[0] ?? null,
+    created,
+    slotStartsUtcIso: slotStartsUtcIso as string[],
+    participants: participantNames.map((participantName) => ({
+      name: participantName,
+      slots: store.hasRow(AVAILABILITY_TABLE, participantName)
+        ? ({ ...store.getRow(AVAILABILITY_TABLE, participantName) } as Record<string, 1 | 2>)
+        : {},
+    })),
   }
 }
 
@@ -77,14 +103,14 @@ export class EventRoom extends WsServerDurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
-    if (request.method === 'GET' && url.pathname === PREVIEW_ROUTE_SUFFIX) {
+    if (request.method === 'GET' && url.pathname === '/json') {
       const eventId = url.searchParams.get('eventId')
 
       if (!eventId) {
         return Response.json({ error: 'Missing eventId' }, { status: 400 })
       }
 
-      const preview = await readEventPreview(this.ctx.storage.sql, eventId)
+      const preview = await readEventJson(this.ctx.storage.sql, eventId)
 
       if (!preview) {
         return Response.json({ error: 'Event not found' }, { status: 404 })
@@ -99,7 +125,7 @@ export class EventRoom extends WsServerDurableObject<Env> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const eventId = matchEventPreviewPath(new URL(request.url).pathname)
+    const eventId = matchEventJsonPath(new URL(request.url).pathname)
 
     if (!eventId) {
       return wsFetch(request, env)
@@ -107,7 +133,7 @@ export default {
 
     const stub = env.EVENT_ROOMS.get(env.EVENT_ROOMS.idFromName(eventRoomPath(eventId)))
     const previewRequest = new Request(
-      `https://event-room/preview?eventId=${encodeURIComponent(eventId)}`,
+      `https://event-room/json?eventId=${encodeURIComponent(eventId)}`,
       {
         method: 'GET',
         headers: request.headers,

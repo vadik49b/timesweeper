@@ -6,6 +6,7 @@ import './styles/grid.css'
 import {
   clearSelectedParticipantName,
   closeEventStore,
+  getEventJson,
   type EventSyncState,
   getEvent,
   getSelectedParticipantName,
@@ -99,6 +100,8 @@ export default function Grid(props: Props) {
   const [copyStatus, setCopyStatus] = createSignal('')
   const [isBrowserOnline, setIsBrowserOnline] = createSignal(window.navigator.onLine)
   const [eventSyncState, setEventSyncState] = createSignal<EventSyncState>('connecting')
+  const [pageErrorTitle, setPageErrorTitle] = createSignal('')
+  const [pageErrorMessage, setPageErrorMessage] = createSignal('')
 
   let shareInputRef!: HTMLInputElement
   const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
@@ -492,6 +495,7 @@ export default function Grid(props: Props) {
     let unsubscribe: (() => void) | null = null
     let unsubscribeSyncState: (() => void) | null = null
     let isDisposed = false
+    let hasAcceptedStoreEvent = false
     const loadingMessageTimer = window.setInterval(() => {
       if (!event()) {
         setLoadingMessageIndex((index) => (index + 1) % LOADING_MESSAGES.length)
@@ -519,7 +523,26 @@ export default function Grid(props: Props) {
     makeEventListener(document, 'keydown', onKeyDown)
     makeEventListener(window, 'online', () => setIsBrowserOnline(true))
     makeEventListener(window, 'offline', () => setIsBrowserOnline(false))
-    unsubscribeSyncState = subscribeEventSyncState(setEventSyncState)
+    unsubscribeSyncState = subscribeEventSyncState((state) => {
+      setEventSyncState(state)
+
+      if (hasAcceptedStoreEvent || state !== 'connected') {
+        return
+      }
+
+      getEvent(props.eventId)
+        .then((next) => {
+          if (isDisposed || !next || hasAcceptedStoreEvent) {
+            return
+          }
+
+          hasAcceptedStoreEvent = true
+          applyLoadedEvent(next)
+        })
+        .catch((error) => {
+          console.error('Failed to read connected event store', error)
+        })
+    })
 
     onCleanup(() => {
       window.clearInterval(loadingMessageTimer)
@@ -541,6 +564,26 @@ export default function Grid(props: Props) {
 
     const initialize = async () => {
       try {
+        const initialEvent = await getEventJson(props.eventId)
+
+        if (isDisposed) {
+          return
+        }
+
+        if (!initialEvent) {
+          setActiveModal(null)
+          setPageErrorTitle('Event Not Found')
+          setPageErrorMessage(
+            'We could not find that schedule. The link may be incomplete, or the event may no longer exist.',
+          )
+          setLocalReady(true)
+
+          return
+        }
+
+        applyLoadedEvent(initialEvent)
+        setLocalReady(true)
+
         await openEventStore(props.eventId)
 
         if (isDisposed) {
@@ -548,22 +591,25 @@ export default function Grid(props: Props) {
         }
 
         unsubscribe = await subscribeEvent(props.eventId, (next) => {
-          if (next) {
-            applyLoadedEvent(next)
+          if (!next) {
+            return
           }
+
+          if (!hasAcceptedStoreEvent && eventSyncState() === 'connecting') {
+            return
+          }
+
+          hasAcceptedStoreEvent = true
+          applyLoadedEvent(next)
         })
-
-        const initial = await getEvent(props.eventId)
-
+      } catch {
         if (isDisposed) {
           return
         }
 
-        if (initial) {
-          applyLoadedEvent(initial)
-        }
-      } catch {
-      } finally {
+        setActiveModal(null)
+        setPageErrorTitle('Could Not Open Schedule')
+        setPageErrorMessage('Check your connection and try opening the link again.')
         setLocalReady(true)
       }
     }
@@ -618,7 +664,7 @@ export default function Grid(props: Props) {
       />
       <Meta name="twitter:image" content={pageImage} />
       <div class="grid-view">
-        <Show when={localReady()} fallback={null}>
+        <Show when={localReady() && !pageErrorMessage()} fallback={null}>
           <div class="grid-view__shell">
             <div class="grid-view__hero row row--between row--center">
               <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
@@ -897,6 +943,16 @@ export default function Grid(props: Props) {
           <Show when={!!dialogError()}>
             <ErrorDialog message={dialogError()} onClose={() => setDialogError('')} />
           </Show>
+        </Show>
+        <Show when={!!pageErrorMessage()}>
+          <ErrorDialog
+            title={pageErrorTitle()}
+            message={pageErrorMessage()}
+            onClose={() => {
+              setPageErrorMessage('')
+              goToLanding()
+            }}
+          />
         </Show>
         <Show when={connectionBarText()}>
           {(text) => <div class="grid-view__connection-bar">{text()}</div>}
