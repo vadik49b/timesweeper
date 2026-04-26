@@ -366,7 +366,7 @@ export async function subscribeEvent(
   onChange: (event: AppEvent | undefined) => void,
 ): Promise<() => void> {
   const store = await requireOpenEventRoomStore(eventId)
-  const listenerId = store.addDidFinishTransactionListener(() => {
+  const listenerId = store.addTablesListener(() => {
     onChange(readEventFromStore(store, eventId))
   })
 
