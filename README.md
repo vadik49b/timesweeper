@@ -17,7 +17,7 @@ TimeSweeper is a no-login group availability app with a Windows 95 Minesweeper v
 ## Stack
 
 - Frontend: SolidJS + Vite
-- Local persistence: TinyBase stores persisted in browser storage
+- Local persistence: TinyBase mergeable stores persisted in `localStorage`
 - Realtime sync: WebSocket via TinyBase synchronizers
 - Backend: Cloudflare Worker + Durable Objects
 - PWA: manifest + service worker in `public/`
@@ -31,7 +31,7 @@ TimeSweeper is a no-login group availability app with a Windows 95 Minesweeper v
 - `src/components/Win95Field.tsx`: shared input/select fields
 - `src/components/AvailabilityLegend.tsx`: cycle legend
 - `src/event-helpers.ts`: event model and slot/date helpers
-- `src/db.ts`: local TinyBase stores and event room websocket sync
+- `src/db.ts`: local TinyBase mergeable store persistence plus event room websocket sync
 - `worker/src/worker.ts`: Durable Object websocket backend
 
 ## Data Model
@@ -103,6 +103,7 @@ Current transport model:
 
 - frontend builds the websocket URL from `VITE_WS_ORIGIN`
 - frontend connects to `/api/events/:eventId` over WebSocket
+- frontend also persists the local TinyBase mergeable store in `localStorage` so CRDT metadata survives reloads between sync sessions
 - in local dev, `VITE_WS_ORIGIN` should be `http://127.0.0.1:8787`
 - in production, the Worker is attached directly to `api.timesweeper.app`
 - the Durable Object worker handles websocket traffic directly on that hostname

@@ -1,6 +1,6 @@
 import { createMergeableStore } from 'tinybase/mergeable-store'
 import type { Store } from 'tinybase/store'
-import { createIndexedDbPersister } from 'tinybase/persisters/persister-indexed-db'
+import { createLocalPersister } from 'tinybase/persisters/persister-browser'
 import {
   createWsSynchronizer,
   type WsSynchronizer,
@@ -256,7 +256,10 @@ function ensureEventRoomSync(eventId: string, store: EventRoomStore): void {
 
 async function loadEventRoomStore(eventId: string): Promise<EventRoomStore> {
   const eventRoomStore = createMergeableStore(`sync-${eventId}`)
-  const persister = createIndexedDbPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
+
+  // Keep the local mergeable state on-device so CRDT metadata survives reloads
+  // before the websocket synchronizer reconnects to the shared event room.
+  const persister = createLocalPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
 
   await persister.load()
   await persister.startAutoSave()
