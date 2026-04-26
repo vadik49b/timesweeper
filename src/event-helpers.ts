@@ -77,6 +77,32 @@ export interface AppEvent {
   participants: Participant[]
 }
 
+function getFormattedDateTimeParts(
+  date: Date,
+  timeZone: string,
+): Pick<DisplaySlot, 'dayKey' | 'dayLabel' | 'timeKey' | 'timeLabel'> & { minutes: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  const hour = Number(values.hour ?? '0')
+  const minute = Number(values.minute ?? '0')
+
+  return {
+    dayKey: `${values.year}-${values.month}-${values.day}`,
+    dayLabel: intlFormat(date, { weekday: 'short', day: 'numeric', timeZone }),
+    timeKey: `${values.hour}:${values.minute}`,
+    timeLabel: intlFormat(date, { hour: 'numeric', minute: '2-digit', timeZone }),
+    minutes: hour * 60 + minute,
+  }
+}
+
 type ZonedDateTimeParts = {
   year: number
   month: number
@@ -340,24 +366,19 @@ export function getParticipantSummaryGroups(
   return groups
 }
 
-export function buildDisplayModel(slotStartsUtcIso: string[]): DisplayModel {
+export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string): DisplayModel {
   const slots: DisplaySlot[] = []
   const dayMap = new Map<string, DisplayDay>()
   const timeMap = new Map<string, DisplayTime>()
   const slotByDayTime: DisplayModel['slotByDayTime'] = {}
+  const displayTimeZone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   slotStartsUtcIso.forEach((slotStartUtcIso, slotIndex) => {
     const date = parseISO(slotStartUtcIso)
-    const dayKey = lightFormat(date, 'yyyy-MM-dd')
-    const dayLabel = intlFormat(date, {
-      weekday: 'short',
-      day: 'numeric',
-    })
-    const timeKey = lightFormat(date, 'HH:mm')
-    const timeLabel = intlFormat(date, {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
+    const { dayKey, dayLabel, timeKey, timeLabel, minutes } = getFormattedDateTimeParts(
+      date,
+      displayTimeZone,
+    )
     const slot = {
       slotIndex,
       startUtcIso: slotStartUtcIso,
@@ -375,7 +396,7 @@ export function buildDisplayModel(slotStartsUtcIso: string[]): DisplayModel {
     timeMap.set(timeKey, {
       key: timeKey,
       label: timeLabel,
-      minutes: getHours(date) * 60 + getMinutes(date),
+      minutes,
     })
     slotByDayTime[`${dayKey}|${timeKey}`] = slot
   })

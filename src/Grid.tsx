@@ -51,16 +51,49 @@ const LOADING_MESSAGES = [
   'Opening this link for the first time can take a few seconds.',
   'Still opening. This can take a little longer on a new device.',
 ]
+const DISPLAY_TIMEZONE_STORAGE_KEY = 'timesweeper-display-timezone'
+
+function getTimezoneOptions(selectedTimezone: string): { value: string; label: string }[] {
+  const supportedValuesOf = Intl.supportedValuesOf as ((key: 'timeZone') => string[]) | undefined
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezones = supportedValuesOf ? supportedValuesOf('timeZone') : [browserTimezone]
+
+  return [...new Set([browserTimezone, selectedTimezone, ...timezones])]
+    .map((timezone) => ({
+      value: timezone,
+      label: formatTimezoneOptionLabel(timezone),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+function formatTimezoneOptionLabel(timezone: string): string {
+  const offset =
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    })
+      .formatToParts(new Date())
+      .find((part) => part.type === 'timeZoneName')?.value ?? 'GMT'
+  const parts = timezone.split('/')
+  const city = parts[parts.length - 1]?.replaceAll('_', ' ') ?? timezone.replaceAll('_', ' ')
+
+  return `${city} — ${offset}`
+}
 
 export default function Grid(props: Props) {
   const [event, setEvent] = createSignal<AppEvent | null>(null)
   const [localReady, setLocalReady] = createSignal(false)
   const [loadingMessageIndex, setLoadingMessageIndex] = createSignal(0)
+  const [displayTimezone, setDisplayTimezone] = createSignal(
+    localStorage.getItem(DISPLAY_TIMEZONE_STORAGE_KEY) ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+  )
+  const timezoneOptions = createMemo(() => getTimezoneOptions(displayTimezone()))
 
   const display = createMemo(() => {
     const ev = event()
 
-    return ev ? buildDisplayModel(ev.slotStartsUtcIso) : EMPTY_DISPLAY
+    return ev ? buildDisplayModel(ev.slotStartsUtcIso, displayTimezone()) : EMPTY_DISPLAY
   })
   const displaySlots = () => display().slots
   const days = () => display().days
@@ -94,7 +127,11 @@ export default function Grid(props: Props) {
 
   let shareInputRef!: HTMLInputElement
   const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
-  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  function updateDisplayTimezone(timezone: string) {
+    setDisplayTimezone(timezone)
+    localStorage.setItem(DISPLAY_TIMEZONE_STORAGE_KEY, timezone)
+  }
 
   function goToLanding() {
     if (window.location.pathname !== '/') {
@@ -616,9 +653,19 @@ export default function Grid(props: Props) {
                 <MineIcon size={18} /> TimeSweeper
               </a>
               <div class="grid-view__hero-actions row row--center">
-                <span class="grid-view__hero-timezone">
-                  Timezone: <b>{localTimezone}</b>
-                </span>
+                <label class="grid-view__hero-timezone" for="display-timezone">
+                  Timezone:
+                </label>
+                <Win95Field
+                  kind="select"
+                  id="display-timezone"
+                  name="displayTimezone"
+                  size="small"
+                  value={displayTimezone()}
+                  options={timezoneOptions()}
+                  wrapperClass="grid-view__timezone-field"
+                  onChange={updateDisplayTimezone}
+                />
               </div>
             </div>
 
@@ -656,8 +703,8 @@ export default function Grid(props: Props) {
                       >
                         <span class="grid-controls__name">{currentName() || 'there'}</span>
                       </a>
-                      ! {introContext()} Share this page with anyone who needs to respond. Fill
-                      your availability. The app will show the strongest overlaps.
+                      ! {introContext()} Share this page with anyone who needs to respond. Fill your
+                      availability. The app will show the strongest overlaps.
                     </p>
                     <section class="grid-view__section">
                       <div class="grid-view__section-header">
@@ -743,7 +790,9 @@ export default function Grid(props: Props) {
               title="Who dis?"
               class="dialog--name-picker"
               onClose={
-                canCloseNamePicker() ? () => (event() ? setActiveModal(null) : goToLanding()) : undefined
+                canCloseNamePicker()
+                  ? () => (event() ? setActiveModal(null) : goToLanding())
+                  : undefined
               }
               showCloseButton={canCloseNamePicker()}
             >
@@ -894,9 +943,7 @@ export default function Grid(props: Props) {
               </label>
               <p class="settings__organizer">{event()?.participants[0]?.name ?? 'Unknown'}</p>
               <p class="settings__label">Dates:</p>
-              <p class="settings__organizer">
-                Locked after setup to keep everyone aligned.
-              </p>
+              <p class="settings__organizer">Locked after setup to keep everyone aligned.</p>
               <p class="settings__label">Participants:</p>
               <div class="settings__participants-list">
                 <table class="settings__participants-table">
@@ -989,7 +1036,6 @@ export default function Grid(props: Props) {
           <Show when={!!dialogError()}>
             <ErrorDialog message={dialogError()} onClose={() => setDialogError('')} />
           </Show>
-
         </Show>
         <Show when={connectionBarText()}>
           {(text) => <div class="grid-view__connection-bar">{text()}</div>}

@@ -26,10 +26,7 @@ export default function OverlapTable(props: Props) {
   const [isDesktop, setIsDesktop] = createSignal(false)
 
   function formatSlotTime(slot: DisplaySlot): string {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(new Date(slot.startUtcIso))
+    return slot.timeLabel
   }
 
   function slotsByDay(slots: DisplaySlot[]): SummaryDayGroup[] {
