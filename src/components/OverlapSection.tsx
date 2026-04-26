@@ -127,10 +127,20 @@ export default function OverlapSection(props: Props) {
 
     return all.slice(0, SPLIT_ROWS_PREVIEW_COUNT)
   })
+
   const canShowSuggestions = createMemo(
     () => props.event.participants.filter(hasParticipantAvailability).length >= 2,
   )
+
   const suggestionsHelperText = createMemo(() => {
+    const marked = props.event.participants.filter((participant) =>
+      hasParticipantAvailability(participant),
+    )
+
+    if (marked.length < 2) {
+      return 'Need at least two people to compare availability.'
+    }
+
     const pending = props.event.participants
       .filter((participant) => participant.name !== props.currentName)
       .filter((participant) => !hasParticipantAvailability(participant))
@@ -140,8 +150,6 @@ export default function OverlapSection(props: Props) {
       if (pending.length > 0) {
         return `Still waiting on availability from ${pending.join(', ')}. Suggestions will show up once participants start filling their availability.`
       }
-
-      return 'Suggestions will show up once participants start filling their availability.'
     }
 
     if (pending.length === 0) {
@@ -153,37 +161,28 @@ export default function OverlapSection(props: Props) {
 
   return (
     <GridSection number={3} title="Group availability">
-      <p class="grid-view__suggestions-helper">
-        {suggestionsHelperText()}
-      </p>
-      <Show when={canShowSuggestions()} fallback={<></>}>
-        <Show
-          when={summaryRows().length > 0}
-          fallback={
-            <div class="empty-text">No candidate times yet</div>
-          }
-        >
-          <div class="summary-table-wrap">
-            <OverlapTable rows={visibleSummaryRows()} />
-            <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
-              <div class="summary-list__meta-row">
-                <div class="summary-list__toggle-row">
-                  <Win95Button
-                    size="small"
-                    onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
+      <p class="grid-view__suggestions-helper">{suggestionsHelperText()}</p>
+      <Show when={canShowSuggestions()}>
+        <div class="summary-table-wrap">
+          <OverlapTable rows={visibleSummaryRows()} />
+          <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
+            <div class="summary-list__meta-row">
+              <div class="summary-list__toggle-row">
+                <Win95Button
+                  size="small"
+                  onClick={() => setShowAllSummaryRows(!showAllSummaryRows())}
+                >
+                  <Show
+                    when={showAllSummaryRows()}
+                    fallback={`Show all ${summaryRows().length} overlaps`}
                   >
-                    <Show
-                      when={showAllSummaryRows()}
-                      fallback={`Show all ${summaryRows().length} overlaps`}
-                    >
-                      Show fewer overlaps
-                    </Show>
-                  </Win95Button>
-                </div>
+                    Show fewer overlaps
+                  </Show>
+                </Win95Button>
               </div>
-            </Show>
-          </div>
-        </Show>
+            </div>
+          </Show>
+        </div>
       </Show>
     </GridSection>
   )
