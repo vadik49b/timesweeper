@@ -555,7 +555,7 @@
 .summary-slots-table__time-text,
 .summary-slots-mobile-table__time-text {
   font-size: var(--fs-xs);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .participant-status-list__row {
   display: flex;

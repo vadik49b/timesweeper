@@ -29,6 +29,10 @@ export default function OverlapTable(props: Props) {
     return slot.timeLabel
   }
 
+  function formatSlotTimes(slots: DisplaySlot[]): string {
+    return slots.map(formatSlotTime).join(', ')
+  }
+
   function slotsByDay(slots: DisplaySlot[]): SummaryDayGroup[] {
     const dayGroups: SummaryDayGroup[] = []
 
@@ -96,18 +100,9 @@ export default function OverlapTable(props: Props) {
                               {dayGroup.dayLabel}
                             </th>
                             <td>
-                              <div class="summary-slots-mobile-table__time-list">
-                                <For each={dayGroup.slots}>
-                                  {(slot, slotIndex) => (
-                                    <span class="summary-slots-mobile-table__time-text">
-                                      <Show when={slotIndex() > 0}>
-                                        <span>, </span>
-                                      </Show>
-                                      <span>{formatSlotTime(slot)}</span>
-                                    </span>
-                                  )}
-                                </For>
-                              </div>
+                              <span class="summary-slots-mobile-table__time-text">
+                                {formatSlotTimes(dayGroup.slots)}
+                              </span>
                             </td>
                           </tr>
                         )}
@@ -155,16 +150,7 @@ export default function OverlapTable(props: Props) {
                         </td>
                         <td>
                           <span class="summary-slots-table__time-text">
-                            <For each={dayGroup.slots}>
-                              {(slot, slotIndex) => (
-                                <>
-                                  <Show when={slotIndex() > 0}>
-                                    <span>, </span>
-                                  </Show>
-                                  <span>{formatSlotTime(slot)}</span>
-                                </>
-                              )}
-                            </For>
+                            {formatSlotTimes(dayGroup.slots)}
                           </span>
                         </td>
                       </tr>
