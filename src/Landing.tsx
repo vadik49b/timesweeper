@@ -367,23 +367,19 @@ export default function Landing(props: Props) {
         <div class="how-steps r">
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">1</div>
-            <div class="how-text">Create a scheduling link and share it with everyone</div>
+            <div class="how-text">Create a scheduling link</div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">2</div>
-            <div class="how-text">
-              Everyone opens the link, picks their name, and marks when they're free
-            </div>
+            <div class="how-text">Everyone marks their availability</div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">3</div>
-            <div class="how-text">
-              As people respond, the app shows the times that work best
-            </div>
+            <div class="how-text">See the strongest group overlaps</div>
           </div>
           <div class="how-step row row--start row--gap-md">
             <div class="how-num r">4</div>
-            <div class="how-text">Review the best overlaps the app suggests</div>
+            <div class="how-text">Use the overlaps to agree on a time</div>
           </div>
         </div>
       </div>
