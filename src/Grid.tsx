@@ -678,11 +678,7 @@ export default function Grid(props: Props) {
                       ! {introContext()} Share this page with anyone who needs to respond. Fill your
                       availability. The app will show the strongest overlaps.
                     </p>
-                    <GridSection
-                      number={1}
-                      title="Share the link with everyone"
-                      bodyClass="grid-view__section-body--title"
-                    >
+                    <GridSection number={1} title="Share the link with everyone">
                       <label for="share-link" class="share-panel__label">
                         Link:
                       </label>
@@ -715,10 +711,11 @@ export default function Grid(props: Props) {
                       </div>
                     </GridSection>
 
-                    <GridSection number={2} title="Mark your availability">
-                      <div class="grid-view__legend">
+                    <GridSection number={2} title="Your availability">
+                      <p class="grid-view__suggestions-helper grid-view__availability-helper">
+                        <span>Click squares to mark your availability:</span>
                         <AvailabilityLegend withLabels />
-                      </div>
+                      </p>
                       <div class="availability-grid-wrap">
                         <AvailabilityGrid
                           days={days()}

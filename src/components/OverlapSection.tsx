@@ -152,20 +152,18 @@ export default function OverlapSection(props: Props) {
   })
 
   return (
-    <GridSection number={3} title="Compare best overlaps">
-      <p class="grid-view__suggestions-helper grid-view__panel-content--title-aligned">
+    <GridSection number={3} title="Group availability">
+      <p class="grid-view__suggestions-helper">
         {suggestionsHelperText()}
       </p>
       <Show when={canShowSuggestions()} fallback={<></>}>
         <Show
           when={summaryRows().length > 0}
           fallback={
-            <div class="empty-text grid-view__panel-content--title-aligned">
-              No candidate times yet
-            </div>
+            <div class="empty-text">No candidate times yet</div>
           }
         >
-          <div class="summary-table-wrap grid-view__panel-content--title-aligned">
+          <div class="summary-table-wrap">
             <OverlapTable rows={visibleSummaryRows()} />
             <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>
               <div class="summary-list__meta-row">
