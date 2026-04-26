@@ -626,7 +626,7 @@ export default function Grid(props: Props) {
               </a>
               <div class="grid-view__hero-actions row row--center">
                 <label class="grid-view__hero-timezone" for="display-timezone">
-                  Timezone:
+                  View in:
                 </label>
                 <Win95Field
                   kind="select"
