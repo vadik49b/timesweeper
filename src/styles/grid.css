@@ -296,7 +296,7 @@
   display: grid;
   --days: 1;
   --times: 1;
-  --day-header-height: calc(var(--size-control) + var(--space-600));
+  --day-header-height: calc(var(--size-control) + var(--space-350));
   grid-template-columns: max-content repeat(var(--days), var(--size-cell));
   grid-template-rows: var(--day-header-height) repeat(var(--times), var(--size-cell));
   width: max-content;
@@ -324,8 +324,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: var(--space-100);
-  padding-bottom: var(--space-150);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .availability-grid__cell {
   appearance: none;
@@ -443,6 +443,7 @@
   color: var(--black);
 }
 .availability-grid__day-weekday,
+.availability-grid__day-date,
 .availability-grid__day-number {
   line-height: 1;
   white-space: nowrap;
@@ -450,9 +451,18 @@
 .availability-grid__day-weekday {
   font-size: var(--fs-xxs);
 }
+.availability-grid__day-date {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-050);
+  margin-top: 0;
+}
+.availability-grid__day-month {
+  font-size: var(--fs-xxs);
+  color: var(--bdk);
+}
 .availability-grid__day-number {
-  font-size: var(--fs-sm);
-  margin-top: var(--space-050);
+  font-size: var(--fs-xxs);
 }
 .availability-grid__time {
   display: flex;

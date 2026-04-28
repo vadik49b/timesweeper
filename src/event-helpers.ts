@@ -45,6 +45,10 @@ export interface Participant {
 export interface DisplayDay {
   key: string
   label: string
+  weekdayLabel: string
+  dayNumberLabel: string
+  monthLabel: string
+  showMonthLabel: boolean
 }
 
 export interface DisplayTime {
@@ -84,7 +88,12 @@ export interface AppEvent {
 function getFormattedDateTimeParts(
   date: Date,
   timeZone: string,
-): Pick<DisplaySlot, 'dayKey' | 'dayLabel' | 'timeKey' | 'timeLabel'> & { minutes: number } {
+): Pick<DisplaySlot, 'dayKey' | 'dayLabel' | 'timeKey' | 'timeLabel'> & {
+  minutes: number
+  weekdayLabel: string
+  dayNumberLabel: string
+  monthLabel: string
+} {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -99,13 +108,17 @@ function getFormattedDateTimeParts(
   const minute = Number(values.minute ?? '0')
   const weekdayLabel = intlFormat(date, { weekday: 'short', timeZone })
   const dayNumberLabel = intlFormat(date, { day: 'numeric', timeZone })
+  const monthLabel = intlFormat(date, { month: 'short', timeZone })
 
   return {
     dayKey: `${values.year}-${values.month}-${values.day}`,
-    dayLabel: `${weekdayLabel} ${dayNumberLabel}`,
+    dayLabel: `${weekdayLabel}, ${monthLabel} ${dayNumberLabel}`,
     timeKey: `${values.hour}:${values.minute}`,
     timeLabel: intlFormat(date, { hour: 'numeric', minute: '2-digit', timeZone }),
     minutes: hour * 60 + minute,
+    weekdayLabel,
+    dayNumberLabel,
+    monthLabel,
   }
 }
 
@@ -374,17 +387,23 @@ export function getParticipantSummaryGroups(
 
 export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string): DisplayModel {
   const slots: DisplaySlot[] = []
-  const dayMap = new Map<string, DisplayDay>()
+  const dayMap = new Map<string, Omit<DisplayDay, 'showMonthLabel'>>()
   const timeMap = new Map<string, DisplayTime>()
   const slotByDayTime: DisplayModel['slotByDayTime'] = {}
   const displayTimeZone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   slotStartsUtcIso.forEach((slotStartUtcIso, slotIndex) => {
     const date = parseISO(slotStartUtcIso)
-    const { dayKey, dayLabel, timeKey, timeLabel, minutes } = getFormattedDateTimeParts(
-      date,
-      displayTimeZone,
-    )
+    const {
+      dayKey,
+      dayLabel,
+      timeKey,
+      timeLabel,
+      minutes,
+      weekdayLabel,
+      dayNumberLabel,
+      monthLabel,
+    } = getFormattedDateTimeParts(date, displayTimeZone)
     const slotEndDate = new Date(date.getTime() + SLOT_DURATION * 60 * 1000)
     const {
       dayKey: endDayKey,
@@ -409,6 +428,9 @@ export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string)
     dayMap.set(dayKey, {
       key: dayKey,
       label: dayLabel,
+      weekdayLabel,
+      dayNumberLabel,
+      monthLabel,
     })
     timeMap.set(timeKey, {
       key: timeKey,
@@ -418,9 +440,14 @@ export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string)
     slotByDayTime[`${dayKey}|${timeKey}`] = slot
   })
 
+  const days = [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key))
+
   return {
     slots,
-    days: [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    days: days.map((day, index) => ({
+      ...day,
+      showMonthLabel: index === 0 || day.monthLabel !== days[index - 1]!.monthLabel,
+    })),
     times: [...timeMap.values()].sort((a, b) => {
       if (a.minutes !== b.minutes) {
         return a.minutes - b.minutes
