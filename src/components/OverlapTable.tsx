@@ -156,18 +156,28 @@ export default function OverlapTable(props: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={buildIntervals(splitRow.slots)}>
-                        {(dayGroup) => (
-                          <tr>
-                            <th scope="row" class="summary-slots-mobile-table__day-cell">
-                              {dayGroup.dateLabel}
-                            </th>
-                            <td>
-                              <span class="summary-slots-mobile-table__time-text">
-                                {dayGroup.timeLabel}
-                              </span>
-                            </td>
-                          </tr>
+                      <For each={groupIntervalsByDate(splitRow.slots)}>
+                        {(dateGroup) => (
+                          <For each={dateGroup.intervals}>
+                            {(interval, intervalIndex) => (
+                              <tr>
+                                <Show when={intervalIndex() === 0}>
+                                  <th
+                                    scope="row"
+                                    rowSpan={dateGroup.intervals.length}
+                                    class="summary-slots-mobile-table__day-cell"
+                                  >
+                                    {dateGroup.dateLabel}
+                                  </th>
+                                </Show>
+                                <td>
+                                  <span class="summary-slots-mobile-table__time-text">
+                                    {interval.timeLabel}
+                                  </span>
+                                </td>
+                              </tr>
+                            )}
+                          </For>
                         )}
                       </For>
                     </tbody>
