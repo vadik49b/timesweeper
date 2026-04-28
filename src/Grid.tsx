@@ -1,6 +1,5 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
-import { Title, Meta } from '@solidjs/meta'
 import { createStore, produce, reconcile } from 'solid-js/store'
 import './styles/grid.css'
 import {
@@ -372,16 +371,6 @@ export default function Grid(props: Props) {
 
     return `${organizer} set up "${ev.name}".`
   })
-  const pageTitle = createMemo(() => {
-    const ev = event()
-
-    if (!ev) {
-      return 'TimeSweeper — Group scheduling, no login needed'
-    }
-
-    return `${ev.name} — TimeSweeper`
-  })
-  const pageImage = `${window.location.origin}/anti-tank-mine-logo.png`
 
   function selectParticipant(name: string) {
     const ev = event()
@@ -649,26 +638,6 @@ export default function Grid(props: Props) {
 
   return (
     <>
-      <Title>{pageTitle()}</Title>
-      <Meta
-        name="description"
-        content="Share your availability to help find a time that works for everyone."
-      />
-      <Meta property="og:type" content="website" />
-      <Meta property="og:url" content={pageUrl} />
-      <Meta property="og:title" content={pageTitle()} />
-      <Meta
-        property="og:description"
-        content="Share your availability to help find a time that works for everyone."
-      />
-      <Meta property="og:image" content={pageImage} />
-      <Meta name="twitter:card" content="summary_large_image" />
-      <Meta name="twitter:title" content={pageTitle()} />
-      <Meta
-        name="twitter:description"
-        content="Share your availability to help find a time that works for everyone."
-      />
-      <Meta name="twitter:image" content={pageImage} />
       <div class="grid-view">
         <Show when={localReady() && !pageErrorMessage()} fallback={null}>
           <div class="grid-view__shell">
