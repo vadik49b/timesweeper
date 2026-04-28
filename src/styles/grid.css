@@ -295,6 +295,11 @@
   grid-template-rows: var(--day-header-height) repeat(var(--times), var(--size-cell));
   width: max-content;
 }
+.availability-grid--dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
 .availability-grid-wrap {
   overflow-x: auto;
   margin-top: var(--space-300);
@@ -340,7 +345,64 @@
 .availability-grid__cell--after-gap {
   align-self: end;
 }
+.availability-grid__cell--preview {
+  border-width: var(--border-thin);
+  border-color: var(--blo);
+  padding: var(--space-025);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-top {
+  box-shadow:
+    inset 0 var(--border-thin) 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-right {
+  box-shadow:
+    inset calc(var(--border-thin) * -1) 0 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-bottom {
+  box-shadow:
+    inset 0 calc(var(--border-thin) * -1) 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-left {
+  box-shadow:
+    inset var(--border-thin) 0 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-top.availability-grid__cell--preview-left {
+  box-shadow:
+    inset var(--border-thin) 0 0 0 var(--navy),
+    inset 0 var(--border-thin) 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-top.availability-grid__cell--preview-right {
+  box-shadow:
+    inset calc(var(--border-thin) * -1) 0 0 0 var(--navy),
+    inset 0 var(--border-thin) 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-bottom.availability-grid__cell--preview-left {
+  box-shadow:
+    inset var(--border-thin) 0 0 0 var(--navy),
+    inset 0 calc(var(--border-thin) * -1) 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+.availability-grid__cell--preview-bottom.availability-grid__cell--preview-right {
+  box-shadow:
+    inset calc(var(--border-thin) * -1) 0 0 0 var(--navy),
+    inset 0 calc(var(--border-thin) * -1) 0 0 var(--navy),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.12);
+}
 .availability-grid__cell:active:not(.availability-grid__cell--yes):not(
+    .availability-grid__cell--maybe
+  ) {
+  border-width: var(--border-thin);
+  border-color: var(--blo);
+  padding: var(--space-025);
+}
+.availability-grid__cell--preview:active:not(.availability-grid__cell--yes):not(
     .availability-grid__cell--maybe
   ) {
   border-width: var(--border-thin);

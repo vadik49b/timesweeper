@@ -15,6 +15,7 @@ import {
   subscribeEvent,
   updateEventSettings,
   updateParticipantSlot,
+  updateParticipantSlots,
 } from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
@@ -195,6 +196,63 @@ export default function Grid(props: Props) {
     }
 
     setEvent(nextEvent)
+
+    if (navigator.vibrate) {
+      navigator.vibrate(10)
+    }
+  }
+
+  async function paintCells(slotStartUtcIsos: string[], value: SlotValue) {
+    const ev = event()
+    const participant = currentParticipant()
+
+    if (!ev || !participant) {
+      return
+    }
+
+    const name = currentName()
+
+    if (!name) {
+      return
+    }
+
+    const nextSlotStartsUtcIso = [...new Set(slotStartUtcIsos)].filter(
+      (slotStartUtcIso) => getParticipantSlotValue({ slots: selectedSlots }, slotStartUtcIso) !== value,
+    )
+
+    if (nextSlotStartsUtcIso.length === 0) {
+      return
+    }
+
+    const nextSlots = { ...selectedSlots }
+
+    nextSlotStartsUtcIso.forEach((slotStartUtcIso) => {
+      if (value === 0) {
+        delete nextSlots[slotStartUtcIso]
+
+        return
+      }
+
+      nextSlots[slotStartUtcIso] = value
+    })
+
+    setSelectedSlots(reconcile(nextSlots))
+
+    const nextEvent: AppEvent = {
+      ...ev,
+      participants: ev.participants.map((entry) =>
+        entry.name === participant.name
+          ? {
+              ...entry,
+              slots: nextSlots,
+            }
+          : entry,
+      ),
+    }
+
+    setEvent(nextEvent)
+
+    await updateParticipantSlots(ev.id, name, nextSlotStartsUtcIso, value)
 
     if (navigator.vibrate) {
       navigator.vibrate(10)
@@ -745,6 +803,7 @@ export default function Grid(props: Props) {
                           slotByDayTime={slotByDayTime()}
                           selectedSlots={selectedSlots}
                           onCycle={cycleCell}
+                          onPaint={paintCells}
                         />
                       </div>
                     </GridSection>

@@ -427,3 +427,34 @@ export async function updateParticipantSlot(
 
   store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value)
 }
+
+export async function updateParticipantSlots(
+  eventId: string,
+  name: string,
+  slotStartUtcIsos: string[],
+  value: SlotValue,
+): Promise<void> {
+  const store = await requireOpenEventRoomStore(eventId)
+
+  if (!readParticipantNamesFromStore(store, eventId).includes(name)) {
+    return
+  }
+
+  const uniqueSlotStartUtcIsos = [...new Set(slotStartUtcIsos)]
+
+  if (uniqueSlotStartUtcIsos.length === 0) {
+    return
+  }
+
+  store.transaction(() => {
+    uniqueSlotStartUtcIsos.forEach((slotStartUtcIso) => {
+      if (value === 0) {
+        store.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
+
+        return
+      }
+
+      store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value)
+    })
+  })
+}
