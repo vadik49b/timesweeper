@@ -13,15 +13,12 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  margin:
-    calc((var(--space-250) + var(--space-300)) * -1)
-    calc(50% - 50vw)
-    var(--space-250);
+  margin: calc((var(--space-250) + var(--space-300)) * -1) calc(50% - 50vw) var(--space-250);
   padding: var(--space-075) var(--space-150);
   background: #d6cf9b;
   border-bottom: var(--border-thin) solid var(--bdk);
   color: var(--black);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-xxs);
   line-height: 1.2;
 }
 .grid-view__shell {
@@ -259,10 +256,7 @@
     padding: var(--space-300) var(--space-250) var(--space-600);
   }
   .grid-view__connection-bar {
-    margin:
-      calc((var(--space-200) + var(--space-200)) * -1)
-      calc(50% - 50vw)
-      var(--space-200);
+    margin: calc((var(--space-200) + var(--space-200)) * -1) calc(50% - 50vw) var(--space-200);
     padding-inline: var(--space-100);
   }
   .grid-view__title-settings {
@@ -343,6 +337,9 @@
   grid-column: calc(var(--di) + 2);
   grid-row: calc(var(--ti) + 2);
 }
+.availability-grid__cell--after-gap {
+  align-self: end;
+}
 .availability-grid__cell:active:not(.availability-grid__cell--yes):not(
     .availability-grid__cell--maybe
   ) {
@@ -384,10 +381,19 @@
 .availability-grid__cell--first-time.availability-grid__cell--empty {
   border-top-width: var(--border-thin);
 }
+.availability-grid__cell--after-gap.availability-grid__cell--empty {
+  border-top-width: var(--border-thin);
+}
 .availability-grid__cell--first-day.availability-grid__cell--empty {
   border-left-width: var(--border-thin);
 }
 .availability-grid__cell--first-time:is(
+  .availability-grid__cell--yes,
+  .availability-grid__cell--maybe
+) {
+  border-top-width: var(--border-thin);
+}
+.availability-grid__cell--after-gap:is(
   .availability-grid__cell--yes,
   .availability-grid__cell--maybe
 ) {
@@ -480,6 +486,30 @@
   z-index: 1;
   background: var(--bg);
   box-shadow: 1px 0 0 var(--blo);
+}
+.availability-grid__time--after-gap {
+  align-self: end;
+}
+.availability-grid__gap-time {
+  grid-column: 1;
+  grid-row: calc(var(--ti) + 2);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  align-self: start;
+  height: calc(var(--space-050) + var(--space-050));
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 0;
+  font-size: var(--fs-xs);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: #6f6f6f;
+  background: var(--bg);
+  white-space: nowrap;
+  transform: translateY(-3px);
 }
 .summary-table-wrap {
   padding-top: var(--space-100);

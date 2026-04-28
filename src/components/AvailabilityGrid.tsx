@@ -34,12 +34,21 @@ function nextStatusLabel(value: number | undefined): string {
 }
 
 export default function AvailabilityGrid(props: Props) {
+  const gridTemplateRows = () =>
+    [
+      'var(--day-header-height)',
+      ...props.times.map((time) =>
+        time.gapBefore ? 'calc(var(--size-cell) + var(--space-050) + var(--space-050))' : 'var(--size-cell)',
+      ),
+    ].join(' ')
+
   return (
     <div
       class="availability-grid"
       style={{
-        '--days': String(Math.min(Math.max(props.days.length, 1), 7)),
+        '--days': String(Math.max(props.days.length, 1)),
         '--times': String(Math.max(props.times.length, 1)),
+        'grid-template-rows': gridTemplateRows(),
       }}
     >
       <div class="availability-grid__corner" />
@@ -58,9 +67,28 @@ export default function AvailabilityGrid(props: Props) {
       </For>
       <For each={props.times}>
         {(time, timeIndex) => (
-          <div class="availability-grid__time" style={{ '--ti': String(timeIndex()) }}>
+          <div
+            classList={{
+              'availability-grid__time': true,
+              'availability-grid__time--after-gap': time.gapBefore,
+            }}
+            style={{ '--ti': String(timeIndex()) }}
+          >
             {time.label}
           </div>
+        )}
+      </For>
+      <For each={props.times}>
+        {(time, timeIndex) => (
+          <Show when={time.gapBefore}>
+            <div
+              class="availability-grid__gap-time"
+              style={{ '--ti': String(timeIndex()) }}
+              aria-hidden="true"
+            >
+              ...
+            </div>
+          </Show>
         )}
       </For>
       <For each={props.times}>
@@ -97,6 +125,7 @@ export default function AvailabilityGrid(props: Props) {
                     'availability-grid__cell--maybe': slotValue() === 2,
                     'availability-grid__cell--first-time': timeIndex() === 0,
                     'availability-grid__cell--first-day': dayIndex() === 0,
+                    'availability-grid__cell--after-gap': time.gapBefore,
                     'availability-grid__cell--empty': !hasSlot(),
                   }}
                   style={{

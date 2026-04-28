@@ -55,6 +55,7 @@ export interface DisplayTime {
   key: string
   label: string
   minutes: number
+  gapBefore: boolean
 }
 
 export interface DisplaySlot {
@@ -436,11 +437,19 @@ export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string)
       key: timeKey,
       label: timeLabel,
       minutes,
+      gapBefore: false,
     })
     slotByDayTime[`${dayKey}|${timeKey}`] = slot
   })
 
   const days = [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key))
+  const times = [...timeMap.values()].sort((a, b) => {
+    if (a.minutes !== b.minutes) {
+      return a.minutes - b.minutes
+    }
+
+    return a.key.localeCompare(b.key)
+  })
 
   return {
     slots,
@@ -448,13 +457,10 @@ export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string)
       ...day,
       showMonthLabel: index === 0 || day.monthLabel !== days[index - 1]!.monthLabel,
     })),
-    times: [...timeMap.values()].sort((a, b) => {
-      if (a.minutes !== b.minutes) {
-        return a.minutes - b.minutes
-      }
-
-      return a.key.localeCompare(b.key)
-    }),
+    times: times.map((time, index) => ({
+      ...time,
+      gapBefore: index > 0 && time.minutes - times[index - 1]!.minutes > SLOT_DURATION,
+    })),
     slotByDayTime,
   }
 }
