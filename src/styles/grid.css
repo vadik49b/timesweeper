@@ -694,14 +694,6 @@
 .help__mini-cell {
   vertical-align: middle;
 }
-.help__keys {
-  margin-bottom: var(--space-250);
-  color: var(--bdk);
-}
-.help__key-line {
-  margin-left: var(--space-400);
-}
-
 @media (max-width: 700px) {
   .dialog--settings,
   .dialog--name-picker,

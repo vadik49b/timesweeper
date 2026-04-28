@@ -198,9 +198,6 @@ body {
   font-family: var(--ui);
 }
 
-.hk {
-  text-decoration: underline;
-}
 .win95-button {
   appearance: none;
   -webkit-appearance: none;

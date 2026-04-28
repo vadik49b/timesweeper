@@ -1,6 +1,5 @@
 import { createSignal, createMemo, onMount, onCleanup, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
-import { makeEventListener } from '@solid-primitives/event-listener'
 import { Title, Meta } from '@solidjs/meta'
 import './styles/grid.css'
 import {
@@ -167,14 +166,6 @@ export default function Grid(props: Props) {
     if (navigator.vibrate) {
       navigator.vibrate(10)
     }
-  }
-
-  function revealSharePanel() {
-    setCopyStatus('')
-    queueMicrotask(() => {
-      shareInputRef?.focus()
-      shareInputRef?.select()
-    })
   }
 
   function openSettingsModal() {
@@ -501,25 +492,6 @@ export default function Grid(props: Props) {
       }
     }, 3000)
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        (e.target as HTMLElement).tagName === 'INPUT' ||
-        (e.target as HTMLElement).tagName === 'SELECT'
-      )
-        return
-
-      if (e.key === 's' || e.key === 'S') {
-        e.preventDefault()
-        revealSharePanel()
-      }
-
-      if (e.key === 'F3') {
-        e.preventDefault()
-        revealSharePanel()
-      }
-    }
-
-    makeEventListener(document, 'keydown', onKeyDown)
     unsubscribeSyncState = subscribeEventSyncState((state) => {
       if (state !== 'connected') {
         return
@@ -750,7 +722,7 @@ export default function Grid(props: Props) {
                           class="share-panel__copy-btn"
                           onClick={() => copyLink(pageUrl)}
                         >
-                          <span class="hk">C</span>opy
+                          Copy
                         </Win95Button>
                         <div class="copy-status" aria-live="polite">
                           {copyStatus()}
@@ -906,11 +878,6 @@ export default function Grid(props: Props) {
               </p>
               <p class="help__step">
                 <b>5.</b> Review the suggested overlaps
-              </p>
-              <p class="help__keys">
-                <b>Keyboard shortcuts:</b>
-                <br />
-                <span class="help__key-line">F3 / S — Focus share link</span>
               </p>
               <DialogActions>
                 <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
