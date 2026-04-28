@@ -293,9 +293,8 @@
   display: grid;
   --days: 1;
   --times: 1;
-  --time-col-width: calc(var(--space-1100) + var(--space-500));
   --day-header-height: calc(var(--size-control) + var(--space-600));
-  grid-template-columns: var(--time-col-width) repeat(var(--days), var(--size-cell));
+  grid-template-columns: max-content repeat(var(--days), var(--size-cell));
   grid-template-rows: var(--day-header-height) repeat(var(--times), var(--size-cell));
   width: max-content;
 }
@@ -451,18 +450,13 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: var(--space-200);
+  padding-right: var(--space-225);
   font-size: var(--fs-xxs);
   color: var(--black);
   height: var(--size-cell);
   grid-column: 1;
   grid-row: calc(var(--ti) + 2);
   white-space: nowrap;
-}
-@media (min-width: 700px) {
-  .availability-grid {
-    --time-col-width: calc(var(--space-1100) + var(--space-600));
-  }
 }
 .summary-table-wrap {
   padding-top: var(--space-100);
