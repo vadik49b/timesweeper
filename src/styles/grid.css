@@ -302,11 +302,16 @@
   overflow-x: auto;
   margin-top: var(--space-300);
   padding-bottom: var(--space-050);
+  position: relative;
 }
 .availability-grid__corner {
   height: var(--day-header-height);
   grid-column: 1;
   grid-row: 1;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg);
 }
 .availability-grid__day {
   height: var(--day-header-height);
@@ -457,6 +462,11 @@
   grid-column: 1;
   grid-row: calc(var(--ti) + 2);
   white-space: nowrap;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg);
+  box-shadow: 1px 0 0 var(--blo);
 }
 .summary-table-wrap {
   padding-top: var(--space-100);
