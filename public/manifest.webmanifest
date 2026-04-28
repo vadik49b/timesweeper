@@ -8,6 +8,18 @@
   "theme_color": "#008080",
   "icons": [
     {
+      "src": "/anti-tank-mine-logo.avif",
+      "sizes": "604x508",
+      "type": "image/avif",
+      "purpose": "any"
+    },
+    {
+      "src": "/anti-tank-mine-logo.webp",
+      "sizes": "604x508",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
       "src": "/anti-tank-mine-logo.png",
       "sizes": "604x508",
       "type": "image/png",

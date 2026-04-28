@@ -1,5 +1,12 @@
-const CACHE_NAME = 'timesweeper-v3'
-const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/anti-tank-mine-logo.png']
+const CACHE_NAME = 'timesweeper-v4'
+const PRECACHE = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/anti-tank-mine-logo.avif',
+  '/anti-tank-mine-logo.webp',
+  '/anti-tank-mine-logo.png',
+]
 
 function extractAssetUrlsFromHtml(html) {
   const matches = html.match(/\/assets\/[^"'`<>\s)]+/g)

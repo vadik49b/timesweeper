@@ -68,11 +68,6 @@ export const onRequestGet: PagesFunction = async (context) => {
         element.setAttribute('content', description)
       },
     })
-    .on('meta[property="og:image"]', {
-      element(element) {
-        element.setAttribute('content', `${pageUrl.origin}/anti-tank-mine-logo.png`)
-      },
-    })
     .on('meta[name="twitter:title"]', {
       element(element) {
         element.setAttribute('content', title)
@@ -81,11 +76,6 @@ export const onRequestGet: PagesFunction = async (context) => {
     .on('meta[name="twitter:description"]', {
       element(element) {
         element.setAttribute('content', description)
-      },
-    })
-    .on('meta[name="twitter:image"]', {
-      element(element) {
-        element.setAttribute('content', `${pageUrl.origin}/anti-tank-mine-logo.png`)
       },
     })
     .transform(indexResponse)
