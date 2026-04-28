@@ -60,6 +60,10 @@ export interface DisplaySlot {
   dayLabel: string
   timeKey: string
   timeLabel: string
+  endDayKey: string
+  endDayLabel: string
+  endTimeKey: string
+  endTimeLabel: string
 }
 
 export interface DisplayModel {
@@ -379,6 +383,13 @@ export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string)
       date,
       displayTimeZone,
     )
+    const slotEndDate = new Date(date.getTime() + SLOT_DURATION * 60 * 1000)
+    const {
+      dayKey: endDayKey,
+      dayLabel: endDayLabel,
+      timeKey: endTimeKey,
+      timeLabel: endTimeLabel,
+    } = getFormattedDateTimeParts(slotEndDate, displayTimeZone)
     const slot = {
       slotIndex,
       startUtcIso: slotStartUtcIso,
@@ -386,6 +397,10 @@ export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string)
       dayLabel,
       timeKey,
       timeLabel,
+      endDayKey,
+      endDayLabel,
+      endTimeKey,
+      endTimeLabel,
     }
 
     slots.push(slot)

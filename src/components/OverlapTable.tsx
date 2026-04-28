@@ -14,8 +14,13 @@ type SummarySplitRow = {
 }
 
 type SummaryDayGroup = {
-  dayLabel: string
-  slots: DisplaySlot[]
+  dateLabel: string
+  timeLabel: string
+}
+
+type SummaryDateGroup = {
+  dateLabel: string
+  intervals: SummaryDayGroup[]
 }
 
 interface Props {
@@ -25,33 +30,91 @@ interface Props {
 export default function OverlapTable(props: Props) {
   const [isDesktop, setIsDesktop] = createSignal(false)
 
-  function formatSlotTime(slot: DisplaySlot): string {
-    return slot.timeLabel
+  function getMeridiem(value: string): string | null {
+    const match = value.match(/\s([AP]M)$/)
+
+    return match ? match[1] : null
   }
 
-  function formatSlotTimes(slots: DisplaySlot[]): string {
-    return slots.map(formatSlotTime).join(', ')
+  function formatTimeRange(start: DisplaySlot, end: DisplaySlot): string {
+    if (start.dayKey === end.endDayKey) {
+      const startMeridiem = getMeridiem(start.timeLabel)
+      const endMeridiem = getMeridiem(end.endTimeLabel)
+
+      if (startMeridiem && startMeridiem === endMeridiem) {
+        return `${start.timeLabel.slice(0, -3)}–${end.endTimeLabel}`
+      }
+
+      return `${start.timeLabel}–${end.endTimeLabel}`
+    }
+
+    return `${start.timeLabel}–${end.endTimeLabel}`
   }
 
-  function slotsByDay(slots: DisplaySlot[]): SummaryDayGroup[] {
-    const dayGroups: SummaryDayGroup[] = []
+  function formatDateRange(start: DisplaySlot, end: DisplaySlot): string {
+    if (start.dayKey === end.endDayKey) {
+      return start.dayLabel
+    }
+
+    return `${start.dayLabel} – ${end.endDayLabel}`
+  }
+
+  function buildIntervals(slots: DisplaySlot[]): SummaryDayGroup[] {
+    const intervals: SummaryDayGroup[] = []
+    let rangeStart: DisplaySlot | null = null
+    let previous: DisplaySlot | null = null
 
     slots.forEach((slot) => {
-      const currentDay = dayGroups[dayGroups.length - 1]
-
-      if (currentDay?.dayLabel === slot.dayLabel) {
-        currentDay.slots.push(slot)
+      if (!rangeStart || !previous) {
+        rangeStart = slot
+        previous = slot
 
         return
       }
 
-      dayGroups.push({
-        dayLabel: slot.dayLabel,
-        slots: [slot],
+      if (slot.slotIndex === previous.slotIndex + 1) {
+        previous = slot
+
+        return
+      }
+
+      intervals.push({
+        dateLabel: formatDateRange(rangeStart, previous),
+        timeLabel: formatTimeRange(rangeStart, previous),
+      })
+      rangeStart = slot
+      previous = slot
+    })
+
+    if (rangeStart && previous) {
+      intervals.push({
+        dateLabel: formatDateRange(rangeStart, previous),
+        timeLabel: formatTimeRange(rangeStart, previous),
+      })
+    }
+
+    return intervals
+  }
+
+  function groupIntervalsByDate(slots: DisplaySlot[]): SummaryDateGroup[] {
+    const dateGroups: SummaryDateGroup[] = []
+
+    buildIntervals(slots).forEach((interval) => {
+      const currentDateGroup = dateGroups[dateGroups.length - 1]
+
+      if (currentDateGroup?.dateLabel === interval.dateLabel) {
+        currentDateGroup.intervals.push(interval)
+
+        return
+      }
+
+      dateGroups.push({
+        dateLabel: interval.dateLabel,
+        intervals: [interval],
       })
     })
 
-    return dayGroups
+    return dateGroups
   }
 
   onMount(() => {
@@ -93,15 +156,15 @@ export default function OverlapTable(props: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={slotsByDay(splitRow.slots)}>
+                      <For each={buildIntervals(splitRow.slots)}>
                         {(dayGroup) => (
                           <tr>
                             <th scope="row" class="summary-slots-mobile-table__day-cell">
-                              {dayGroup.dayLabel}
+                              {dayGroup.dateLabel}
                             </th>
                             <td>
                               <span class="summary-slots-mobile-table__time-text">
-                                {formatSlotTimes(dayGroup.slots)}
+                                {dayGroup.timeLabel}
                               </span>
                             </td>
                           </tr>
@@ -128,32 +191,43 @@ export default function OverlapTable(props: Props) {
           <tbody>
             <For each={props.rows}>
               {(splitRow) => {
-                const dayGroups = slotsByDay(splitRow.slots)
-                const totalRows = dayGroups.length
+                const dateGroups = groupIntervalsByDate(splitRow.slots)
+                const totalRows = dateGroups.reduce(
+                  (sum, dateGroup) => sum + dateGroup.intervals.length,
+                  0,
+                )
 
                 return (
-                  <For each={dayGroups}>
-                    {(dayGroup, dayIndex) => (
-                      <tr>
-                        <Show when={dayIndex() === 0}>
-                          <td rowSpan={totalRows}>
-                            <SummaryInline
-                              yesCount={splitRow.yesCount}
-                              maybeCount={splitRow.maybeCount}
-                              noCount={splitRow.noCount}
-                            />
-                            <ParticipantStatusList groups={splitRow.groups} />
-                          </td>
-                        </Show>
-                        <td>
-                          <span class="summary-slots-table__date">{dayGroup.dayLabel}</span>
-                        </td>
-                        <td>
-                          <span class="summary-slots-table__time-text">
-                            {formatSlotTimes(dayGroup.slots)}
-                          </span>
-                        </td>
-                      </tr>
+                  <For each={dateGroups}>
+                    {(dateGroup, dateIndex) => (
+                      <For each={dateGroup.intervals}>
+                        {(interval, intervalIndex) => (
+                          <tr>
+                            <Show when={dateIndex() === 0 && intervalIndex() === 0}>
+                              <td rowSpan={totalRows}>
+                                <SummaryInline
+                                  yesCount={splitRow.yesCount}
+                                  maybeCount={splitRow.maybeCount}
+                                  noCount={splitRow.noCount}
+                                />
+                                <ParticipantStatusList groups={splitRow.groups} />
+                              </td>
+                            </Show>
+                            <Show when={intervalIndex() === 0}>
+                              <td rowSpan={dateGroup.intervals.length}>
+                                <span class="summary-slots-table__date">
+                                  {dateGroup.dateLabel}
+                                </span>
+                              </td>
+                            </Show>
+                            <td>
+                              <span class="summary-slots-table__time-text">
+                                {interval.timeLabel}
+                              </span>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
                     )}
                   </For>
                 )

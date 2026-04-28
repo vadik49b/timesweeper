@@ -513,6 +513,7 @@
   border: var(--border-thin) solid var(--blo);
   text-align: left;
   vertical-align: top;
+  user-select: text;
 }
 .summary-slots-table th,
 .summary-slots-table td {
@@ -534,11 +535,16 @@
 .summary-slots-table__date {
   font-weight: var(--fw-bold);
   font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .summary-slots-table__time-text,
 .summary-slots-mobile-table__time-text {
   font-size: var(--fs-xs);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 .participant-status-list__row {
   display: flex;
