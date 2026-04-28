@@ -104,21 +104,14 @@ export default function Landing(props: Props) {
   })
   const selectedDateKeys = createMemo(() => Object.keys(selectedDates()).sort())
 
-  const selectedDateLabels = createMemo(() => {
-    const keys = selectedDateKeys()
+  const selectedDateCountLabel = createMemo(() => {
+    const count = selectedDateKeys().length
 
-    if (keys.length === 0) {
+    if (count === 0) {
       return 'No dates selected'
     }
 
-    const labels = keys.map((ds) =>
-      intlFormat(parseISO(ds), {
-        weekday: 'short',
-        day: 'numeric',
-      }),
-    )
-
-    return `${labels.join(', ')} (${keys.length} day${keys.length > 1 ? 's' : ''})`
+    return `${count} day${count > 1 ? 's' : ''} selected`
   })
 
   function calNav(dir: number) {
@@ -146,10 +139,6 @@ export default function Landing(props: Props) {
       delete next[ds]
       setSelectedDates(next)
     } else {
-      if (selectedDateKeys().length >= 7) {
-        return
-      }
-
       setSelectedDates({ ...cur, [ds]: true })
     }
   }
@@ -318,7 +307,7 @@ export default function Landing(props: Props) {
                 )}
               </For>
             </div>
-            <div class="landing__date-summary">{selectedDateLabels()}</div>
+            <div class="landing__date-summary">{selectedDateCountLabel()}</div>
           </div>
         </fieldset>
 
