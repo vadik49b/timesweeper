@@ -44,11 +44,20 @@ export default function AvailabilityGrid(props: Props) {
     >
       <div class="availability-grid__corner" />
       <For each={props.days}>
-        {(day, dayIndex) => (
-          <div class="availability-grid__day" style={{ '--di': String(dayIndex()) }}>
-            {day.label}
-          </div>
-        )}
+        {(day, dayIndex) => {
+          const date = new Date(`${day.key}T12:00:00`)
+
+          return (
+            <div class="availability-grid__day" style={{ '--di': String(dayIndex()) }}>
+              <span class="availability-grid__day-weekday">
+                {new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date)}
+              </span>
+              <span class="availability-grid__day-number">
+                {new Intl.DateTimeFormat(undefined, { day: 'numeric' }).format(date)}
+              </span>
+            </div>
+          )
+        }}
       </For>
       <For each={props.times}>
         {(time, timeIndex) => (

@@ -97,10 +97,12 @@ function getFormattedDateTimeParts(
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   const hour = Number(values.hour ?? '0')
   const minute = Number(values.minute ?? '0')
+  const weekdayLabel = intlFormat(date, { weekday: 'short', timeZone })
+  const dayNumberLabel = intlFormat(date, { day: 'numeric', timeZone })
 
   return {
     dayKey: `${values.year}-${values.month}-${values.day}`,
-    dayLabel: intlFormat(date, { weekday: 'short', day: 'numeric', timeZone }),
+    dayLabel: `${weekdayLabel} ${dayNumberLabel}`,
     timeKey: `${values.hour}:${values.minute}`,
     timeLabel: intlFormat(date, { hour: 'numeric', minute: '2-digit', timeZone }),
     minutes: hour * 60 + minute,

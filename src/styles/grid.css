@@ -23,7 +23,6 @@
   color: var(--black);
   font-size: var(--fs-xs);
   line-height: 1.2;
-  text-align: left;
 }
 .grid-view__shell {
   background: transparent;
@@ -136,7 +135,6 @@
 }
 .grid-view__intro-text {
   font-size: var(--fs-sm);
-  font-weight: var(--fw-regular);
   color: var(--black);
   line-height: 1.35;
 }
@@ -295,10 +293,11 @@
   display: grid;
   --days: 1;
   --times: 1;
-  --time-col-width: calc(var(--space-900) - var(--space-050));
-  --day-col-width: var(--size-cell);
+  --time-col-width: calc(var(--space-1100) + var(--space-500));
+  --day-header-height: calc(var(--size-control) + var(--space-600));
   grid-template-columns: var(--time-col-width) repeat(var(--days), var(--size-cell));
-  grid-template-rows: var(--size-control) repeat(var(--times), var(--size-cell));
+  grid-template-rows: var(--day-header-height) repeat(var(--times), var(--size-cell));
+  width: max-content;
 }
 .availability-grid-wrap {
   overflow-x: auto;
@@ -306,14 +305,20 @@
   padding-bottom: var(--space-050);
 }
 .availability-grid__corner {
-  height: var(--size-control);
+  height: var(--day-header-height);
   grid-column: 1;
   grid-row: 1;
 }
 .availability-grid__day {
-  height: var(--size-control);
+  height: var(--day-header-height);
   grid-column: calc(var(--di) + 2);
   grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: var(--space-100);
+  padding-bottom: var(--space-150);
 }
 .availability-grid__cell {
   appearance: none;
@@ -363,7 +368,17 @@
 }
 .availability-grid__cell--empty {
   cursor: default;
-  background: color-mix(in srgb, var(--bg) 75%, var(--bdk) 25%);
+  pointer-events: none;
+  background: var(--bg);
+  border-style: solid;
+  border-color: var(--blo);
+  border-width: 0 var(--border-thin) var(--border-thin) 0;
+}
+.availability-grid__cell--first-time.availability-grid__cell--empty {
+  border-top-width: var(--border-thin);
+}
+.availability-grid__cell--first-day.availability-grid__cell--empty {
+  border-left-width: var(--border-thin);
 }
 .availability-grid__cell--first-time:is(
   .availability-grid__cell--yes,
@@ -418,76 +433,35 @@
 
 .availability-grid__day {
   text-align: center;
-  font-size: var(--fs-xs);
-  padding: var(--space-050) 0;
   color: var(--black);
-  font-weight: var(--fw-regular);
+}
+.availability-grid__day-weekday,
+.availability-grid__day-number {
+  line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
+}
+.availability-grid__day-weekday {
+  font-size: var(--fs-xxs);
+}
+.availability-grid__day-number {
+  font-size: var(--fs-sm);
+  margin-top: var(--space-050);
 }
 .availability-grid__time {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: var(--space-075);
+  padding-right: var(--space-200);
   font-size: var(--fs-xxs);
   color: var(--black);
   height: var(--size-cell);
   grid-column: 1;
   grid-row: calc(var(--ti) + 2);
+  white-space: nowrap;
 }
 @media (min-width: 700px) {
   .availability-grid {
-    grid-template-columns: var(--day-col-width) repeat(var(--times), var(--size-cell));
-    grid-template-rows: var(--size-control) repeat(var(--days), var(--size-cell));
-    width: max-content;
-    min-width: 100%;
-  }
-  .availability-grid__day {
-    grid-column: 1;
-    grid-row: calc(var(--di) + 2);
-    height: var(--size-cell);
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    text-align: right;
-    padding-right: var(--space-150);
-    font-size: var(--fs-xxs);
-  }
-  .availability-grid__time {
-    grid-column: calc(var(--ti) + 2);
-    grid-row: 1;
-    height: var(--size-control);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-right: 0;
-    font-size: var(--fs-xxs);
-  }
-  .availability-grid__cell {
-    grid-column: calc(var(--ti) + 2);
-    grid-row: calc(var(--di) + 2);
-  }
-  .availability-grid__cell--first-time:is(
-    .availability-grid__cell--yes,
-    .availability-grid__cell--maybe
-  ) {
-    border-top-width: 0;
-    border-left-width: var(--border-thin);
-  }
-  .availability-grid__cell--first-day:is(
-    .availability-grid__cell--yes,
-    .availability-grid__cell--maybe
-  ) {
-    border-left-width: 0;
-    border-top-width: var(--border-thin);
-  }
-  .availability-grid__cell--first-time.availability-grid__cell--first-day:is(
-      .availability-grid__cell--yes,
-      .availability-grid__cell--maybe
-    ) {
-    border-left-width: var(--border-thin);
-    border-top-width: var(--border-thin);
+    --time-col-width: calc(var(--space-1100) + var(--space-600));
   }
 }
 .summary-table-wrap {
@@ -505,6 +479,12 @@
 .summary-slots-table {
   width: max-content;
   min-width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.summary-slots-mobile-table {
+  user-select: text;
+  -webkit-user-select: text;
 }
 .summary-slots-table th,
 .summary-slots-table td,
@@ -513,7 +493,6 @@
   border: var(--border-thin) solid var(--blo);
   text-align: left;
   vertical-align: top;
-  user-select: text;
 }
 .summary-slots-table th,
 .summary-slots-table td {
@@ -524,7 +503,6 @@
   font-weight: var(--fw-bold);
 }
 .participant-status-list {
-  white-space: normal;
   display: grid;
   grid-template-columns: 1fr;
   row-gap: var(--space-100);
@@ -536,13 +514,11 @@
   font-weight: var(--fw-bold);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
-  white-space: normal;
   overflow-wrap: anywhere;
 }
 .summary-slots-table__time-text,
 .summary-slots-mobile-table__time-text {
   font-size: var(--fs-xs);
-  white-space: normal;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
@@ -683,7 +659,6 @@
 .participant-picker__lead,
 .participant-picker__label {
   line-height: 1.4;
-  font-weight: var(--fw-regular);
 }
 .participant-picker__lead {
   margin-bottom: var(--space-200);
