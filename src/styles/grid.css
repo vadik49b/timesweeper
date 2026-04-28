@@ -249,6 +249,9 @@
   .grid-view__hero-actions {
     margin-left: 0;
   }
+  .grid-view__hero-timezone {
+    display: none;
+  }
   .grid-view__steps-panel {
     margin-top: 0;
   }
