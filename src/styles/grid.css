@@ -378,15 +378,6 @@
   border-left-width: var(--border-thin);
 }
 
-.grid-view__legend {
-  gap: var(--space-075);
-  justify-content: flex-start;
-  align-items: center;
-  margin-top: var(--space-200);
-  margin-bottom: var(--space-150);
-  font-size: var(--fs-sm);
-  color: var(--bdk);
-}
 .availability-legend {
   display: inline-flex;
   align-items: center;
@@ -398,9 +389,6 @@
 }
 .availability-legend__arrow {
   color: var(--bdk);
-}
-.availability-legend--mini {
-  gap: var(--space-075);
 }
 .grid-view__legend-cell {
   display: inline-flex;
@@ -660,9 +648,6 @@
     --grid-title-size: var(--fs-display-title-sm);
   }
 }
-.dialog--help {
-  max-width: var(--max-dialog-help);
-}
 .dialog--settings {
   width: min(440px, calc(100vw - var(--space-300)));
   max-width: 440px;
@@ -679,25 +664,9 @@
   display: flex;
   flex-direction: column;
 }
-.dialog-body--help {
-  line-height: 1.6;
-}
-.help__lead {
-  margin-bottom: var(--space-200);
-}
-.help__step {
-  margin-bottom: var(--space-150);
-}
-.help__cycle {
-  margin-left: var(--space-400);
-}
-.help__mini-cell {
-  vertical-align: middle;
-}
 @media (max-width: 700px) {
   .dialog--settings,
-  .dialog--name-picker,
-  .dialog--help {
+  .dialog--name-picker {
     width: calc(100vw - var(--space-900));
     max-width: calc(100vw - var(--space-900));
   }

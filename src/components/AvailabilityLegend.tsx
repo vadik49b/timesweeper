@@ -1,16 +1,12 @@
 interface Props {
   withLabels?: boolean
-  mini?: boolean
   class?: string
 }
 
 export default function AvailabilityLegend(props: Props) {
   const rootClass = () =>
-    ['availability-legend', props.mini ? 'availability-legend--mini' : '', props.class]
-      .filter(Boolean)
-      .join(' ')
-  const cellClass = (extra?: string) =>
-    ['grid-view__legend-cell', props.mini ? 'help__mini-cell' : '', extra].filter(Boolean).join(' ')
+    ['availability-legend', props.class].filter(Boolean).join(' ')
+  const cellClass = (extra?: string) => ['grid-view__legend-cell', extra].filter(Boolean).join(' ')
   const arrow = '\u2192'
 
   return (

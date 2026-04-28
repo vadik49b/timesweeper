@@ -89,7 +89,7 @@ export default function Grid(props: Props) {
   })
   const selectedSlots = createMemo(() => currentParticipant()?.slots ?? {})
 
-  type ActiveModal = null | 'name-picker' | 'help' | 'settings'
+  type ActiveModal = null | 'name-picker' | 'settings'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [settingsEventName, setSettingsEventName] = createSignal('')
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
@@ -849,41 +849,6 @@ export default function Grid(props: Props) {
                   </form>
                 </div>
               </Show>
-            </Win95Dialog>
-          </Show>
-
-          <Show when={activeModal() === 'help'}>
-            <Win95Dialog
-              title="Help — TimeSweeper"
-              class="dialog--help"
-              bodyClass="dialog-body--help"
-              onClose={() => setActiveModal(null)}
-            >
-              <p class="help__lead">
-                <b>How to use TimeSweeper:</b>
-              </p>
-              <p class="help__step">
-                <b>1.</b> Click your <b>name</b> and pick your name
-              </p>
-              <p class="help__step">
-                <b>2.</b> Click a cell to mark availability:
-                <br />
-                <AvailabilityLegend mini class="help__cycle" />
-              </p>
-              <p class="help__step">
-                <b>3.</b> Check the overlap table to compare the best and near-match slots
-              </p>
-              <p class="help__step">
-                <b>4.</b> Copy the link and send it to others
-              </p>
-              <p class="help__step">
-                <b>5.</b> Review the suggested overlaps
-              </p>
-              <DialogActions>
-                <Win95Button class="dialog-btn" onClick={() => setActiveModal(null)}>
-                  OK
-                </Win95Button>
-              </DialogActions>
             </Win95Dialog>
           </Show>
 

@@ -506,10 +506,3 @@ body {
   padding: 0;
   background: transparent;
 }
-
-.copy-status {
-  font-size: var(--fs-xs);
-  color: var(--bdk);
-  margin-top: var(--space-150);
-  min-height: var(--space-350);
-}
