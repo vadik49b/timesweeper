@@ -1,6 +1,7 @@
-import { createSignal, createMemo, onMount, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { Title, Meta } from '@solidjs/meta'
+import { createStore, produce, reconcile } from 'solid-js/store'
 import './styles/grid.css'
 import {
   clearSelectedParticipantName,
@@ -36,6 +37,7 @@ import {
   findDuplicateName,
   getNameKey,
   getParticipantSlotValue,
+  type SlotMap,
   type SlotValue,
 } from './event-helpers'
 
@@ -49,6 +51,8 @@ const EMPTY_DISPLAY: DisplayModel = {
   times: [],
   slotByDayTime: {},
 }
+const EMPTY_SLOT_STARTS_UTC_ISO: string[] = []
+const EMPTY_SLOT_MAP: SlotMap = {}
 
 const LOADING_MESSAGES = [
   'Opening link...',
@@ -66,10 +70,20 @@ export default function Grid(props: Props) {
   )
   const timezoneOptions = createMemo(() => getTimezoneOptions(displayTimezone()))
 
-  const display = createMemo(() => {
-    const ev = event()
+  const eventSlotStartsUtcIso = createMemo(
+    () => event()?.slotStartsUtcIso ?? EMPTY_SLOT_STARTS_UTC_ISO,
+    EMPTY_SLOT_STARTS_UTC_ISO,
+    {
+      equals: (a, b) => a.length === b.length && a.every((entry, index) => entry === b[index]),
+    },
+  )
 
-    return ev ? buildDisplayModel(ev.slotStartsUtcIso, displayTimezone()) : EMPTY_DISPLAY
+  const display = createMemo(() => {
+    const slotStartsUtcIso = eventSlotStartsUtcIso()
+
+    return slotStartsUtcIso.length > 0
+      ? buildDisplayModel(slotStartsUtcIso, displayTimezone())
+      : EMPTY_DISPLAY
   })
   const displaySlots = () => display().slots
   const days = () => display().days
@@ -87,7 +101,26 @@ export default function Grid(props: Props) {
 
     return ev.participants.find((entry) => entry.name === name) ?? null
   })
-  const selectedSlots = createMemo(() => currentParticipant()?.slots ?? {})
+  const [selectedSlots, setSelectedSlots] = createStore<SlotMap>({})
+  const selectedParticipantSlots = createMemo(() => currentParticipant()?.slots ?? EMPTY_SLOT_MAP)
+
+  createEffect(() => {
+    setSelectedSlots(reconcile(selectedParticipantSlots()))
+  })
+
+  function setSelectedSlotValue(slotStartUtcIso: string, value: SlotValue): void {
+    if (value === 0) {
+      setSelectedSlots(
+        produce((slots) => {
+          delete slots[slotStartUtcIso]
+        }),
+      )
+
+      return
+    }
+
+    setSelectedSlots(slotStartUtcIso, value)
+  }
 
   type ActiveModal = null | 'name-picker' | 'settings'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
@@ -132,14 +165,14 @@ export default function Grid(props: Props) {
 
     const slot = displaySlots()[slotIndex]!
 
-    const prev = getParticipantSlotValue(participant, slot.startUtcIso)
+    const prev = getParticipantSlotValue({ slots: selectedSlots }, slot.startUtcIso)
     const next = (prev + 1) % 3
 
     if (prev === next) {
       return
     }
 
-    const nextSlots = { ...participant.slots }
+    const nextSlots = { ...selectedSlots }
 
     if (next === 0) {
       delete nextSlots[slot.startUtcIso]
@@ -148,6 +181,7 @@ export default function Grid(props: Props) {
     }
 
     await updateParticipantSlot(ev.id, name, slot.startUtcIso, next as SlotValue)
+    setSelectedSlotValue(slot.startUtcIso, next as SlotValue)
 
     const nextEvent: AppEvent = {
       ...ev,
@@ -740,7 +774,7 @@ export default function Grid(props: Props) {
                           days={days()}
                           times={times()}
                           slotByDayTime={slotByDayTime()}
-                          selectedSlots={selectedSlots()}
+                          selectedSlots={selectedSlots}
                           onCycle={cycleCell}
                         />
                       </div>
