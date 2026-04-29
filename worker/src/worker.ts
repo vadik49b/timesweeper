@@ -31,7 +31,10 @@ interface EventJson {
   participants: EventParticipant[]
 }
 
-const wsFetch = getWsServerDurableObjectFetch('EVENT_ROOMS')
+const wsFetch = getWsServerDurableObjectFetch('EVENT_ROOMS') as unknown as (
+  request: Request,
+  env: Env,
+) => Response
 
 function createEventRoomPersister(sqlStorage: SqlStorage, uniqueId?: string) {
   return createDurableObjectSqlStoragePersister(createMergeableStore(uniqueId), sqlStorage)
@@ -141,7 +144,7 @@ export class EventRoom extends WsServerDurableObject<Env> {
       })
     }
 
-    return super.fetch(request)
+    return super.fetch!(request)
   }
 }
 
