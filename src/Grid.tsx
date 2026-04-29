@@ -1,6 +1,6 @@
 import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
-import { createStore, produce, reconcile } from 'solid-js/store'
+import { createStore, reconcile } from 'solid-js/store'
 import './styles/grid.css'
 import {
   clearSelectedParticipantName,
@@ -108,20 +108,6 @@ export default function Grid(props: Props) {
     setSelectedSlots(reconcile(selectedParticipantSlots()))
   })
 
-  function setSelectedSlotValue(slotStartUtcIso: string, value: SlotValue): void {
-    if (value === 0) {
-      setSelectedSlots(
-        produce((slots) => {
-          delete slots[slotStartUtcIso]
-        }),
-      )
-
-      return
-    }
-
-    setSelectedSlots(slotStartUtcIso, value)
-  }
-
   type ActiveModal = null | 'name-picker' | 'settings'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
   const [settingsEventName, setSettingsEventName] = createSignal('')
@@ -179,9 +165,7 @@ export default function Grid(props: Props) {
     } else {
       nextSlots[slot.startUtcIso] = next as SlotValue
     }
-
-    await updateParticipantSlot(ev.id, name, slot.startUtcIso, next as SlotValue)
-    setSelectedSlotValue(slot.startUtcIso, next as SlotValue)
+    setSelectedSlots(reconcile(nextSlots))
 
     const nextEvent: AppEvent = {
       ...ev,
@@ -196,6 +180,7 @@ export default function Grid(props: Props) {
     }
 
     setEvent(nextEvent)
+    await updateParticipantSlot(ev.id, name, slot.startUtcIso, next as SlotValue)
 
     if (navigator.vibrate) {
       navigator.vibrate(10)

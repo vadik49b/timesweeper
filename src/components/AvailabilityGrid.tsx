@@ -56,10 +56,22 @@ function nextStatusLabel(value: number | undefined): string {
   return 'yes'
 }
 
+function statusGlyph(value: number | undefined): string {
+  if (value === 1) {
+    return '✔'
+  }
+
+  if (value === 2) {
+    return '?'
+  }
+
+  return '×'
+}
+
 export default function AvailabilityGrid(props: Props) {
   let gridRef!: HTMLDivElement
   const cellRefs: HTMLButtonElement[][] = []
-  let suppressNextClick = false
+  let suppressedClickButton: HTMLButtonElement | null = null
   let previousHtmlOverflow = ''
   let previousBodyOverflow = ''
   const preventTouchScroll = (event: TouchEvent) => {
@@ -90,17 +102,58 @@ export default function AvailabilityGrid(props: Props) {
           : 'var(--size-cell)',
       ),
     ].join(' ')
-  const previewContains = (row: number, col: number) => {
+  const previewOverlay = createMemo(() => {
     const bounds = previewBounds()
+    const gesture = dragGesture()
 
-    return (
-      bounds !== null &&
-      row >= bounds.top &&
-      row <= bounds.bottom &&
-      col >= bounds.left &&
-      col <= bounds.right
-    )
-  }
+    if (!bounds || !gesture) {
+      return null
+    }
+
+    const left = gesture.colLefts[bounds.left] ?? 0
+    const top = gesture.rowTops[bounds.top] ?? 0
+    const right = (gesture.colLefts[bounds.right] ?? left) + gesture.cellWidth
+    const bottom = (gesture.rowTops[bounds.bottom] ?? top) + gesture.cellHeight
+
+    return {
+      left,
+      top,
+      width: Math.max(right - left, gesture.cellWidth),
+      height: Math.max(bottom - top, gesture.cellHeight),
+      targetValue: bounds.targetValue,
+      markers: Array.from({ length: bounds.bottom - bounds.top + 1 }, (_, rowOffset) =>
+        Array.from({ length: bounds.right - bounds.left + 1 }, (_, colOffset) => {
+          const row = bounds.top + rowOffset
+          const col = bounds.left + colOffset
+          const day = props.days[col]
+          const time = props.times[row]
+          const nextSlot = day && time ? props.slotByDayTime[`${day.key}|${time.key}`] : undefined
+
+          if (!nextSlot) {
+            return null
+          }
+
+          const currentValue = props.selectedSlots[nextSlot.startUtcIso]
+          const normalizedCurrentValue = currentValue ?? 0
+          const changes = normalizedCurrentValue !== bounds.targetValue
+
+          if (!changes) {
+            return null
+          }
+
+          return {
+            key: nextSlot.startUtcIso,
+            left: (gesture.colLefts[col] ?? left) - left,
+            top: (gesture.rowTops[row] ?? top) - top,
+            currentValue,
+            currentGlyph: currentValue === undefined ? null : statusGlyph(currentValue),
+            nextGlyph: bounds.targetValue === 0 ? null : statusGlyph(bounds.targetValue),
+            showNextCentered: currentValue === undefined && bounds.targetValue !== 0,
+          }
+        }),
+      ).flatMap((row) => row.filter((marker) => marker !== null)),
+    }
+  })
   const snapIndex = (position: number, starts: number[], size: number) => {
     if (starts.length === 0) {
       return 0
@@ -264,7 +317,7 @@ export default function AvailabilityGrid(props: Props) {
 
     startAutoScrollLoop()
   }
-  const finishDragGesture = () => {
+  const finishDragGesture = (event?: PointerEvent) => {
     const gesture = dragGesture()
 
     if (!gesture) {
@@ -319,7 +372,10 @@ export default function AvailabilityGrid(props: Props) {
       return
     }
 
-    suppressNextClick = true
+    suppressedClickButton =
+      event?.target instanceof Element
+        ? (event.target.closest('.availability-grid__cell') as HTMLButtonElement | null)
+        : null
     void props.onPaint(slotStartUtcIsos, gesture.targetValue)
   }
 
@@ -396,7 +452,7 @@ export default function AvailabilityGrid(props: Props) {
 
         event.preventDefault()
         updateDragTarget(event.clientX, event.clientY)
-        finishDragGesture()
+        finishDragGesture(event)
       }}
       onPointerCancel={(event) => {
         const gesture = dragGesture()
@@ -461,27 +517,11 @@ export default function AvailabilityGrid(props: Props) {
                   ? undefined
                   : props.selectedSlots[nextSlot.startUtcIso]
               }
-              const displayedValue = () => {
-                const bounds = previewBounds()
-
-                if (
-                  bounds &&
-                  timeIndex() >= bounds.top &&
-                  timeIndex() <= bounds.bottom &&
-                  dayIndex() >= bounds.left &&
-                  dayIndex() <= bounds.right &&
-                  slotIndex() !== undefined
-                ) {
-                  return bounds.targetValue
-                }
-
-                return slotValue()
-              }
               const hasSlot = () => slotIndex() !== undefined
               const cellLabel = () =>
                 hasSlot()
                   ? `${day.label} at ${time.label}. Your availability is ${statusLabel(
-                      displayedValue(),
+                      slotValue(),
                     )}. Click to mark ${nextStatusLabel(slotValue())}.`
                   : `${day.label} at ${time.label}. No availability slot here.`
               const cellTitle = () =>
@@ -498,25 +538,12 @@ export default function AvailabilityGrid(props: Props) {
                   type="button"
                   classList={{
                     'availability-grid__cell': true,
-                    'availability-grid__cell--yes': displayedValue() === 1,
-                    'availability-grid__cell--maybe': displayedValue() === 2,
+                    'availability-grid__cell--yes': slotValue() === 1,
+                    'availability-grid__cell--maybe': slotValue() === 2,
                     'availability-grid__cell--first-time': timeIndex() === 0,
                     'availability-grid__cell--first-day': dayIndex() === 0,
                     'availability-grid__cell--after-gap': time.gapBefore,
                     'availability-grid__cell--empty': !hasSlot(),
-                    'availability-grid__cell--preview': previewContains(timeIndex(), dayIndex()),
-                    'availability-grid__cell--preview-top':
-                      previewContains(timeIndex(), dayIndex()) &&
-                      timeIndex() === previewBounds()?.top,
-                    'availability-grid__cell--preview-right':
-                      previewContains(timeIndex(), dayIndex()) &&
-                      dayIndex() === previewBounds()?.right,
-                    'availability-grid__cell--preview-bottom':
-                      previewContains(timeIndex(), dayIndex()) &&
-                      timeIndex() === previewBounds()?.bottom,
-                    'availability-grid__cell--preview-left':
-                      previewContains(timeIndex(), dayIndex()) &&
-                      dayIndex() === previewBounds()?.left,
                   }}
                   style={{
                     '--ti': String(timeIndex()),
@@ -571,12 +598,14 @@ export default function AvailabilityGrid(props: Props) {
                       scrollLocked: false,
                     })
                   }}
-                  onClick={() => {
-                    if (suppressNextClick) {
-                      suppressNextClick = false
+                  onClick={(event) => {
+                    if (event.currentTarget === suppressedClickButton) {
+                      suppressedClickButton = null
 
                       return
                     }
+
+                    suppressedClickButton = null
 
                     const nextSlotIndex = slotIndex()
 
@@ -587,10 +616,10 @@ export default function AvailabilityGrid(props: Props) {
                     props.onCycle(nextSlotIndex)
                   }}
                 >
-                  <Show when={displayedValue() === 1}>
+                  <Show when={slotValue() === 1}>
                     <span class="availability-grid__icon">✔</span>
                   </Show>
-                  <Show when={displayedValue() === 2}>
+                  <Show when={slotValue() === 2}>
                     <span class="availability-grid__icon">?</span>
                   </Show>
                 </button>
@@ -599,6 +628,53 @@ export default function AvailabilityGrid(props: Props) {
           </For>
         )}
       </For>
+      <Show when={previewOverlay()}>
+        {(overlay) => (
+          <div
+            classList={{
+              'availability-grid__drag-overlay': true,
+              'availability-grid__drag-overlay--yes': overlay().targetValue === 1,
+              'availability-grid__drag-overlay--maybe': overlay().targetValue === 2,
+              'availability-grid__drag-overlay--no': overlay().targetValue === 0,
+            }}
+            style={{
+              left: `${overlay().left}px`,
+              top: `${overlay().top}px`,
+              width: `${overlay().width}px`,
+              height: `${overlay().height}px`,
+            }}
+            aria-hidden="true"
+          >
+            <For each={overlay().markers}>
+              {(marker) => (
+                <span
+                  class="availability-grid__drag-marker"
+                  style={{
+                    left: `${marker.left}px`,
+                    top: `${marker.top}px`,
+                  }}
+                >
+                  <Show when={marker.currentGlyph}>
+                    <span class="availability-grid__drag-marker-old">
+                      {marker.currentGlyph}
+                    </span>
+                  </Show>
+                  <Show when={marker.nextGlyph}>
+                    <span
+                      classList={{
+                        'availability-grid__drag-marker-new': true,
+                        'availability-grid__drag-marker-new--centered': marker.showNextCentered,
+                      }}
+                    >
+                      {marker.nextGlyph}
+                    </span>
+                  </Show>
+                </span>
+              )}
+            </For>
+          </div>
+        )}
+      </Show>
     </div>
   )
 }
