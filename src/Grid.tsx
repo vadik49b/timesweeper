@@ -799,6 +799,7 @@ export default function Grid(props: Props) {
                         <OverlapSection
                           event={loadedEvent()}
                           currentName={currentName()}
+                          currentParticipant={currentParticipant()}
                           displaySlots={displaySlots()}
                         />
                       )}

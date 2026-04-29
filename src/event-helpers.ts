@@ -328,62 +328,8 @@ export function findDuplicateName(names: string[], reservedNames: string[] = [])
   return null
 }
 
-export function getOrderedParticipants(
-  participants: Participant[],
-  currentName: string,
-): Participant[] {
-  return [...participants].sort((a, b) => {
-    if (a.name === currentName) {
-      return -1
-    }
-
-    if (b.name === currentName) {
-      return 1
-    }
-
-    return a.name.localeCompare(b.name)
-  })
-}
-
 export function formatParticipantDisplayName(name: string, currentName: string): string {
   return name === currentName ? `${name} (you)` : name
-}
-
-export function emptyParticipantSummaryGroups(): ParticipantSummaryGroups {
-  return {
-    yes: [],
-    maybe: [],
-    no: [],
-  }
-}
-
-export function getParticipantSummaryGroups(
-  event: Pick<AppEvent, 'participants'>,
-  currentName: string,
-  slotStartUtcIso: string,
-): ParticipantSummaryGroups {
-  const groups = emptyParticipantSummaryGroups()
-
-  getOrderedParticipants(event.participants, currentName).forEach((participant) => {
-    const value = getParticipantSlotValue(participant, slotStartUtcIso)
-    const displayName = formatParticipantDisplayName(participant.name, currentName)
-
-    if (value === 1) {
-      groups.yes.push(displayName)
-
-      return
-    }
-
-    if (value === 2) {
-      groups.maybe.push(displayName)
-
-      return
-    }
-
-    groups.no.push(displayName)
-  })
-
-  return groups
 }
 
 export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string): DisplayModel {

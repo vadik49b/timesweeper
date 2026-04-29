@@ -3,13 +3,12 @@ import Win95Button from './Win95Button'
 import OverlapTable from './OverlapTable'
 import GridSection from './GridSection'
 import {
-  emptyParticipantSummaryGroups,
   formatParticipantDisplayName,
   getParticipantSlotValue,
-  getOrderedParticipants,
   hasParticipantAvailability,
   type AppEvent,
   type DisplaySlot,
+  type Participant,
   type ParticipantSummaryGroups,
 } from '../event-helpers'
 
@@ -29,6 +28,7 @@ type SummarySplitRow = {
 interface Props {
   event: AppEvent
   currentName: string
+  currentParticipant: Participant | null
   displaySlots: DisplaySlot[]
 }
 
@@ -42,47 +42,61 @@ export default function OverlapSection(props: Props) {
       return []
     }
 
-    const orderedParticipants = getOrderedParticipants(props.event.participants, props.currentName)
-    const rows = new Map<string, SummarySplitRow>()
+    const otherParticipants = props.event.participants.filter((participant) => {
+      return participant.name !== props.currentName
+    })
 
-    props.displaySlots.forEach((slot) => {
-      const groups = emptyParticipantSummaryGroups()
-      let key = ''
+    const participants = props.currentParticipant
+      ? [props.currentParticipant, ...otherParticipants]
+      : otherParticipants
 
-      orderedParticipants.forEach((participant) => {
-        const value = getParticipantSlotValue(participant, slot.startUtcIso)
-        const displayName = formatParticipantDisplayName(participant.name, props.currentName)
+    const rows = props.displaySlots.reduce((acc, slot) => {
+      const { groups, key } = participants.reduce(
+        (slotAcc, participant) => {
+          const { groups } = slotAcc
+          const value = getParticipantSlotValue(participant, slot.startUtcIso)
+          const displayName = formatParticipantDisplayName(participant.name, props.currentName)
 
-        key += String(value)
+          slotAcc.key += String(value)
 
-        if (value === 1) {
-          groups.yes.push(displayName)
+          if (value === 1) {
+            groups.yes.push(displayName)
 
-          return
-        }
+            return slotAcc
+          }
 
-        if (value === 2) {
-          groups.maybe.push(displayName)
+          if (value === 2) {
+            groups.maybe.push(displayName)
 
-          return
-        }
+            return slotAcc
+          }
 
-        groups.no.push(displayName)
-      })
+          groups.no.push(displayName)
+          return slotAcc
+        },
+        {
+          groups: {
+            yes: [],
+            maybe: [],
+            no: [],
+          } as ParticipantSummaryGroups,
+          key: '',
+        },
+      )
       const yesCount = groups.yes.length
       const maybeCount = groups.maybe.length
       const canAttend = yesCount + maybeCount
 
       if (canAttend === 0) {
-        return
+        return acc
       }
 
-      const existing = rows.get(key)
+      const existing = acc.get(key)
 
       if (!existing) {
         const noCount = groups.no.length
 
-        rows.set(key, {
+        acc.set(key, {
           key,
           groups,
           yesCount,
@@ -94,11 +108,12 @@ export default function OverlapSection(props: Props) {
           canAttend,
         })
 
-        return
+        return acc
       }
 
       existing.slots.push(slot)
-    })
+      return acc
+    }, new Map<string, SummarySplitRow>())
 
     const kindRank: Record<SummarySplitRow['kind'], number> = { best: 0, almost: 1, partial: 2 }
 
@@ -118,6 +133,7 @@ export default function OverlapSection(props: Props) {
       return b.slots.length - a.slots.length
     })
   })
+
   const visibleSummaryRows = createMemo(() => {
     const all = summaryRows()
 
