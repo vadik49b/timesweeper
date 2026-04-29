@@ -202,7 +202,8 @@ export default function Grid(props: Props) {
     }
 
     const nextSlotStartsUtcIso = [...new Set(slotStartUtcIsos)].filter(
-      (slotStartUtcIso) => getParticipantSlotValue({ slots: selectedSlots }, slotStartUtcIso) !== value,
+      (slotStartUtcIso) =>
+        getParticipantSlotValue({ slots: selectedSlots }, slotStartUtcIso) !== value,
     )
 
     if (nextSlotStartsUtcIso.length === 0) {
@@ -778,7 +779,7 @@ export default function Grid(props: Props) {
 
                     <GridSection number={2} title="Your availability">
                       <p class="grid-view__suggestions-helper grid-view__availability-helper">
-                        <span>Click squares to mark your availability:</span>
+                        <span>Click or drag squares to mark your availability:</span>
                         <AvailabilityLegend withLabels />
                       </p>
                       <div class="availability-grid-wrap">
