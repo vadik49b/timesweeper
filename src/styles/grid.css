@@ -350,6 +350,10 @@
   outline: var(--space-025) dotted var(--black);
   outline-offset: calc(var(--space-100) * -1);
 }
+.availability-grid__cell:active {
+  border-color: var(--bdk) var(--white) var(--white) var(--bdk);
+  transform: translate(1px, 1px);
+}
 .availability-grid__cell--after-gap {
   align-self: end;
 }
@@ -372,6 +376,12 @@
 }
 .availability-grid__cell--maybe .availability-grid__icon {
   color: var(--accent-danger);
+}
+.availability-grid__cell--yes:active {
+  background: color-mix(in srgb, var(--cell-open) 98%, var(--bdk));
+}
+.availability-grid__cell--maybe:active {
+  background: rgba(146, 67, 60, 0.015);
 }
 .availability-grid__cell--empty {
   cursor: default;
