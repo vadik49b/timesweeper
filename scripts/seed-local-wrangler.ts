@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 
 import { addDays, addMinutes, getHours, getMinutes, isValid, lightFormat, parse } from 'date-fns'
-import { Status } from 'tinybase/persisters'
+import { nanoid } from 'nanoid'
 import { createMergeableStore } from 'tinybase/mergeable-store'
 import { createWsSynchronizer } from 'tinybase/synchronizers/synchronizer-ws-client'
+import {
+  AVAILABILITY_TABLE,
+  EVENT_META_CREATED_CELL,
+  EVENT_META_TABLE,
+  EVENT_META_NAME_CELL,
+  EVENT_META_PARTICIPANT_NAMES_CELL,
+  EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+} from '../shared/tinybase-schema.ts'
 
 const SLOT_MINUTES = 30
-const EVENT_META_TABLE = 'eventMeta'
-const EVENT_NAME_CELL = 'name'
-const EVENT_CREATED_CELL = 'created'
-const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
-const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
-const AVAILABILITY_TABLE = 'availability'
+const SYNC_STATUS_IDLE = 0
+const SYNC_STATUS_SAVING = 2
 
 const DEFAULTS = {
   baseUrl: 'http://127.0.0.1:8787',
@@ -24,6 +28,34 @@ const DEFAULTS = {
   maybeRate: 0.18,
   noRate: 0.45,
 }
+
+interface SeedConfig {
+  baseUrl: string
+  appUrl: string
+  events: number
+  participants: number
+  days: number
+  start: string
+  end: string
+  maybeRate: number
+  noRate: number
+  help?: boolean
+}
+
+interface SeedParticipant {
+  name: string
+  slots: Record<string, 1 | 2>
+}
+
+interface SeedEvent {
+  id: string
+  name: string
+  created: number
+  slotStartsUtcIso: string[]
+  participants: SeedParticipant[]
+}
+
+type EventSynchronizer = Awaited<ReturnType<typeof createWsSynchronizer>>
 
 function showHelp() {
   console.log(`Seed local Wrangler Durable Object rooms with fake TimeSweeper events.
@@ -49,8 +81,8 @@ Examples:
 `)
 }
 
-function parseArgs(argv) {
-  const config = { ...DEFAULTS }
+function parseArgs(argv: string[]): SeedConfig {
+  const config: SeedConfig = { ...DEFAULTS }
   let i = 0
 
   while (i < argv.length) {
@@ -96,7 +128,7 @@ function parseArgs(argv) {
   return config
 }
 
-function validateConfig(config) {
+function validateConfig(config: SeedConfig): void {
   if (!Number.isInteger(config.events) || config.events < 1) {
     throw new Error('--events must be an integer >= 1')
   }
@@ -122,7 +154,7 @@ function validateConfig(config) {
   }
 }
 
-function parseTimeToMinutes(hhmm) {
+function parseTimeToMinutes(hhmm: string): number {
   const parsed = parse(hhmm, 'HH:mm', new Date(2000, 0, 1))
 
   if (!isValid(parsed) || lightFormat(parsed, 'HH:mm') !== hhmm) {
@@ -132,8 +164,8 @@ function parseTimeToMinutes(hhmm) {
   return getHours(parsed) * 60 + getMinutes(parsed)
 }
 
-function buildDates(days) {
-  const out = []
+function buildDates(days: number): string[] {
+  const out: string[] = []
   const start = new Date()
   start.setHours(0, 0, 0, 0)
 
@@ -144,8 +176,8 @@ function buildDates(days) {
   return out
 }
 
-function buildSlotStartsUtcIso(dates, startMins, endMins) {
-  const slots = []
+function buildSlotStartsUtcIso(dates: string[], startMins: number, endMins: number): string[] {
+  const slots: string[] = []
 
   for (const dateKey of dates) {
     const dayStart = parse(dateKey, 'yyyy-MM-dd', new Date())
@@ -158,7 +190,7 @@ function buildSlotStartsUtcIso(dates, startMins, endMins) {
   return slots
 }
 
-function randomChoice(noRate, maybeRate) {
+function randomChoice(noRate: number, maybeRate: number): 0 | 1 | 2 {
   const r = Math.random()
 
   if (r < noRate) {
@@ -172,7 +204,7 @@ function randomChoice(noRate, maybeRate) {
   return 1
 }
 
-function makeName(index) {
+function makeName(index: number): string {
   const first = [
     'Alex',
     'Sam',
@@ -213,13 +245,18 @@ function makeName(index) {
   return `${f} ${l} ${suffix + 1}`
 }
 
-function buildParticipant(name, slotStartsUtcIso, noRate, maybeRate) {
-  const slots = {}
+function buildParticipant(
+  name: string,
+  slotStartsUtcIso: string[],
+  noRate: number,
+  maybeRate: number,
+): SeedParticipant {
+  const slots: Record<string, 1 | 2> = {}
 
   for (const slotStartUtcIso of slotStartsUtcIso) {
     const value = randomChoice(noRate, maybeRate)
 
-    if (value > 0) {
+    if (value !== 0) {
       slots[slotStartUtcIso] = value
     }
   }
@@ -230,15 +267,11 @@ function buildParticipant(name, slotStartsUtcIso, noRate, maybeRate) {
   }
 }
 
-function randomId() {
-  return `seed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function normalizeBaseUrl(url) {
+function normalizeBaseUrl(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url
 }
 
-function eventSyncUrl(baseUrl, eventId) {
+function eventSyncUrl(baseUrl: string, eventId: string): string {
   const url = new URL(normalizeBaseUrl(baseUrl))
 
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -247,14 +280,14 @@ function eventSyncUrl(baseUrl, eventId) {
   return url.toString()
 }
 
-function buildSeedTables(event) {
+function buildSeedTables(event: SeedEvent) {
   const eventMetaRow = {
-    [EVENT_NAME_CELL]: event.name,
-    [EVENT_CREATED_CELL]: event.created,
-    [EVENT_SLOT_STARTS_UTC_ISO_CELL]: event.slotStartsUtcIso,
-    [EVENT_PARTICIPANT_NAMES_CELL]: event.participants.map((participant) => participant.name),
+    [EVENT_META_NAME_CELL]: event.name,
+    [EVENT_META_CREATED_CELL]: event.created,
+    [EVENT_META_SLOT_STARTS_UTC_ISO_CELL]: event.slotStartsUtcIso,
+    [EVENT_META_PARTICIPANT_NAMES_CELL]: event.participants.map((participant) => participant.name),
   }
-  const availabilityRows = {}
+  const availabilityRows: Record<string, Record<string, 1 | 2>> = {}
 
   for (const participant of event.participants) {
     if (Object.keys(participant.slots).length > 0) {
@@ -270,18 +303,18 @@ function buildSeedTables(event) {
   }
 }
 
-async function waitForIdle(synchronizer, timeoutMs = 5_000) {
-  if (synchronizer.getStatus() === Status.Idle) {
+async function waitForIdle(synchronizer: EventSynchronizer, timeoutMs = 5_000): Promise<void> {
+  if (synchronizer.getStatus() === SYNC_STATUS_IDLE) {
     return
   }
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       synchronizer.delListener(listenerId)
       reject(new Error(`Sync did not become idle within ${timeoutMs}ms`))
     }, timeoutMs)
     const listenerId = synchronizer.addStatusListener((_synchronizer, status) => {
-      if (status === Status.Idle) {
+      if (status === SYNC_STATUS_IDLE) {
         clearTimeout(timeoutId)
         synchronizer.delListener(listenerId)
         resolve()
@@ -290,19 +323,19 @@ async function waitForIdle(synchronizer, timeoutMs = 5_000) {
   })
 }
 
-async function waitForSave(synchronizer, timeoutMs = 5_000) {
-  if (synchronizer.getStatus() === Status.Saving) {
+async function waitForSave(synchronizer: EventSynchronizer, timeoutMs = 5_000): Promise<void> {
+  if (synchronizer.getStatus() === SYNC_STATUS_SAVING) {
     await waitForIdle(synchronizer, timeoutMs)
     return
   }
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       synchronizer.delListener(listenerId)
       reject(new Error(`Sync did not save within ${timeoutMs}ms`))
     }, timeoutMs)
     const listenerId = synchronizer.addStatusListener((_synchronizer, status) => {
-      if (status === Status.Saving) {
+      if (status === SYNC_STATUS_SAVING) {
         clearTimeout(timeoutId)
         synchronizer.delListener(listenerId)
         waitForIdle(synchronizer, timeoutMs).then(resolve, reject)
@@ -311,7 +344,7 @@ async function waitForSave(synchronizer, timeoutMs = 5_000) {
   })
 }
 
-async function seedEvent(baseUrl, event) {
+async function seedEvent(baseUrl: string, event: SeedEvent): Promise<void> {
   const store = createMergeableStore()
   const webSocket = new WebSocket(eventSyncUrl(baseUrl, event.id))
   const synchronizer = await createWsSynchronizer(store, webSocket)
@@ -352,11 +385,11 @@ async function main() {
   const slotStartsUtcIso = buildSlotStartsUtcIso(dates, startMins, endMins)
   const baseUrl = normalizeBaseUrl(config.baseUrl)
   const appUrl = normalizeBaseUrl(config.appUrl)
-  const created = []
+  const created: SeedEvent[] = []
 
   for (let eventIndex = 0; eventIndex < config.events; eventIndex += 1) {
-    const id = randomId()
-    const participants = []
+    const id = `seed-${nanoid()}`
+    const participants: SeedParticipant[] = []
 
     for (let personIndex = 0; personIndex < config.participants; personIndex += 1) {
       const personName = makeName(eventIndex * config.participants + personIndex)
@@ -379,7 +412,9 @@ async function main() {
   }
 
   console.log(`Seeded ${created.length} event(s) over TinyBase WS on ${baseUrl}.`)
-  console.log(`Each event has ${config.participants} participants and ${slotStartsUtcIso.length} slots.`)
+  console.log(
+    `Each event has ${config.participants} participants and ${slotStartsUtcIso.length} slots.`,
+  )
 
   for (const event of created) {
     console.log(`- ${event.name}`)

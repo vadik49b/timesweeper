@@ -5,13 +5,14 @@ import {
   getWsServerDurableObjectFetch,
   WsServerDurableObject,
 } from 'tinybase/synchronizers/synchronizer-ws-server-durable-object'
-
-const EVENT_META_TABLE = 'eventMeta'
-const EVENT_NAME_CELL = 'name'
-const EVENT_CREATED_CELL = 'created'
-const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
-const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
-const AVAILABILITY_TABLE = 'availability'
+import {
+  AVAILABILITY_TABLE,
+  EVENT_META_CREATED_CELL,
+  EVENT_META_TABLE,
+  EVENT_META_NAME_CELL,
+  EVENT_META_PARTICIPANT_NAMES_CELL,
+  EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+} from '../../shared/tinybase-schema.ts'
 
 interface Env {
   EVENT_ROOMS: DurableObjectNamespace<EventRoom>
@@ -63,15 +64,16 @@ async function readEventJson(
     return null
   }
 
-  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_NAME_CELL)
-  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL)
+  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL)
+  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL)
   const slotStartsUtcIso = store.getCell(
     EVENT_META_TABLE,
     eventId,
-    EVENT_SLOT_STARTS_UTC_ISO_CELL,
+    EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
   )
   const participantNames =
-    (store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]) ?? []
+    (store.getCell(EVENT_META_TABLE, eventId, EVENT_META_PARTICIPANT_NAMES_CELL) as string[]) ??
+    []
 
   if (
     typeof name !== 'string' ||

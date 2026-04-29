@@ -1,0 +1,6 @@
+export const EVENT_META_TABLE = 'eventMeta'
+export const EVENT_META_NAME_CELL = 'name'
+export const EVENT_META_CREATED_CELL = 'created'
+export const EVENT_META_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
+export const EVENT_META_PARTICIPANT_NAMES_CELL = 'participantNames'
+export const AVAILABILITY_TABLE = 'availability'

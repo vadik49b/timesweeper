@@ -7,13 +7,15 @@ import {
 } from 'tinybase/synchronizers/synchronizer-ws-client'
 import ReconnectingWebSocket from 'reconnecting-websocket'
 import type { AppEvent, Participant, SlotValue } from './event-helpers'
+import {
+  AVAILABILITY_TABLE,
+  EVENT_META_CREATED_CELL,
+  EVENT_META_TABLE,
+  EVENT_META_NAME_CELL,
+  EVENT_META_PARTICIPANT_NAMES_CELL,
+  EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+} from '../shared/tinybase-schema.ts'
 
-const EVENT_META_TABLE = 'eventMeta'
-const EVENT_NAME_CELL = 'name'
-const EVENT_CREATED_CELL = 'created'
-const EVENT_SLOT_STARTS_UTC_ISO_CELL = 'slotStartsUtcIso'
-const EVENT_PARTICIPANT_NAMES_CELL = 'participantNames'
-const AVAILABILITY_TABLE = 'availability'
 const RECENT_EVENTS_STORAGE_KEY = 'timesweeper-recent-events'
 const SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX = 'timesweeper-selected-participant:'
 const MAX_RECENT_EVENTS = 5
@@ -88,13 +90,15 @@ function readSlotStartsUtcIsoFromStore(
     slotStartsUtcIso: store.getCell(
       EVENT_META_TABLE,
       eventId,
-      EVENT_SLOT_STARTS_UTC_ISO_CELL,
+      EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
     ) as string[],
   }
 }
 
 function readParticipantNamesFromStore(store: Store, eventId: string): string[] {
-  return (store.getCell(EVENT_META_TABLE, eventId, EVENT_PARTICIPANT_NAMES_CELL) as string[]) ?? []
+  return (
+    (store.getCell(EVENT_META_TABLE, eventId, EVENT_META_PARTICIPANT_NAMES_CELL) as string[]) ?? []
+  )
 }
 
 function readParticipantsFromStore(store: Store, participantNames: string[]): Participant[] {
@@ -113,8 +117,8 @@ function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | 
     return
   }
 
-  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_NAME_CELL)
-  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL)
+  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL)
+  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL)
 
   const slotStartsUtcIso = readSlotStartsUtcIsoFromStore(store, eventId)
   const participants = readParticipantsFromStore(
@@ -135,15 +139,20 @@ function writeEventMeta(
   store: EventRoomStore,
   event: Pick<AppEvent, 'id' | 'name' | 'created'>,
 ): void {
-  store.setCell(EVENT_META_TABLE, event.id, EVENT_NAME_CELL, event.name)
-  store.setCell(EVENT_META_TABLE, event.id, EVENT_CREATED_CELL, event.created)
+  store.setCell(EVENT_META_TABLE, event.id, EVENT_META_NAME_CELL, event.name)
+  store.setCell(EVENT_META_TABLE, event.id, EVENT_META_CREATED_CELL, event.created)
 }
 
 function writeEventSlots(
   store: EventRoomStore,
   event: Pick<AppEvent, 'id' | 'slotStartsUtcIso'>,
 ): void {
-  store.setCell(EVENT_META_TABLE, event.id, EVENT_SLOT_STARTS_UTC_ISO_CELL, event.slotStartsUtcIso)
+  store.setCell(
+    EVENT_META_TABLE,
+    event.id,
+    EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+    event.slotStartsUtcIso,
+  )
 }
 
 function writeParticipantNames(
@@ -154,7 +163,7 @@ function writeParticipantNames(
   store.setCell(
     EVENT_META_TABLE,
     eventId,
-    EVENT_PARTICIPANT_NAMES_CELL,
+    EVENT_META_PARTICIPANT_NAMES_CELL,
     participants.map((participant) => participant.name),
   )
 }
@@ -372,7 +381,7 @@ export async function updateEventSettings(
   settings: Pick<AppEvent, 'name' | 'participants'>,
 ): Promise<void> {
   const store = await requireWritableEventStore(eventId)
-  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_CREATED_CELL) as number
+  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL) as number
 
   store.transaction(() => {
     writeEventMeta(store, {
