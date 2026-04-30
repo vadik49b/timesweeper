@@ -36,10 +36,6 @@ const wsFetch = getWsServerDurableObjectFetch('EVENT_ROOMS') as unknown as (
   env: Env,
 ) => Response
 
-function createEventRoomPersister(sqlStorage: SqlStorage, uniqueId?: string) {
-  return createDurableObjectSqlStoragePersister(createMergeableStore(uniqueId), sqlStorage)
-}
-
 function matchEventJsonPath(pathname: string): string | null {
   const route = pathname.match(/^\/api\/events\/([^/]+)\/json$/)
 
@@ -50,101 +46,51 @@ function matchEventJsonPath(pathname: string): string | null {
   return decodeURIComponent(route[1]!)
 }
 
-function eventRoomPath(eventId: string): string {
-  return `api/events/${encodeURIComponent(eventId)}`
-}
-
-async function readEventJson(
-  sqlStorage: SqlStorage,
-  eventId: string,
-): Promise<EventJson | null> {
-  const persister = createEventRoomPersister(sqlStorage, `preview-${eventId}`)
-  const store = persister.getStore() as MergeableStore
-
-  await persister.load()
-
-  if (!store.hasRow(EVENT_META_TABLE, eventId)) {
-    return null
-  }
-
-  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL)
-  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL)
-  const slotStartsUtcIso = store.getCell(
-    EVENT_META_TABLE,
-    eventId,
-    EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
-  )
-  const participantNames =
-    (store.getCell(EVENT_META_TABLE, eventId, EVENT_META_PARTICIPANT_NAMES_CELL) as string[]) ??
-    []
-
-  if (
-    typeof name !== 'string' ||
-    typeof created !== 'number' ||
-    !Array.isArray(slotStartsUtcIso)
-  ) {
-    return null
-  }
-
-  return {
-    id: eventId,
-    name,
-    created,
-    slotStartsUtcIso: slotStartsUtcIso as string[],
-    participants: participantNames.map((participantName) => ({
-      name: participantName,
-      slots: store.hasRow(AVAILABILITY_TABLE, participantName)
-        ? ({ ...store.getRow(AVAILABILITY_TABLE, participantName) } as Record<string, 1 | 2>)
-        : {},
-    })),
-  }
-}
-
 export class EventRoom extends WsServerDurableObject<Env> {
-  createPersister() {
-    return createEventRoomPersister(this.ctx.storage.sql)
+  private readonly store: MergeableStore
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env)
+    this.store = createMergeableStore()
   }
 
-  override async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url)
+  createPersister() {
+    return createDurableObjectSqlStoragePersister(this.store, this.ctx.storage.sql)
+  }
 
-    if (request.method === 'GET' && url.pathname === '/json') {
-      const eventId = url.searchParams.get('eventId')
-
-      if (!eventId) {
-        return Response.json(
-          { error: 'Missing eventId' },
-          {
-            headers: {
-              'Access-Control-Allow-Origin': '*',
-            },
-            status: 400,
-          },
-        )
-      }
-
-      const preview = await readEventJson(this.ctx.storage.sql, eventId)
-
-      if (!preview) {
-        return Response.json(
-          { error: 'Event not found' },
-          {
-            headers: {
-              'Access-Control-Allow-Origin': '*',
-            },
-            status: 404,
-          },
-        )
-      }
-
-      return Response.json(preview, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-      })
+  async getPreview(eventId: string): Promise<EventJson | null> {
+    if (!this.store.hasRow(EVENT_META_TABLE, eventId)) {
+      return null
     }
 
-    return super.fetch!(request)
+    const name = this.store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL)
+    const created = this.store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL)
+    const slotStartsUtcIso = this.store.getCell(
+      EVENT_META_TABLE,
+      eventId,
+      EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+    )
+    const participantNames =
+      (this.store.getCell(
+        EVENT_META_TABLE,
+        eventId,
+        EVENT_META_PARTICIPANT_NAMES_CELL,
+      ) as string[]) ?? []
+
+    return {
+      id: eventId,
+      name: name as string,
+      created: created as number,
+      slotStartsUtcIso: slotStartsUtcIso as string[],
+      participants: participantNames.map((participantName) => ({
+        name: participantName,
+        slots: this.store.hasRow(AVAILABILITY_TABLE, participantName)
+          ? ({
+              ...this.store.getRow(AVAILABILITY_TABLE, participantName),
+            } as Record<string, 1 | 2>)
+          : {},
+      })),
+    }
   }
 }
 
@@ -156,15 +102,27 @@ export default {
       return wsFetch(request, env)
     }
 
-    const stub = env.EVENT_ROOMS.get(env.EVENT_ROOMS.idFromName(eventRoomPath(eventId)))
-    const previewRequest = new Request(
-      `https://event-room/json?eventId=${encodeURIComponent(eventId)}`,
-      {
-        method: 'GET',
-        headers: request.headers,
-      },
+    const stub = env.EVENT_ROOMS.get(
+      env.EVENT_ROOMS.idFromName(`api/events/${encodeURIComponent(eventId)}`),
     )
+    const preview = await stub.getPreview(eventId)
 
-    return stub.fetch(previewRequest)
+    if (!preview) {
+      return Response.json(
+        { error: 'Event not found' },
+        {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          },
+          status: 404,
+        },
+      )
+    }
+
+    return Response.json(preview, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
   },
 }
