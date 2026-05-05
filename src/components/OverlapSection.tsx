@@ -46,7 +46,7 @@ export default function OverlapSection(props: Props) {
       return participant.name !== props.currentName
     })
 
-    const participants = props.currentParticipant
+    const participants = props.currentParticipant && hasParticipantAvailability(props.currentParticipant)
       ? [props.currentParticipant, ...otherParticipants]
       : otherParticipants
 
@@ -144,29 +144,21 @@ export default function OverlapSection(props: Props) {
     return all.slice(0, SPLIT_ROWS_PREVIEW_COUNT)
   })
 
-  const canShowSuggestions = createMemo(
-    () => props.event.participants.filter(hasParticipantAvailability).length >= 2,
-  )
+  const hasSummaryRows = createMemo(() => summaryRows().length > 0)
 
   const suggestionsHelperText = createMemo(() => {
     const marked = props.event.participants.filter((participant) =>
       hasParticipantAvailability(participant),
     )
 
-    if (marked.length < 2) {
-      return 'Need at least two people to compare availability.'
+    if (marked.length === 0) {
+      return 'No availability responses yet. This table will fill in as people respond.'
     }
 
     const pending = props.event.participants
       .filter((participant) => participant.name !== props.currentName)
       .filter((participant) => !hasParticipantAvailability(participant))
       .map((participant) => participant.name)
-
-    if (summaryRows().length === 0) {
-      if (pending.length > 0) {
-        return `Still waiting on availability from ${pending.join(', ')}. Suggestions will show up once participants start filling their availability.`
-      }
-    }
 
     if (pending.length === 0) {
       return 'Suggestions update as participants continue filling availability.'
@@ -178,7 +170,7 @@ export default function OverlapSection(props: Props) {
   return (
     <GridSection number={3} title="Group availability">
       <p class="grid-view__suggestions-helper">{suggestionsHelperText()}</p>
-      <Show when={canShowSuggestions()}>
+      <Show when={hasSummaryRows()}>
         <div class="summary-table-wrap">
           <OverlapTable rows={visibleSummaryRows()} />
           <Show when={summaryRows().length > SPLIT_ROWS_PREVIEW_COUNT}>

@@ -25,10 +25,6 @@ function summaryPhrase(props: Props) {
     return 'Works for everyone'
   }
 
-  if (props.noCount === total) {
-    return 'Works for no one'
-  }
-
   if (props.noCount === 0 && props.maybeCount > 0) {
     return 'Could work for everyone'
   }
@@ -41,6 +37,12 @@ function summaryPhrase(props: Props) {
 }
 
 export default function SummaryInline(props: Props) {
+  const total = props.yesCount + props.maybeCount + props.noCount
+
+  if (total === 1) {
+    return null
+  }
+
   const countsText = formatCounts(props)
   const phrase = summaryPhrase(props)
   const text = phrase ? `${phrase}: ${countsText}` : `Summary: ${countsText}`
