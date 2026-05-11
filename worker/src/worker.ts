@@ -36,7 +36,7 @@ interface RoomAnalyticsSnapshot {
   eventId: string
   name: string
   created: number
-  slotCount: number
+  daysCount: number
   participantCount: number
   participantsWithAvailabilityCount: number
 }
@@ -125,7 +125,6 @@ export class EventRoom extends WsServerDurableObject<Env> {
         eventId,
         EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
       ) as string[]) ?? []
-
     const participantsWithAvailabilityCount = participantNames.filter((participantName) => {
       if (!this.store.hasRow(AVAILABILITY_TABLE, participantName)) {
         return false
@@ -133,13 +132,18 @@ export class EventRoom extends WsServerDurableObject<Env> {
 
       return Object.keys(this.store.getRow(AVAILABILITY_TABLE, participantName)).length > 0
     }).length
+    const daysCount = new Set(
+      slotStartsUtcIso.map((slotStartUtcIso) => {
+        return slotStartUtcIso.slice(0, 10)
+      }),
+    ).size
 
     return {
       eventId,
       name: (this.store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL) as string) ?? '',
       created:
         (this.store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL) as number) ?? 0,
-      slotCount: slotStartsUtcIso.length,
+      daysCount,
       participantCount: participantNames.length,
       participantsWithAvailabilityCount,
     }
@@ -169,7 +173,7 @@ export class EventRoom extends WsServerDurableObject<Env> {
           event_id,
           name,
           created,
-          slot_count,
+          days_count,
           participant_count,
           participants_with_availability_count,
           updated_at
@@ -177,7 +181,7 @@ export class EventRoom extends WsServerDurableObject<Env> {
         ON CONFLICT(event_id) DO UPDATE SET
           name = excluded.name,
           created = excluded.created,
-          slot_count = excluded.slot_count,
+          days_count = excluded.days_count,
           participant_count = excluded.participant_count,
           participants_with_availability_count = excluded.participants_with_availability_count,
           updated_at = excluded.updated_at
@@ -187,7 +191,7 @@ export class EventRoom extends WsServerDurableObject<Env> {
         snapshot.eventId,
         snapshot.name,
         snapshot.created,
-        snapshot.slotCount,
+        snapshot.daysCount,
         snapshot.participantCount,
         snapshot.participantsWithAvailabilityCount,
         Date.now(),
