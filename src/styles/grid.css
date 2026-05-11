@@ -541,6 +541,9 @@
   text-align: center;
   color: var(--black);
 }
+.availability-grid__day--past {
+  color: var(--bdk);
+}
 .availability-grid__day-weekday,
 .availability-grid__day-date,
 .availability-grid__day-number {

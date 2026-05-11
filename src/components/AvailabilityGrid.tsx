@@ -78,6 +78,14 @@ export default function AvailabilityGrid(props: Props) {
     event.preventDefault()
   }
   const [dragGesture, setDragGesture] = createSignal<DragGesture | null>(null)
+  const isPastSlot = (slot: DisplaySlot | undefined) =>
+    slot !== undefined && Date.parse(slot.startUtcIso) < Date.now()
+  const isPastDay = (dayKey: string) =>
+    props.times.every((time) => {
+      const slot = props.slotByDayTime[`${dayKey}|${time.key}`]
+
+      return slot === undefined || isPastSlot(slot)
+    })
   const previewBounds = createMemo(() => {
     const gesture = dragGesture()
 
@@ -129,7 +137,7 @@ export default function AvailabilityGrid(props: Props) {
           const time = props.times[row]
           const nextSlot = day && time ? props.slotByDayTime[`${day.key}|${time.key}`] : undefined
 
-          if (!nextSlot) {
+          if (!nextSlot || isPastSlot(nextSlot)) {
             return null
           }
 
@@ -360,7 +368,7 @@ export default function AvailabilityGrid(props: Props) {
         const time = props.times[row]
         const slot = day && time ? props.slotByDayTime[`${day.key}|${time.key}`] : undefined
 
-        if (slot) {
+        if (slot && !isPastSlot(slot)) {
           slotStartUtcIsos.push(slot.startUtcIso)
         }
       }
@@ -467,7 +475,13 @@ export default function AvailabilityGrid(props: Props) {
       <div class="availability-grid__corner" />
       <For each={props.days}>
         {(day, dayIndex) => (
-          <div class="availability-grid__day" style={{ '--di': String(dayIndex()) }}>
+          <div
+            classList={{
+              'availability-grid__day': true,
+              'availability-grid__day--past': isPastDay(day.key),
+            }}
+            style={{ '--di': String(dayIndex()) }}
+          >
             <span class="availability-grid__day-weekday">{day.weekdayLabel}</span>
             <span class="availability-grid__day-date">
               <Show when={day.showMonthLabel}>
@@ -510,6 +524,12 @@ export default function AvailabilityGrid(props: Props) {
             {(day, dayIndex) => {
               const slot = () => props.slotByDayTime[`${day.key}|${time.key}`]
               const slotIndex = () => slot()?.slotIndex
+              const hasSlot = () => slotIndex() !== undefined
+              const isInteractiveSlot = () => {
+                const nextSlot = slot()
+
+                return nextSlot !== undefined && !isPastSlot(nextSlot)
+              }
               const slotValue = () => {
                 const nextSlot = slot()
 
@@ -517,17 +537,20 @@ export default function AvailabilityGrid(props: Props) {
                   ? undefined
                   : props.selectedSlots[nextSlot.startUtcIso]
               }
-              const hasSlot = () => slotIndex() !== undefined
               const cellLabel = () =>
-                hasSlot()
+                isInteractiveSlot()
                   ? `${day.label} at ${time.label}. Your availability is ${statusLabel(
                       slotValue(),
                     )}. Click to mark ${nextStatusLabel(slotValue())}.`
-                  : `${day.label} at ${time.label}. No availability slot here.`
+                  : hasSlot()
+                    ? `${day.label} at ${time.label}. This time has already passed.`
+                    : `${day.label} at ${time.label}. No availability slot here.`
               const cellTitle = () =>
-                hasSlot()
+                isInteractiveSlot()
                   ? `${day.label}, ${time.label}: mark ${nextStatusLabel(slotValue())}`
-                  : `${day.label}, ${time.label}: no slot`
+                  : hasSlot()
+                    ? `${day.label}, ${time.label}: in the past`
+                    : `${day.label}, ${time.label}: no slot`
 
               return (
                 <button
@@ -543,7 +566,7 @@ export default function AvailabilityGrid(props: Props) {
                     'availability-grid__cell--first-time': timeIndex() === 0,
                     'availability-grid__cell--first-day': dayIndex() === 0,
                     'availability-grid__cell--after-gap': time.gapBefore,
-                    'availability-grid__cell--empty': !hasSlot(),
+                    'availability-grid__cell--empty': !isInteractiveSlot(),
                   }}
                   style={{
                     '--ti': String(timeIndex()),
@@ -551,12 +574,12 @@ export default function AvailabilityGrid(props: Props) {
                   }}
                   aria-label={cellLabel()}
                   title={cellTitle()}
-                  disabled={!hasSlot()}
+                  disabled={!isInteractiveSlot()}
                   onPointerDown={(event) => {
                     const nextSlotIndex = slotIndex()
                     const firstCell = cellRefs[0]?.[0]
 
-                    if (nextSlotIndex === undefined || !firstCell) {
+                    if (nextSlotIndex === undefined || !isInteractiveSlot() || !firstCell) {
                       return
                     }
 
@@ -609,7 +632,7 @@ export default function AvailabilityGrid(props: Props) {
 
                     const nextSlotIndex = slotIndex()
 
-                    if (nextSlotIndex === undefined) {
+                    if (nextSlotIndex === undefined || !isInteractiveSlot()) {
                       return
                     }
 

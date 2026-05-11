@@ -36,9 +36,14 @@ const SPLIT_ROWS_PREVIEW_COUNT = 10
 
 export default function OverlapSection(props: Props) {
   const [showAllSummaryRows, setShowAllSummaryRows] = createSignal(false)
+  const interactiveDisplaySlots = createMemo(() =>
+    props.displaySlots.filter((slot) => Date.parse(slot.startUtcIso) >= Date.now()),
+  )
 
   const summaryRows = createMemo<SummarySplitRow[]>(() => {
-    if (props.displaySlots.length === 0) {
+    const slots = interactiveDisplaySlots()
+
+    if (slots.length === 0) {
       return []
     }
 
@@ -50,7 +55,7 @@ export default function OverlapSection(props: Props) {
       ? [props.currentParticipant, ...otherParticipants]
       : otherParticipants
 
-    const rows = props.displaySlots.reduce((acc, slot) => {
+    const rows = slots.reduce((acc, slot) => {
       const { groups, key } = participants.reduce(
         (slotAcc, participant) => {
           const { groups } = slotAcc
