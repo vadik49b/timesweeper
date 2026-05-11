@@ -4,6 +4,7 @@
 
 .grid-view {
   --grid-title-size: var(--fs-display-title);
+  --grid-sticky-inset: var(--space-300);
   display: flex;
   justify-content: center;
   min-height: 100dvh;
@@ -13,18 +14,11 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  margin:
-    calc((var(--space-250) + var(--space-300)) * -1)
-    calc(50% - 50vw)
-    var(--space-350);
   background: var(--bg);
-  box-shadow:
-    inset 0 -1px 0 var(--white),
-    inset 0 -2px 0 var(--bdk);
+  border-bottom: 0;
 }
 .grid-view__connection-bar {
-  margin: 0;
-  padding: var(--space-075) calc(var(--space-150) + var(--space-200));
+  padding: var(--space-075) var(--grid-sticky-inset);
   background: #d6cf9b;
   border-bottom: var(--border-thin) solid var(--bdk);
   color: var(--black);
@@ -44,15 +38,8 @@
 
 .grid-view__hero {
   gap: var(--space-150);
-  margin-bottom: 0;
-  padding: var(--space-075) calc(var(--space-150) + var(--space-200));
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.08) 0 1px,
-      rgba(192, 192, 192, 0) 1px 2px
-    ),
-    var(--bg);
+  padding: var(--space-075) var(--grid-sticky-inset);
+  background: var(--bg);
 }
 .grid-view__brand {
   color: var(--black);
@@ -89,10 +76,8 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  overflow: visible;
 }
 
 .grid-controls__name {
@@ -158,8 +143,8 @@
 }
 
 .grid-view__steps-panel {
-  margin-top: 0;
   background: var(--bg);
+  border-top: 0;
 }
 
 .grid-view__panels {
@@ -248,14 +233,12 @@
 }
 @media (max-width: 620px) {
   .grid-view {
+    --grid-sticky-inset: var(--space-250);
     padding: var(--space-200) var(--space-100);
   }
   .grid-view__shell {
     min-height: calc(100dvh - var(--space-400));
     padding: var(--space-200) var(--space-100);
-  }
-  .grid-view__sticky-header {
-    margin: calc((var(--space-200) + var(--space-200)) * -1) calc(50% - 50vw) var(--space-300);
   }
   .grid-view__connection-bar {
     padding-inline: var(--space-100);
@@ -272,9 +255,6 @@
   }
   .grid-view__hero-timezone {
     display: none;
-  }
-  .grid-view__steps-panel {
-    margin-top: 0;
   }
   .grid-view__panel-frame {
     padding: var(--space-300) var(--space-250) var(--space-600);

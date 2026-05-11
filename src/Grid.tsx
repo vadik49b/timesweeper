@@ -687,31 +687,30 @@ export default function Grid(props: Props) {
       <div class="grid-view">
         <Show when={localReady() && !pageErrorMessage()} fallback={null}>
           <div class="grid-view__shell">
-            <div class="grid-view__sticky-header">
-              <StatusBar class="grid-view__connection-bar" ready={localReady()} />
-              <div class="grid-view__hero row row--between row--center">
-                <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
-                  <MineIcon size={18} /> TimeSweeper
-                </a>
-                <div class="grid-view__hero-actions row row--center">
-                  <label class="grid-view__hero-timezone" for="display-timezone">
-                    View in:
-                  </label>
-                  <Win95Field
-                    kind="select"
-                    id="display-timezone"
-                    name="displayTimezone"
-                    size="small"
-                    value={displayTimezone()}
-                    options={timezoneOptions()}
-                    wrapperClass="grid-view__timezone-field"
-                    onChange={updateDisplayTimezone}
-                  />
+            <div class="grid-view__content">
+              <div class="grid-view__sticky-header r">
+                <StatusBar class="grid-view__connection-bar" ready={localReady()} />
+                <div class="grid-view__hero row row--between row--center">
+                  <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
+                    <MineIcon size={18} /> TimeSweeper
+                  </a>
+                  <div class="grid-view__hero-actions row row--center">
+                    <label class="grid-view__hero-timezone" for="display-timezone">
+                      View in:
+                    </label>
+                    <Win95Field
+                      kind="select"
+                      id="display-timezone"
+                      name="displayTimezone"
+                      size="small"
+                      value={displayTimezone()}
+                      options={timezoneOptions()}
+                      wrapperClass="grid-view__timezone-field"
+                      onChange={updateDisplayTimezone}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div class="grid-view__content">
               <section class="grid-view__steps-panel r">
                 <div class="grid-view__panels">
                   <div class="grid-view__panel-frame">
