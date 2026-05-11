@@ -386,9 +386,15 @@
 .availability-grid__cell--empty {
   cursor: default;
   pointer-events: none;
-  background: var(--bg);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(64, 64, 64, 0.045) 0 4px,
+      rgba(255, 255, 255, 0.045) 4px 8px
+    ),
+    color-mix(in srgb, var(--bg) 94%, var(--blo));
   border-style: solid;
-  border-color: var(--blo);
+  border-color: color-mix(in srgb, var(--blo) 92%, var(--bdk));
   border-width: 0 var(--border-thin) var(--border-thin) 0;
 }
 .availability-grid__cell--first-time.availability-grid__cell--empty {
@@ -540,9 +546,6 @@
 .availability-grid__day {
   text-align: center;
   color: var(--black);
-}
-.availability-grid__day--past {
-  color: var(--bdk);
 }
 .availability-grid__day-weekday,
 .availability-grid__day-date,

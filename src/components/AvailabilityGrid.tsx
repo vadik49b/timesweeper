@@ -80,12 +80,6 @@ export default function AvailabilityGrid(props: Props) {
   const [dragGesture, setDragGesture] = createSignal<DragGesture | null>(null)
   const isPastSlot = (slot: DisplaySlot | undefined) =>
     slot !== undefined && Date.parse(slot.startUtcIso) < Date.now()
-  const isPastDay = (dayKey: string) =>
-    props.times.every((time) => {
-      const slot = props.slotByDayTime[`${dayKey}|${time.key}`]
-
-      return slot === undefined || isPastSlot(slot)
-    })
   const previewBounds = createMemo(() => {
     const gesture = dragGesture()
 
@@ -470,13 +464,7 @@ export default function AvailabilityGrid(props: Props) {
       <div class="availability-grid__corner" />
       <For each={props.days}>
         {(day, dayIndex) => (
-          <div
-            classList={{
-              'availability-grid__day': true,
-              'availability-grid__day--past': isPastDay(day.key),
-            }}
-            style={{ '--di': String(dayIndex()) }}
-          >
+          <div class="availability-grid__day" style={{ '--di': String(dayIndex()) }}>
             <span class="availability-grid__day-weekday">{day.weekdayLabel}</span>
             <span class="availability-grid__day-date">
               <Show when={day.showMonthLabel}>
