@@ -178,9 +178,7 @@ function toUtcCivilMs(parts: ZonedDateTimeParts): number {
 function getZonedDateTimeParts(utcMs: number, timeZone: string): ZonedDateTimeParts {
   const formatter = getZonedDateTimeFormatter(timeZone)
   const parts = formatter.formatToParts(new Date(utcMs))
-  const values: Partial<ZonedDateTimeParts> = {}
-
-  parts.forEach((part) => {
+  const values = parts.reduce<Partial<ZonedDateTimeParts>>((acc, part) => {
     if (
       part.type === 'year' ||
       part.type === 'month' ||
@@ -189,9 +187,11 @@ function getZonedDateTimeParts(utcMs: number, timeZone: string): ZonedDateTimePa
       part.type === 'minute' ||
       part.type === 'second'
     ) {
-      values[part.type] = Number(part.value)
+      acc[part.type] = Number(part.value)
     }
-  })
+
+    return acc
+  }, {})
 
   return {
     year: values.year ?? 0,
@@ -270,23 +270,16 @@ export function getSlotsPerDay(
 }
 
 export function buildSlotStartsUtcIso(input: SlotGenerationInput): string[] {
-  const slots: string[] = []
   const slotsPerDay = getSlotsPerDay(input)
 
-  input.dates.forEach((dateKey) => {
-    for (let offset = 0; offset < slotsPerDay; offset += 1) {
+  return input.dates.flatMap((dateKey) =>
+    Array.from({ length: slotsPerDay }, (_, offset) => {
       const minute = input.windowStartMin + offset * input.slotMinutes
       const startUtcMs = zonedDateTimeToUtcMs(dateKey, minute, input.timezone)
 
-      if (startUtcMs === null) {
-        continue
-      }
-
-      slots.push(new Date(startUtcMs).toISOString())
-    }
-  })
-
-  return slots
+      return startUtcMs === null ? null : new Date(startUtcMs).toISOString()
+    }).filter((slotStartUtcIso): slotStartUtcIso is string => slotStartUtcIso !== null),
+  )
 }
 
 export function getEventSlotCount(event: Pick<AppEvent, 'slotStartsUtcIso'>): number {
@@ -333,60 +326,65 @@ export function formatParticipantDisplayName(name: string, currentName: string):
 }
 
 export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string): DisplayModel {
-  const slots: DisplaySlot[] = []
-  const dayMap = new Map<string, Omit<DisplayDay, 'showMonthLabel'>>()
-  const timeMap = new Map<string, DisplayTime>()
-  const slotByDayTime: DisplayModel['slotByDayTime'] = {}
   const displayTimeZone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+  const { slots, dayMap, timeMap, slotByDayTime } = slotStartsUtcIso.reduce(
+    (acc, slotStartUtcIso, slotIndex) => {
+      const date = parseISO(slotStartUtcIso)
+      const {
+        dayKey,
+        dayLabel,
+        timeKey,
+        timeLabel,
+        minutes,
+        weekdayLabel,
+        dayNumberLabel,
+        monthLabel,
+      } = getFormattedDateTimeParts(date, displayTimeZone)
+      const slotEndDate = new Date(date.getTime() + SLOT_DURATION * 60 * 1000)
+      const {
+        dayKey: endDayKey,
+        dayLabel: endDayLabel,
+        timeKey: endTimeKey,
+        timeLabel: endTimeLabel,
+      } = getFormattedDateTimeParts(slotEndDate, displayTimeZone)
+      const slot = {
+        slotIndex,
+        startUtcIso: slotStartUtcIso,
+        dayKey,
+        dayLabel,
+        timeKey,
+        timeLabel,
+        endDayKey,
+        endDayLabel,
+        endTimeKey,
+        endTimeLabel,
+      }
 
-  slotStartsUtcIso.forEach((slotStartUtcIso, slotIndex) => {
-    const date = parseISO(slotStartUtcIso)
-    const {
-      dayKey,
-      dayLabel,
-      timeKey,
-      timeLabel,
-      minutes,
-      weekdayLabel,
-      dayNumberLabel,
-      monthLabel,
-    } = getFormattedDateTimeParts(date, displayTimeZone)
-    const slotEndDate = new Date(date.getTime() + SLOT_DURATION * 60 * 1000)
-    const {
-      dayKey: endDayKey,
-      dayLabel: endDayLabel,
-      timeKey: endTimeKey,
-      timeLabel: endTimeLabel,
-    } = getFormattedDateTimeParts(slotEndDate, displayTimeZone)
-    const slot = {
-      slotIndex,
-      startUtcIso: slotStartUtcIso,
-      dayKey,
-      dayLabel,
-      timeKey,
-      timeLabel,
-      endDayKey,
-      endDayLabel,
-      endTimeKey,
-      endTimeLabel,
-    }
+      acc.slots.push(slot)
+      acc.dayMap.set(dayKey, {
+        key: dayKey,
+        label: dayLabel,
+        weekdayLabel,
+        dayNumberLabel,
+        monthLabel,
+      })
+      acc.timeMap.set(timeKey, {
+        key: timeKey,
+        label: timeLabel,
+        minutes,
+        gapBefore: false,
+      })
+      acc.slotByDayTime[`${dayKey}|${timeKey}`] = slot
 
-    slots.push(slot)
-    dayMap.set(dayKey, {
-      key: dayKey,
-      label: dayLabel,
-      weekdayLabel,
-      dayNumberLabel,
-      monthLabel,
-    })
-    timeMap.set(timeKey, {
-      key: timeKey,
-      label: timeLabel,
-      minutes,
-      gapBefore: false,
-    })
-    slotByDayTime[`${dayKey}|${timeKey}`] = slot
-  })
+      return acc
+    },
+    {
+      slots: [] as DisplaySlot[],
+      dayMap: new Map<string, Omit<DisplayDay, 'showMonthLabel'>>(),
+      timeMap: new Map<string, DisplayTime>(),
+      slotByDayTime: {} as DisplayModel['slotByDayTime'],
+    },
+  )
 
   const days = [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key))
   const times = [...timeMap.values()].sort((a, b) => {

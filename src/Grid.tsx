@@ -210,17 +210,19 @@ export default function Grid(props: Props) {
       return
     }
 
-    const nextSlots = { ...selectedSlots }
+    const nextSlots = nextSlotStartsUtcIso.reduce(
+      (slots, slotStartUtcIso) => {
+        if (value === 0) {
+          delete slots[slotStartUtcIso]
 
-    nextSlotStartsUtcIso.forEach((slotStartUtcIso) => {
-      if (value === 0) {
-        delete nextSlots[slotStartUtcIso]
+          return slots
+        }
 
-        return
-      }
-
-      nextSlots[slotStartUtcIso] = value
-    })
+        slots[slotStartUtcIso] = value
+        return slots
+      },
+      { ...selectedSlots },
+    )
 
     setSelectedSlots(reconcile(nextSlots))
 

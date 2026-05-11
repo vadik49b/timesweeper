@@ -167,20 +167,15 @@ export default function AvailabilityGrid(props: Props) {
       return 0
     }
 
-    let closestIndex = 0
-    let closestDistance = Number.POSITIVE_INFINITY
+    return starts.reduce(
+      (closest, start, index) => {
+        const center = start + size / 2
+        const distance = Math.abs(position - center)
 
-    starts.forEach((start, index) => {
-      const center = start + size / 2
-      const distance = Math.abs(position - center)
-
-      if (distance < closestDistance) {
-        closestDistance = distance
-        closestIndex = index
-      }
-    })
-
-    return closestIndex
+        return distance < closest.distance ? { index, distance } : closest
+      },
+      { index: 0, distance: Number.POSITIVE_INFINITY },
+    ).index
   }
   const clearDragGesture = () => {
     const gesture = dragGesture()

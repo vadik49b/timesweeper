@@ -39,7 +39,7 @@ const eventSyncStateListeners = new Set<(state: EventSyncState) => void>()
 
 function setEventSyncState(next: EventSyncState): void {
   eventSyncState = next
-  eventSyncStateListeners.forEach((listener) => listener(next))
+  Array.from(eventSyncStateListeners, (listener) => listener(next))
 }
 
 function getApiOrigin(): string {
@@ -172,27 +172,26 @@ function syncParticipantAvailability(store: EventRoomStore, participants: Partic
   const nextParticipantNames = new Set(participants.map((participant) => participant.name))
 
   if (store.hasTable(AVAILABILITY_TABLE)) {
-    store.getRowIds(AVAILABILITY_TABLE).forEach((rowId) => {
-      if (!nextParticipantNames.has(String(rowId))) {
-        store.delRow(AVAILABILITY_TABLE, rowId)
-      }
-    })
+    store
+      .getRowIds(AVAILABILITY_TABLE)
+      .filter((rowId) => !nextParticipantNames.has(String(rowId)))
+      .map((rowId) => store.delRow(AVAILABILITY_TABLE, rowId))
   }
 
-  participants.forEach((participant) => {
+  participants.map((participant) => {
     const nextAvailabilityCellIds = new Set(Object.keys(participant.slots))
 
-    Object.entries(participant.slots).forEach(([slotStartUtcIso, slotValue]) => {
-      store.setCell(AVAILABILITY_TABLE, participant.name, slotStartUtcIso, slotValue)
-    })
+    Object.entries(participant.slots).map(([slotStartUtcIso, slotValue]) =>
+      store.setCell(AVAILABILITY_TABLE, participant.name, slotStartUtcIso, slotValue),
+    )
 
     if (store.hasRow(AVAILABILITY_TABLE, participant.name)) {
-      Object.keys(store.getRow(AVAILABILITY_TABLE, participant.name)).forEach((cellId) => {
-        if (!nextAvailabilityCellIds.has(cellId)) {
-          store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true)
-        }
-      })
+      Object.keys(store.getRow(AVAILABILITY_TABLE, participant.name))
+        .filter((cellId) => !nextAvailabilityCellIds.has(cellId))
+        .map((cellId) => store.delCell(AVAILABILITY_TABLE, participant.name, cellId, true))
     }
+
+    return participant
   })
 }
 
@@ -456,14 +455,10 @@ export async function updateParticipantSlots(
   }
 
   store.transaction(() => {
-    uniqueSlotStartUtcIsos.forEach((slotStartUtcIso) => {
-      if (value === 0) {
-        store.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
-
-        return
-      }
-
-      store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value)
-    })
+    uniqueSlotStartUtcIsos.map((slotStartUtcIso) =>
+      value === 0
+        ? store.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
+        : store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value),
+    )
   })
 }

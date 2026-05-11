@@ -60,61 +60,75 @@ export default function OverlapTable(props: Props) {
   }
 
   function buildIntervals(slots: DisplaySlot[]): SummaryDayGroup[] {
-    const intervals: SummaryDayGroup[] = []
-    let rangeStart: DisplaySlot | null = null
-    let previous: DisplaySlot | null = null
+    const { intervals, rangeStart, previous } = slots.reduce(
+      (acc, slot) => {
+        if (!acc.rangeStart || !acc.previous) {
+          return {
+            ...acc,
+            rangeStart: slot,
+            previous: slot,
+          }
+        }
 
-    slots.forEach((slot) => {
-      if (!rangeStart || !previous) {
-        rangeStart = slot
-        previous = slot
+        if (slot.slotIndex === acc.previous.slotIndex + 1) {
+          return {
+            ...acc,
+            previous: slot,
+          }
+        }
 
-        return
-      }
+        return {
+          intervals: [
+            ...acc.intervals,
+            {
+              dateLabel: formatDateRange(acc.rangeStart, acc.previous),
+              timeLabel: formatTimeRange(acc.rangeStart, acc.previous),
+            },
+          ],
+          rangeStart: slot,
+          previous: slot,
+        }
+      },
+      {
+        intervals: [] as SummaryDayGroup[],
+        rangeStart: null as DisplaySlot | null,
+        previous: null as DisplaySlot | null,
+      },
+    )
 
-      if (slot.slotIndex === previous.slotIndex + 1) {
-        previous = slot
-
-        return
-      }
-
-      intervals.push({
-        dateLabel: formatDateRange(rangeStart, previous),
-        timeLabel: formatTimeRange(rangeStart, previous),
-      })
-      rangeStart = slot
-      previous = slot
-    })
-
-    if (rangeStart && previous) {
-      intervals.push({
-        dateLabel: formatDateRange(rangeStart, previous),
-        timeLabel: formatTimeRange(rangeStart, previous),
-      })
-    }
-
-    return intervals
+    return rangeStart && previous
+      ? [
+          ...intervals,
+          {
+            dateLabel: formatDateRange(rangeStart, previous),
+            timeLabel: formatTimeRange(rangeStart, previous),
+          },
+        ]
+      : intervals
   }
 
   function groupIntervalsByDate(slots: DisplaySlot[]): SummaryDateGroup[] {
-    const dateGroups: SummaryDateGroup[] = []
-
-    buildIntervals(slots).forEach((interval) => {
+    return buildIntervals(slots).reduce<SummaryDateGroup[]>((dateGroups, interval) => {
       const currentDateGroup = dateGroups[dateGroups.length - 1]
 
       if (currentDateGroup?.dateLabel === interval.dateLabel) {
-        currentDateGroup.intervals.push(interval)
-
-        return
+        return [
+          ...dateGroups.slice(0, -1),
+          {
+            ...currentDateGroup,
+            intervals: [...currentDateGroup.intervals, interval],
+          },
+        ]
       }
 
-      dateGroups.push({
-        dateLabel: interval.dateLabel,
-        intervals: [interval],
-      })
-    })
-
-    return dateGroups
+      return [
+        ...dateGroups,
+        {
+          dateLabel: interval.dateLabel,
+          intervals: [interval],
+        },
+      ]
+    }, [])
   }
 
   onMount(() => {

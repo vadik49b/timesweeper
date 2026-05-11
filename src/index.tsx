@@ -17,10 +17,8 @@ if ('serviceWorker' in navigator) {
     })
   } else {
     // Prevent SW from hijacking Vite HMR during local development.
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((reg) => {
-        void reg.unregister()
-      })
-    })
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
   }
 }
