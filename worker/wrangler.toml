@@ -9,6 +9,11 @@ custom_domain = true
 [durable_objects]
 bindings = [{ name = "EVENT_ROOMS", class_name = "EventRoom" }]
 
+[[d1_databases]]
+binding = "ROOM_ANALYTICS_DB"
+database_name = "timesweeper-room-analytics"
+database_id = "a1fb36e5-42c4-42d1-9288-6c8238c03ab0"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["EventRoom"]

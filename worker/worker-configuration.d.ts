@@ -7,6 +7,7 @@ declare namespace Cloudflare {
 		durableNamespaces: "EventRoom";
 	}
 	interface Env {
+		ROOM_ANALYTICS_DB: D1Database;
 		EVENT_ROOMS: DurableObjectNamespace<import("./src/worker").EventRoom>;
 	}
 }
