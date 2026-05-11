@@ -9,22 +9,12 @@
   min-height: 100dvh;
   padding: var(--space-300) var(--space-200);
 }
-.grid-view__sticky-header {
+.grid-view__connection-bar {
   position: sticky;
   top: 0;
-  z-index: 30;
-  margin:
-    calc((var(--space-250) + var(--space-300)) * -1)
-    calc(50% - 50vw)
-    var(--space-350);
-  background: var(--bg);
-  box-shadow:
-    inset 0 -1px 0 var(--white),
-    inset 0 -2px 0 var(--bdk);
-}
-.grid-view__connection-bar {
-  margin: 0;
-  padding: var(--space-075) calc(var(--space-150) + var(--space-200));
+  z-index: 20;
+  margin: calc((var(--space-250) + var(--space-300)) * -1) calc(50% - 50vw) var(--space-250);
+  padding: var(--space-075) var(--space-150);
   background: #d6cf9b;
   border-bottom: var(--border-thin) solid var(--bdk);
   color: var(--black);
@@ -44,18 +34,10 @@
 
 .grid-view__hero {
   gap: var(--space-150);
-  margin-bottom: 0;
-  padding: var(--space-075) calc(var(--space-150) + var(--space-200));
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.08) 0 1px,
-      rgba(192, 192, 192, 0) 1px 2px
-    ),
-    var(--bg);
+  margin-bottom: var(--space-600);
 }
 .grid-view__brand {
-  color: var(--black);
+  color: var(--white);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -64,7 +46,7 @@
   font-weight: var(--fw-bold);
   letter-spacing: calc(var(--space-100) / 10);
   line-height: 1;
-  text-shadow: 1px 1px 0 var(--white);
+  text-shadow: var(--title-shadow-strong);
 }
 .grid-view__brand:hover {
   text-decoration: underline;
@@ -75,7 +57,7 @@
   gap: var(--space-100);
 }
 .grid-view__hero-timezone {
-  color: var(--black);
+  color: var(--white);
   font-size: var(--fs-xs);
   line-height: 1;
   margin-left: var(--space-200);
@@ -254,21 +236,15 @@
     min-height: calc(100dvh - var(--space-400));
     padding: var(--space-200) var(--space-100);
   }
-  .grid-view__sticky-header {
-    margin: calc((var(--space-200) + var(--space-200)) * -1) calc(50% - 50vw) var(--space-300);
-  }
-  .grid-view__connection-bar {
-    padding-inline: var(--space-100);
-  }
   .grid-view__hero {
     flex-wrap: wrap;
-    padding: var(--space-075) var(--space-100);
+    margin-bottom: var(--space-700);
   }
   .grid-view__brand {
     font-size: var(--fs-lg);
   }
   .grid-view__hero-actions {
-    margin-left: auto;
+    margin-left: 0;
   }
   .grid-view__hero-timezone {
     display: none;
@@ -278,6 +254,10 @@
   }
   .grid-view__panel-frame {
     padding: var(--space-300) var(--space-250) var(--space-600);
+  }
+  .grid-view__connection-bar {
+    margin: calc((var(--space-200) + var(--space-200)) * -1) calc(50% - 50vw) var(--space-200);
+    padding-inline: var(--space-100);
   }
   .grid-view__title-settings {
     margin-top: var(--space-200);
@@ -409,15 +389,12 @@
   background:
     repeating-linear-gradient(
       -45deg,
-      rgba(64, 64, 64, 0.05) 0 4px,
-      rgba(255, 255, 255, 0.05) 4px 8px
+      rgba(64, 64, 64, 0.045) 0 4px,
+      rgba(255, 255, 255, 0.045) 4px 8px
     ),
-    color-mix(in srgb, var(--bg) 90%, var(--white));
+    color-mix(in srgb, var(--bg) 94%, var(--blo));
   border-style: solid;
-  border-color: color-mix(in srgb, var(--white) 78%, var(--blo))
-    color-mix(in srgb, var(--blo) 88%, var(--bdk))
-    color-mix(in srgb, var(--blo) 88%, var(--bdk))
-    color-mix(in srgb, var(--white) 78%, var(--blo));
+  border-color: color-mix(in srgb, var(--blo) 92%, var(--bdk));
   border-width: 0 var(--border-thin) var(--border-thin) 0;
 }
 .availability-grid__cell--first-time.availability-grid__cell--empty {
