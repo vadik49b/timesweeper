@@ -4,6 +4,8 @@
 
 Group scheduling, defused.
 
+Licensed under [AGPL-3.0-or-later](LICENSE). If you run a modified version as a network service, you must offer your users the corresponding source.
+
 TimeSweeper is a no-login group availability app with a Windows 95 Minesweeper visual style.
 
 ## Product Rules
