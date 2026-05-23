@@ -1,23 +1,26 @@
-import { createEffect, createMemo, createSignal, onMount, onCleanup, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onMount, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
-import { useCell, useRow, useStore, useTable } from 'tinybase/ui-solid'
+import { useCell, useRow, useStore, useValue } from 'tinybase/ui-solid'
 import {
   AVAILABILITY_TABLE,
   EVENT_META_CREATED_CELL,
   EVENT_META_NAME_CELL,
-  EVENT_META_PARTICIPANT_NAMES_CELL,
   EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
   EVENT_META_TABLE,
 } from '../shared/tinybase-schema'
 import './styles/grid.css'
 import {
-  clearSelectedParticipantName,
+  clearSelectedParticipant,
   createEvent,
+  DISPLAY_TIMEZONE_VALUE,
   getEventJson,
-  getSelectedParticipantName,
+  getLocalStore,
   pushRecentEvent,
-  setSelectedParticipantName,
+  setDisplayTimezone,
+  setSelectedParticipant,
   updateEventSettings,
+  useParticipants,
+  useSelectedParticipant,
 } from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
@@ -31,14 +34,13 @@ import DialogActions from './components/DialogActions'
 import SettingsDialog from './components/SettingsDialog'
 import StatusBar from './components/StatusBar'
 import MineIcon from './icons/MineIcon'
-import { DISPLAY_TIMEZONE_STORAGE_KEY, getTimezoneOptions } from './timezone-options'
+import { getTimezoneOptions } from './timezone-options'
 import {
   type AppEvent,
   buildDisplayModel,
   type DisplayModel,
   findDuplicateName,
   getNameKey,
-  type Participant,
   type SlotMap,
   type SlotValue,
 } from './event-helpers'
@@ -56,6 +58,7 @@ const EMPTY_DISPLAY: DisplayModel = {
 const EMPTY_SLOT_STARTS_UTC_ISO: string[] = []
 
 export default function Grid(props: Props) {
+  const localStore = getLocalStore()
   const eventName = useCell(EVENT_META_TABLE, props.eventId, EVENT_META_NAME_CELL) as () =>
     | string
     | undefined
@@ -67,18 +70,7 @@ export default function Grid(props: Props) {
     props.eventId,
     EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
   ) as () => string[] | undefined
-  const participantNames = useCell(
-    EVENT_META_TABLE,
-    props.eventId,
-    EVENT_META_PARTICIPANT_NAMES_CELL,
-  ) as () => string[] | undefined
-  const availabilityTable = useTable(AVAILABILITY_TABLE) as () => Record<string, SlotMap>
-  const participants = createMemo<Participant[]>(() => {
-    const names = participantNames() ?? []
-    const avail = availabilityTable()
-
-    return names.map((name) => ({ name, slots: (avail[name] ?? {}) as SlotMap }))
-  })
+  const participants = useParticipants(props.eventId)
   const event = createMemo<AppEvent | null>(() => {
     const name = eventName()
     const created = eventCreated()
@@ -97,9 +89,9 @@ export default function Grid(props: Props) {
     }
   })
   const [localReady, setLocalReady] = createSignal(false)
-  const [displayTimezone, setDisplayTimezone] = createSignal(
-    localStorage.getItem(DISPLAY_TIMEZONE_STORAGE_KEY) ||
-      Intl.DateTimeFormat().resolvedOptions().timeZone,
+  const storedTimezone = useValue(DISPLAY_TIMEZONE_VALUE, localStore) as () => string | undefined
+  const displayTimezone = createMemo(
+    () => storedTimezone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
   const timezoneOptions = createMemo(() => getTimezoneOptions(displayTimezone()))
 
@@ -115,13 +107,14 @@ export default function Grid(props: Props) {
   const times = () => display().times
   const slotByDayTime = () => display().slotByDayTime
 
-  const [currentName, setCurrentName] = createSignal('')
+  const { currentName, storedName: storedParticipantName } = useSelectedParticipant(
+    props.eventId,
+    participants,
+  )
   const currentParticipant = createMemo(() => {
     const name = currentName()
 
-    if (!name) {
-      return null
-    }
+    if (!name) return null
 
     return participants().find((entry) => entry.name === name) ?? null
   })
@@ -144,7 +137,6 @@ export default function Grid(props: Props) {
 
   function updateDisplayTimezone(timezone: string) {
     setDisplayTimezone(timezone)
-    localStorage.setItem(DISPLAY_TIMEZONE_STORAGE_KEY, timezone)
   }
 
   function goToLanding() {
@@ -268,11 +260,10 @@ export default function Grid(props: Props) {
       participants: updated.participants,
     })
     if (nextSelected) {
-      setSelectedParticipantName(updated.id, nextSelected)
+      setSelectedParticipant(updated.id, nextSelected)
     } else {
-      clearSelectedParticipantName(updated.id)
+      clearSelectedParticipant(updated.id)
     }
-    setCurrentName(nextSelected)
   }
 
   async function saveSettings() {
@@ -395,8 +386,7 @@ export default function Grid(props: Props) {
       return
     }
 
-    setSelectedParticipantName(ev.id, name)
-    setCurrentName(name)
+    setSelectedParticipant(ev.id, name)
     setActiveModal(null)
   }
 
@@ -477,48 +467,26 @@ export default function Grid(props: Props) {
     pushRecentEvent({ id: props.eventId, name, created })
   })
 
-  // Initialize the selected participant once the event is loaded
-  let didInitializeSelectedParticipant = false
+  // Set localReady and open/close name-picker once event meta is loaded
+  let didInit = false
   createEffect(() => {
-    if (didInitializeSelectedParticipant) {
-      return
-    }
+    if (didInit) return
+    if (eventName() === undefined) return
 
-    if (eventName() === undefined || participantNames() === undefined) {
-      return
-    }
-
-    didInitializeSelectedParticipant = true
-    const savedName = getSelectedParticipantName(props.eventId)
-    const exists = savedName ? participants().some((p) => p.name === savedName) : false
-
-    if (savedName && exists) {
-      setCurrentName(savedName)
-      setActiveModal(null)
-    } else {
-      setActiveModal('name-picker')
-    }
-
+    didInit = true
     setLocalReady(true)
+    if (currentName()) setActiveModal(null)
+    else setActiveModal('name-picker')
   })
 
-  // Clear stale selection if the participant is removed via settings
+  // Clear stale selection if the participant is removed and reopen name-picker
   createEffect(() => {
-    if (eventName() === undefined || participantNames() === undefined) {
-      return
-    }
+    if (!localReady()) return
 
-    const selected = currentName()
+    const stored = storedParticipantName() as string | undefined
 
-    if (!selected) {
-      return
-    }
-
-    const stillExists = participants().some((participant) => participant.name === selected)
-
-    if (!stillExists) {
-      clearSelectedParticipantName(props.eventId)
-      setCurrentName('')
+    if (stored && !participants().some((p) => p.name === stored)) {
+      clearSelectedParticipant(props.eventId)
       setActiveModal('name-picker')
     }
   })

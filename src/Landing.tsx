@@ -1,5 +1,6 @@
-import { createSignal, createMemo, onMount, For, Show } from 'solid-js'
+import { createSignal, createMemo, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
+import { useTable } from 'tinybase/ui-solid'
 import './styles/landing.css'
 import {
   addMinutes,
@@ -19,9 +20,10 @@ import {
 } from './event-helpers'
 import {
   createEvent,
-  listRecentEvents,
+  getLocalStore,
   pushRecentEvent,
-  setSelectedParticipantName,
+  RECENT_EVENTS_TABLE,
+  setSelectedParticipant,
   type RecentEventSummary,
 } from './db'
 import Win95Field from './components/Win95Field'
@@ -60,12 +62,17 @@ export default function Landing(props: Props) {
   const [calYear, setCalYear] = createSignal(today.getFullYear())
   const [calMonth, setCalMonth] = createSignal(today.getMonth())
   const [selectedDates, setSelectedDates] = createSignal<Record<string, boolean>>({})
-  const [recentEvents, setRecentEvents] = createSignal<RecentEventSummary[]>([])
   const [validationError, setValidationError] = createSignal('')
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  onMount(() => {
-    setRecentEvents(listRecentEvents().slice(0, 5))
+  const recentEventsTable = useTable(RECENT_EVENTS_TABLE, getLocalStore())
+  const recentEvents = createMemo<RecentEventSummary[]>(() => {
+    const table = recentEventsTable()
+
+    return Object.entries(table)
+      .map(([id, row]) => ({ id, name: row.name as string, created: row.created as number }))
+      .sort((a, b) => b.created - a.created)
+      .slice(0, 5)
   })
 
   const calDays = createMemo(() => {
@@ -211,7 +218,7 @@ export default function Landing(props: Props) {
       ],
     }
     await createEvent(createdEvent)
-    setSelectedParticipantName(createdEvent.id, organizer)
+    setSelectedParticipant(createdEvent.id, organizer)
     pushRecentEvent({ id: createdEvent.id, name: createdEvent.name, created: createdEvent.created })
     props.onOpenEvent(createdEvent.id)
   }

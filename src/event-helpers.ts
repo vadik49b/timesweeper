@@ -253,7 +253,7 @@ export function parseTimeStringToMinutes(value: string): number | null {
   return getHours(parsed) * 60 + getMinutes(parsed)
 }
 
-export function getSlotsPerDay(
+function getSlotsPerDay(
   input: Pick<SlotGenerationInput, 'slotMinutes' | 'windowStartMin' | 'windowEndMin'>,
 ): number {
   if (input.slotMinutes <= 0) {
@@ -280,10 +280,6 @@ export function buildSlotStartsUtcIso(input: SlotGenerationInput): string[] {
       return startUtcMs === null ? null : new Date(startUtcMs).toISOString()
     }).filter((slotStartUtcIso): slotStartUtcIso is string => slotStartUtcIso !== null),
   )
-}
-
-export function getEventSlotCount(event: Pick<AppEvent, 'slotStartsUtcIso'>): number {
-  return event.slotStartsUtcIso.length
 }
 
 export function getParticipantSlotValue(
@@ -417,8 +413,3 @@ export function participantStatusRows(groups: ParticipantSummaryGroups): Partici
   ].filter((group) => group.names.length > 0)
 }
 
-export function participantStatusSummary(groups: ParticipantSummaryGroups): string {
-  return participantStatusRows(groups)
-    .map((group) => `${group.names.length} ${group.label}`)
-    .join(', ')
-}

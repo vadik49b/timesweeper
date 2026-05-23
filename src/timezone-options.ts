@@ -3,8 +3,6 @@ export interface TimezoneOption {
   label: string
 }
 
-export const DISPLAY_TIMEZONE_STORAGE_KEY = 'timesweeper-display-timezone'
-
 export function getTimezoneOptions(selectedTimezone: string): TimezoneOption[] {
   const supportedValuesOf = Intl.supportedValuesOf as ((key: 'timeZone') => string[]) | undefined
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
