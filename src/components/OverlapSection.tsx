@@ -6,7 +6,6 @@ import {
   formatParticipantDisplayName,
   getParticipantSlotValue,
   hasParticipantAvailability,
-  type AppEvent,
   type DisplaySlot,
   type Participant,
   type ParticipantSummaryGroups,
@@ -26,7 +25,7 @@ type SummarySplitRow = {
 }
 
 interface Props {
-  event: AppEvent
+  participants: Participant[]
   currentName: string
   currentParticipant: Participant | null
   displaySlots: DisplaySlot[]
@@ -47,7 +46,7 @@ export default function OverlapSection(props: Props) {
       return []
     }
 
-    const otherParticipants = props.event.participants.filter((participant) => {
+    const otherParticipants = props.participants.filter((participant) => {
       return participant.name !== props.currentName
     })
 
@@ -152,7 +151,7 @@ export default function OverlapSection(props: Props) {
   const hasSummaryRows = createMemo(() => summaryRows().length > 0)
 
   const suggestionsHelperText = createMemo(() => {
-    const marked = props.event.participants.filter((participant) =>
+    const marked = props.participants.filter((participant) =>
       hasParticipantAvailability(participant),
     )
 
@@ -160,7 +159,7 @@ export default function OverlapSection(props: Props) {
       return 'No availability responses yet. This table will fill in as people respond.'
     }
 
-    const pending = props.event.participants
+    const pending = props.participants
       .filter((participant) => participant.name !== props.currentName)
       .filter((participant) => !hasParticipantAvailability(participant))
       .map((participant) => participant.name)

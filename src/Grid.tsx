@@ -1,21 +1,23 @@
-import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onMount, onCleanup, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
-import { createStore, reconcile } from 'solid-js/store'
+import { useCell, useRow, useStore, useTable } from 'tinybase/ui-solid'
+import {
+  AVAILABILITY_TABLE,
+  EVENT_META_CREATED_CELL,
+  EVENT_META_NAME_CELL,
+  EVENT_META_PARTICIPANT_NAMES_CELL,
+  EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+  EVENT_META_TABLE,
+} from '../shared/tinybase-schema'
 import './styles/grid.css'
 import {
   clearSelectedParticipantName,
-  closeEventStore,
+  createEvent,
   getEventJson,
-  getEvent,
   getSelectedParticipantName,
-  openEventStore,
   pushRecentEvent,
   setSelectedParticipantName,
-  subscribeEventSyncState,
-  subscribeEvent,
   updateEventSettings,
-  updateParticipantSlot,
-  updateParticipantSlots,
 } from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
@@ -36,7 +38,7 @@ import {
   type DisplayModel,
   findDuplicateName,
   getNameKey,
-  getParticipantSlotValue,
+  type Participant,
   type SlotMap,
   type SlotValue,
 } from './event-helpers'
@@ -52,34 +54,57 @@ const EMPTY_DISPLAY: DisplayModel = {
   slotByDayTime: {},
 }
 const EMPTY_SLOT_STARTS_UTC_ISO: string[] = []
-const EMPTY_SLOT_MAP: SlotMap = {}
-
-const LOADING_MESSAGES = [
-  'Opening link...',
-  'Opening this link for the first time can take a few seconds.',
-  'Still opening. This can take a little longer on a new device.',
-]
 
 export default function Grid(props: Props) {
-  const [event, setEvent] = createSignal<AppEvent | null>(null)
+  const eventName = useCell(EVENT_META_TABLE, props.eventId, EVENT_META_NAME_CELL) as () =>
+    | string
+    | undefined
+  const eventCreated = useCell(EVENT_META_TABLE, props.eventId, EVENT_META_CREATED_CELL) as () =>
+    | number
+    | undefined
+  const eventSlotStartsUtcIso = useCell(
+    EVENT_META_TABLE,
+    props.eventId,
+    EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
+  ) as () => string[] | undefined
+  const participantNames = useCell(
+    EVENT_META_TABLE,
+    props.eventId,
+    EVENT_META_PARTICIPANT_NAMES_CELL,
+  ) as () => string[] | undefined
+  const availabilityTable = useTable(AVAILABILITY_TABLE) as () => Record<string, SlotMap>
+  const participants = createMemo<Participant[]>(() => {
+    const names = participantNames() ?? []
+    const avail = availabilityTable()
+
+    return names.map((name) => ({ name, slots: (avail[name] ?? {}) as SlotMap }))
+  })
+  const event = createMemo<AppEvent | null>(() => {
+    const name = eventName()
+    const created = eventCreated()
+    const slotStartsUtcIso = eventSlotStartsUtcIso()
+
+    if (name === undefined || created === undefined || slotStartsUtcIso === undefined) {
+      return null
+    }
+
+    return {
+      id: props.eventId,
+      name,
+      created,
+      slotStartsUtcIso,
+      participants: participants(),
+    }
+  })
   const [localReady, setLocalReady] = createSignal(false)
-  const [loadingMessageIndex, setLoadingMessageIndex] = createSignal(0)
   const [displayTimezone, setDisplayTimezone] = createSignal(
     localStorage.getItem(DISPLAY_TIMEZONE_STORAGE_KEY) ||
       Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
   const timezoneOptions = createMemo(() => getTimezoneOptions(displayTimezone()))
 
-  const eventSlotStartsUtcIso = createMemo(
-    () => event()?.slotStartsUtcIso ?? EMPTY_SLOT_STARTS_UTC_ISO,
-    EMPTY_SLOT_STARTS_UTC_ISO,
-    {
-      equals: (a, b) => a.length === b.length && a.every((entry, index) => entry === b[index]),
-    },
-  )
-
   const display = createMemo(() => {
-    const slotStartsUtcIso = eventSlotStartsUtcIso()
+    const slotStartsUtcIso = eventSlotStartsUtcIso() ?? EMPTY_SLOT_STARTS_UTC_ISO
 
     return slotStartsUtcIso.length > 0
       ? buildDisplayModel(slotStartsUtcIso, displayTimezone())
@@ -92,21 +117,16 @@ export default function Grid(props: Props) {
 
   const [currentName, setCurrentName] = createSignal('')
   const currentParticipant = createMemo(() => {
-    const ev = event()
     const name = currentName()
 
-    if (!ev || !name) {
+    if (!name) {
       return null
     }
 
-    return ev.participants.find((entry) => entry.name === name) ?? null
+    return participants().find((entry) => entry.name === name) ?? null
   })
-  const [selectedSlots, setSelectedSlots] = createStore<SlotMap>({})
-  const selectedParticipantSlots = createMemo(() => currentParticipant()?.slots ?? EMPTY_SLOT_MAP)
-
-  createEffect(() => {
-    setSelectedSlots(reconcile(selectedParticipantSlots()))
-  })
+  const store = useStore()
+  const selectedSlots = useRow(AVAILABILITY_TABLE, () => currentName()) as () => SlotMap
 
   type ActiveModal = null | 'name-picker' | 'settings'
   const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
@@ -116,7 +136,6 @@ export default function Grid(props: Props) {
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
-  const [hasConnectedSync, setHasConnectedSync] = createSignal(false)
   const [pageErrorTitle, setPageErrorTitle] = createSignal('')
   const [pageErrorMessage, setPageErrorMessage] = createSignal('')
 
@@ -135,112 +154,59 @@ export default function Grid(props: Props) {
     }
   }
 
-  async function cycleCell(slotIndex: number) {
-    const ev = event()
-    const participant = currentParticipant()
-
-    if (!ev || !participant) {
-      return
-    }
-
+  function cycleCell(slotIndex: number) {
+    const s = store()
     const name = currentName()
 
-    if (!name) {
+    if (!s || !name) {
       return
     }
 
     const slot = displaySlots()[slotIndex]!
-
-    const prev = getParticipantSlotValue({ slots: selectedSlots }, slot.startUtcIso)
-    const next = (prev + 1) % 3
+    const prev = (s.getCell(AVAILABILITY_TABLE, name, slot.startUtcIso) as SlotValue) ?? 0
+    const next = ((prev + 1) % 3) as SlotValue
 
     if (prev === next) {
       return
     }
 
-    const nextSlots = { ...selectedSlots }
-
     if (next === 0) {
-      delete nextSlots[slot.startUtcIso]
+      s.delCell(AVAILABILITY_TABLE, name, slot.startUtcIso, true)
     } else {
-      nextSlots[slot.startUtcIso] = next as SlotValue
+      s.setCell(AVAILABILITY_TABLE, name, slot.startUtcIso, next)
     }
-    setSelectedSlots(reconcile(nextSlots))
-
-    const nextEvent: AppEvent = {
-      ...ev,
-      participants: ev.participants.map((entry) =>
-        entry.name === participant.name
-          ? {
-              ...entry,
-              slots: nextSlots,
-            }
-          : entry,
-      ),
-    }
-
-    setEvent(nextEvent)
-    await updateParticipantSlot(ev.id, name, slot.startUtcIso, next as SlotValue)
 
     if (navigator.vibrate) {
       navigator.vibrate(10)
     }
   }
 
-  async function paintCells(slotStartUtcIsos: string[], value: SlotValue) {
-    const ev = event()
-    const participant = currentParticipant()
-
-    if (!ev || !participant) {
-      return
-    }
-
+  function paintCells(slotStartUtcIsos: string[], value: SlotValue) {
+    const s = store()
     const name = currentName()
 
-    if (!name) {
+    if (!s || !name) {
       return
     }
 
     const nextSlotStartsUtcIso = [...new Set(slotStartUtcIsos)].filter(
       (slotStartUtcIso) =>
-        getParticipantSlotValue({ slots: selectedSlots }, slotStartUtcIso) !== value,
+        ((s.getCell(AVAILABILITY_TABLE, name, slotStartUtcIso) as SlotValue) ?? 0) !== value,
     )
 
     if (nextSlotStartsUtcIso.length === 0) {
       return
     }
 
-    const nextSlots = nextSlotStartsUtcIso.reduce(
-      (slots, slotStartUtcIso) => {
+    s.transaction(() => {
+      nextSlotStartsUtcIso.forEach((slotStartUtcIso) => {
         if (value === 0) {
-          delete slots[slotStartUtcIso]
-
-          return slots
+          s.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
+        } else {
+          s.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value)
         }
-
-        slots[slotStartUtcIso] = value
-        return slots
-      },
-      { ...selectedSlots },
-    )
-
-    setSelectedSlots(reconcile(nextSlots))
-
-    const nextEvent: AppEvent = {
-      ...ev,
-      participants: ev.participants.map((entry) =>
-        entry.name === participant.name
-          ? {
-              ...entry,
-              slots: nextSlots,
-            }
-          : entry,
-      ),
-    }
-
-    setEvent(nextEvent)
-
-    await updateParticipantSlots(ev.id, name, nextSlotStartsUtcIso, value)
+      })
+    })
 
     if (navigator.vibrate) {
       navigator.vibrate(10)
@@ -306,8 +272,6 @@ export default function Grid(props: Props) {
     } else {
       clearSelectedParticipantName(updated.id)
     }
-    pushRecentEvent({ id: updated.id, name: updated.name, created: updated.created })
-    setEvent(updated)
     setCurrentName(nextSelected)
   }
 
@@ -326,7 +290,7 @@ export default function Grid(props: Props) {
       return
     }
 
-    const organizer = event()?.participants[0]?.name ?? 'Unknown'
+    const organizer = participants()[0]?.name ?? 'Unknown'
     const organizerParticipant = ev.participants[0]
 
     if (!organizerParticipant) {
@@ -476,65 +440,17 @@ export default function Grid(props: Props) {
     setActiveModal(null)
   }
 
-  function initializeSelectedParticipant(ev: AppEvent) {
-    const savedName = getSelectedParticipantName(ev.id)
-    const exists = savedName ? ev.participants.some((p) => p.name === savedName) : false
-
-    if (savedName && exists) {
-      setCurrentName(savedName)
-      setActiveModal(null)
-    } else {
-      setActiveModal('name-picker')
-    }
-  }
-
-  function applyLoadedEvent(next: AppEvent) {
-    const previous = event()
-
-    setEvent(next)
-
-    if (
-      !previous ||
-      previous.id !== next.id ||
-      previous.name !== next.name ||
-      previous.created !== next.created
-    ) {
-      pushRecentEvent({ id: next.id, name: next.name, created: next.created })
-    }
-
-    if (!previous) {
-      initializeSelectedParticipant(next)
-
-      return
-    }
-
-    const selected = currentName()
-    const stillExists = selected
-      ? next.participants.some((participant) => participant.name === selected)
-      : false
-
-    if (!stillExists) {
-      clearSelectedParticipantName(next.id)
-      setCurrentName('')
-      setActiveModal('name-picker')
-    }
-  }
-
-  const useParticipantSelect = createMemo(() => {
-    const count = event()?.participants.length ?? 0
-
-    return count > 5
-  })
+  const useParticipantSelect = createMemo(() => participants().length > 5)
   const participantPickerOptions = createMemo(() => {
-    const ev = event()
+    const list = participants()
 
-    if (!ev) {
+    if (list.length === 0) {
       return []
     }
 
     return [
       { value: '', label: 'Select your name...' },
-      ...ev.participants.map((participant) => ({
+      ...list.map((participant) => ({
         value: participant.name,
         label: participant.name,
       })),
@@ -549,117 +465,87 @@ export default function Grid(props: Props) {
     selectParticipant(name)
   }
 
-  // Global event listeners + initial load
+  // Push to recents whenever the canonical name/created cells change
+  createEffect(() => {
+    const name = eventName()
+    const created = eventCreated()
+
+    if (name === undefined || created === undefined) {
+      return
+    }
+
+    pushRecentEvent({ id: props.eventId, name, created })
+  })
+
+  // Initialize the selected participant once the event is loaded
+  let didInitializeSelectedParticipant = false
+  createEffect(() => {
+    if (didInitializeSelectedParticipant) {
+      return
+    }
+
+    if (eventName() === undefined || participantNames() === undefined) {
+      return
+    }
+
+    didInitializeSelectedParticipant = true
+    const savedName = getSelectedParticipantName(props.eventId)
+    const exists = savedName ? participants().some((p) => p.name === savedName) : false
+
+    if (savedName && exists) {
+      setCurrentName(savedName)
+      setActiveModal(null)
+    } else {
+      setActiveModal('name-picker')
+    }
+
+    setLocalReady(true)
+  })
+
+  // Clear stale selection if the participant is removed via settings
+  createEffect(() => {
+    if (eventName() === undefined || participantNames() === undefined) {
+      return
+    }
+
+    const selected = currentName()
+
+    if (!selected) {
+      return
+    }
+
+    const stillExists = participants().some((participant) => participant.name === selected)
+
+    if (!stillExists) {
+      clearSelectedParticipantName(props.eventId)
+      setCurrentName('')
+      setActiveModal('name-picker')
+    }
+  })
+
+  // HTTP fallback if local store stays empty
   onMount(() => {
-    let unsubscribe: (() => void) | null = null
-    let unsubscribeSyncState: (() => void) | null = null
-    let isDisposed = false
-    let hasAcceptedStoreEvent = false
-    const loadingMessageTimer = window.setInterval(() => {
-      if (!event()) {
-        setLoadingMessageIndex((index) => (index + 1) % LOADING_MESSAGES.length)
-      }
-    }, 3000)
-
-    unsubscribeSyncState = subscribeEventSyncState((state) => {
-      if (state !== 'connected') {
-        return
-      }
-
-      setHasConnectedSync(true)
-
-      if (hasAcceptedStoreEvent) {
-        return
-      }
-
-      getEvent(props.eventId)
-        .then((next) => {
-          if (isDisposed || !next || hasAcceptedStoreEvent) {
-            return
-          }
-
-          hasAcceptedStoreEvent = true
-          applyLoadedEvent(next)
-        })
-        .catch((error) => {
-          console.error('Failed to read connected event store', error)
-        })
-    })
-
-    onCleanup(() => {
-      window.clearInterval(loadingMessageTimer)
-
-      if (unsubscribe) {
-        unsubscribe()
-      }
-
-      if (unsubscribeSyncState) {
-        unsubscribeSyncState()
-      }
-
-      closeEventStore(props.eventId).catch((error) => {
-        console.error('Failed to close event store', error)
-      })
-
-      isDisposed = true
-    })
-
-    const initialize = async () => {
-      try {
-        await openEventStore(props.eventId)
-
-        if (isDisposed) {
-          return
-        }
-
-        unsubscribe = await subscribeEvent(props.eventId, (next) => {
-          if (!next) {
-            return
-          }
-
-          if (!hasAcceptedStoreEvent && !hasConnectedSync()) {
-            return
-          }
-
-          hasAcceptedStoreEvent = true
-          applyLoadedEvent(next)
-        })
-
-        const localEvent = await getEvent(props.eventId)
-
-        if (isDisposed) {
-          return
-        }
-
-        if (localEvent) {
-          hasAcceptedStoreEvent = true
-          applyLoadedEvent(localEvent)
-          setLocalReady(true)
+    getEventJson(props.eventId)
+      .then((json) => {
+        if (json && eventName() === undefined) {
+          createEvent(json).catch((error) => {
+            console.error('Failed to hydrate event from server', error)
+          })
 
           return
         }
 
-        const initialEvent = await getEventJson(props.eventId)
-
-        if (isDisposed) {
-          return
-        }
-
-        if (!initialEvent) {
+        if (!json && eventName() === undefined) {
           setActiveModal(null)
           setPageErrorTitle('Event Not Found')
           setPageErrorMessage(
             'We could not find that schedule. The link may be incomplete, or the event may no longer exist.',
           )
           setLocalReady(true)
-
-          return
         }
-
-        applyLoadedEvent(initialEvent)
-        setLocalReady(true)
-      } catch {
-        if (isDisposed) {
+      })
+      .catch(() => {
+        if (eventName() !== undefined) {
           return
         }
 
@@ -667,13 +553,9 @@ export default function Grid(props: Props) {
         setPageErrorTitle('Could Not Open Schedule')
         setPageErrorMessage('Check your connection and try opening the link again.')
         setLocalReady(true)
-      }
-    }
-
-    initialize().catch(() => {})
+      })
   })
 
-  const loadingOverlayText = createMemo(() => LOADING_MESSAGES[loadingMessageIndex()])
   const canCloseNamePicker = createMemo(() => {
     if (!event()) {
       return true
@@ -713,23 +595,19 @@ export default function Grid(props: Props) {
               <section class="grid-view__steps-panel r">
                 <div class="grid-view__panels">
                   <div class="grid-view__panel-frame">
-                    <Show when={event()}>
-                      {(loadedEvent) => (
-                        <div class="grid-view__title-row">
-                          <h2 class="grid-view__pane-title grid-view__pane-title--event">
-                            {loadedEvent().name}
-                          </h2>
-                          <Win95Button
-                            size="small"
-                            variant="toolbar"
-                            class="grid-view__title-settings"
-                            onClick={openSettingsModal}
-                          >
-                            Settings
-                          </Win95Button>
-                        </div>
-                      )}
-                    </Show>
+                    <div class="grid-view__title-row">
+                      <h2 class="grid-view__pane-title grid-view__pane-title--event">
+                        {eventName()}
+                      </h2>
+                      <Win95Button
+                        size="small"
+                        variant="toolbar"
+                        class="grid-view__title-settings"
+                        onClick={openSettingsModal}
+                      >
+                        Settings
+                      </Win95Button>
+                    </div>
                     <p class="grid-view__intro-text">
                       Hi{' '}
                       <a
@@ -789,23 +667,19 @@ export default function Grid(props: Props) {
                           days={days()}
                           times={times()}
                           slotByDayTime={slotByDayTime()}
-                          selectedSlots={selectedSlots}
+                          selectedSlots={selectedSlots()}
                           onCycle={cycleCell}
                           onPaint={paintCells}
                         />
                       </div>
                     </GridSection>
 
-                    <Show when={event()}>
-                      {(loadedEvent) => (
-                        <OverlapSection
-                          event={loadedEvent()}
-                          currentName={currentName()}
-                          currentParticipant={currentParticipant()}
-                          displaySlots={displaySlots()}
-                        />
-                      )}
-                    </Show>
+                    <OverlapSection
+                      participants={participants()}
+                      currentName={currentName()}
+                      currentParticipant={currentParticipant()}
+                      displaySlots={displaySlots()}
+                    />
                   </div>
                 </div>
               </section>
@@ -825,59 +699,49 @@ export default function Grid(props: Props) {
               }
               showCloseButton={canCloseNamePicker()}
             >
-              <Show
-                when={event()}
-                fallback={
-                  <div class="participant-picker__loading">
-                    <p class="participant-picker__lead">{loadingOverlayText()}</p>
-                  </div>
-                }
-              >
-                <p class="participant-picker__lead">
-                  {event()?.participants[0]?.name ?? 'Unknown'} set up "
-                  {event()?.name ?? 'this schedule'}" and wants to know when you're available.
-                </p>
-                <Show when={(event()?.participants.length ?? 0) > 0}>
-                  <div class="participant-picker__existing">
-                    <p class="participant-picker__label">Continue as:</p>
-                    <Show
-                      when={useParticipantSelect()}
-                      fallback={
-                        <div class="participant-picker__list">
-                          <For each={event()?.participants ?? []}>
-                            {(participant) => (
-                              <Win95Button
-                                size="small"
-                                class={`dialog-btn participant-picker__item${
-                                  currentName() === participant.name
-                                    ? ' participant-picker__item--selected'
-                                    : ''
-                                }`}
-                                onClick={() => {
-                                  selectParticipant(participant.name)
-                                }}
-                              >
-                                {participant.name}
-                              </Win95Button>
-                            )}
-                          </For>
-                        </div>
-                      }
-                    >
-                      <Win95Field
-                        kind="select"
-                        id="participant-picker-select"
-                        name="participantPicker"
-                        size="small"
-                        value={currentName() || ''}
-                        options={participantPickerOptions()}
-                        wrapperClass="dialog__field participant-picker__select-field"
-                        onChange={onParticipantPickerChange}
-                      />
-                    </Show>
-                  </div>
+              <p class="participant-picker__lead">
+                {participants()[0]?.name ?? 'Unknown'} set up "
+                {eventName() ?? 'this schedule'}" and wants to know when you're available.
+              </p>
+              <div class="participant-picker__existing">
+                <p class="participant-picker__label">Continue as:</p>
+                <Show
+                  when={useParticipantSelect()}
+                  fallback={
+                    <div class="participant-picker__list">
+                      <For each={participants()}>
+                        {(participant) => (
+                          <Win95Button
+                            size="small"
+                            class={`dialog-btn participant-picker__item${
+                              currentName() === participant.name
+                                ? ' participant-picker__item--selected'
+                                : ''
+                            }`}
+                            onClick={() => {
+                              selectParticipant(participant.name)
+                            }}
+                          >
+                            {participant.name}
+                          </Win95Button>
+                        )}
+                      </For>
+                    </div>
+                  }
+                >
+                  <Win95Field
+                    kind="select"
+                    id="participant-picker-select"
+                    name="participantPicker"
+                    size="small"
+                    value={currentName() || ''}
+                    options={participantPickerOptions()}
+                    wrapperClass="dialog__field participant-picker__select-field"
+                    onChange={onParticipantPickerChange}
+                  />
                 </Show>
-                <div class="participant-picker__new">
+              </div>
+              <div class="participant-picker__new">
                   <label class="participant-picker__label" for="new-participant-name">
                     New here?
                   </label>
@@ -899,14 +763,13 @@ export default function Grid(props: Props) {
                     </DialogActions>
                   </form>
                 </div>
-              </Show>
             </Win95Dialog>
           </Show>
 
           <Show when={activeModal() === 'settings'}>
             <SettingsDialog
               eventName={settingsEventName()}
-              organizerName={event()?.participants[0]?.name ?? 'Unknown'}
+              organizerName={participants()[0]?.name ?? 'Unknown'}
               participantNames={settingsParticipantNames()}
               visibleParticipantNames={visibleSettingsParticipantNames()}
               newParticipantNames={settingsNewParticipantNames()}

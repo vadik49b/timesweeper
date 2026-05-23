@@ -1,12 +1,11 @@
 import { createMergeableStore } from 'tinybase/mergeable-store'
-import type { Store } from 'tinybase/store'
 import { createLocalPersister } from 'tinybase/persisters/persister-browser'
 import {
   createWsSynchronizer,
   type WsSynchronizer,
 } from 'tinybase/synchronizers/synchronizer-ws-client'
 import ReconnectingWebSocket from 'reconnecting-websocket'
-import type { AppEvent, Participant, SlotValue } from './event-helpers'
+import type { AppEvent, Participant } from './event-helpers'
 import {
   AVAILABILITY_TABLE,
   EVENT_META_CREATED_CELL,
@@ -31,7 +30,7 @@ export interface RecentEventSummary {
 export type EventSyncState = 'connecting' | 'connected' | 'reconnecting'
 
 let eventRoomId: string | null = null
-let eventRoomStorePromise: Promise<EventRoomStore> | null = null
+let eventRoomStore: EventRoomStore | null = null
 let eventRoomSynchronizer: WsSynchronizer<ReconnectingWebSocket> | null = null
 let eventRoomSyncPromise: Promise<void> | null = null
 let eventSyncState: EventSyncState = 'connecting'
@@ -80,59 +79,6 @@ export function setSelectedParticipantName(eventId: string, participantName: str
 
 export function clearSelectedParticipantName(eventId: string): void {
   localStorage.removeItem(`${SELECTED_PARTICIPANT_STORAGE_KEY_PREFIX}${eventId}`)
-}
-
-function readSlotStartsUtcIsoFromStore(
-  store: Store,
-  eventId: string,
-): Pick<AppEvent, 'slotStartsUtcIso'> {
-  return {
-    slotStartsUtcIso: store.getCell(
-      EVENT_META_TABLE,
-      eventId,
-      EVENT_META_SLOT_STARTS_UTC_ISO_CELL,
-    ) as string[],
-  }
-}
-
-function readParticipantNamesFromStore(store: Store, eventId: string): string[] {
-  return (
-    (store.getCell(EVENT_META_TABLE, eventId, EVENT_META_PARTICIPANT_NAMES_CELL) as string[]) ?? []
-  )
-}
-
-function readParticipantsFromStore(store: Store, participantNames: string[]): Participant[] {
-  return participantNames.map((name) => {
-    return {
-      name,
-      slots: store.hasRow(AVAILABILITY_TABLE, name)
-        ? ({ ...store.getRow(AVAILABILITY_TABLE, name) } as Participant['slots'])
-        : {},
-    }
-  })
-}
-
-function readEventFromStore(store: EventRoomStore, eventId: string): AppEvent | undefined {
-  if (!store.hasRow(EVENT_META_TABLE, eventId)) {
-    return
-  }
-
-  const name = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL)
-  const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL)
-
-  const slotStartsUtcIso = readSlotStartsUtcIsoFromStore(store, eventId)
-  const participants = readParticipantsFromStore(
-    store,
-    readParticipantNamesFromStore(store, eventId),
-  )
-
-  return {
-    id: eventId,
-    name: name as string,
-    created: created as number,
-    ...slotStartsUtcIso,
-    participants,
-  }
 }
 
 function writeEventMeta(
@@ -275,40 +221,36 @@ function ensureEventRoomSync(eventId: string, store: EventRoomStore): void {
     })
 }
 
-async function loadEventRoomStore(eventId: string): Promise<EventRoomStore> {
-  const eventRoomStore = createMergeableStore(`sync-${eventId}`)
+export function openEventStore(eventId: string): EventRoomStore {
+  if (eventRoomStore && eventRoomId === eventId) {
+    ensureEventRoomSync(eventId, eventRoomStore)
+    return eventRoomStore
+  }
+
+  if (eventRoomStore) {
+    stopEventRoomSync().catch((error) => {
+      console.error('Failed to stop previous event room sync', error)
+    })
+  }
+
+  eventRoomId = eventId
+  eventRoomStore = createMergeableStore(`sync-${eventId}`)
+  setEventSyncState('connecting')
 
   // Keep the local mergeable state on-device so CRDT metadata survives reloads
   // before the websocket synchronizer reconnects to the shared event room.
   const persister = createLocalPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
 
-  await persister.load()
-  await persister.startAutoSave()
+  persister
+    .load()
+    .then(() => persister.startAutoSave())
+    .catch((error) => {
+      console.error('Failed to load event room persister', error)
+    })
+
+  ensureEventRoomSync(eventId, eventRoomStore)
 
   return eventRoomStore
-}
-
-async function requireOpenEventRoomStore(eventId: string): Promise<EventRoomStore> {
-  if (!eventRoomStorePromise || eventRoomId !== eventId) {
-    throw new Error(`Event store is not open for ${eventId}`)
-  }
-
-  const store = await eventRoomStorePromise
-  return store
-}
-
-export async function openEventStore(eventId: string): Promise<void> {
-  if (!eventRoomStorePromise || eventRoomId !== eventId) {
-    await stopEventRoomSync()
-
-    eventRoomId = eventId
-    eventRoomStorePromise = loadEventRoomStore(eventId)
-    setEventSyncState('connecting')
-  }
-
-  const store = await eventRoomStorePromise
-
-  ensureEventRoomSync(eventId, store)
 }
 
 export async function closeEventStore(eventId?: string): Promise<void> {
@@ -319,7 +261,7 @@ export async function closeEventStore(eventId?: string): Promise<void> {
   await stopEventRoomSync()
 
   eventRoomId = null
-  eventRoomStorePromise = null
+  eventRoomStore = null
   setEventSyncState('connecting')
 }
 
@@ -334,12 +276,12 @@ export function subscribeEventSyncState(
   }
 }
 
-async function requireWritableEventStore(eventId: string): Promise<EventRoomStore> {
-  if (!eventRoomStorePromise || eventRoomId !== eventId) {
-    await openEventStore(eventId)
+function requireWritableEventStore(eventId: string): EventRoomStore {
+  if (!eventRoomStore || eventRoomId !== eventId) {
+    return openEventStore(eventId)
   }
 
-  return requireOpenEventRoomStore(eventId)
+  return eventRoomStore
 }
 
 export function listRecentEvents(): RecentEventSummary[] {
@@ -365,7 +307,7 @@ export async function getEventJson(eventId: string): Promise<AppEvent | null> {
 }
 
 export async function createEvent(event: AppEvent): Promise<void> {
-  const store = await requireWritableEventStore(event.id)
+  const store = requireWritableEventStore(event.id)
 
   store.transaction(() => {
     writeEventMeta(store, event)
@@ -379,7 +321,7 @@ export async function updateEventSettings(
   eventId: string,
   settings: Pick<AppEvent, 'name' | 'participants'>,
 ): Promise<void> {
-  const store = await requireWritableEventStore(eventId)
+  const store = requireWritableEventStore(eventId)
   const created = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_CREATED_CELL) as number
 
   store.transaction(() => {
@@ -393,72 +335,3 @@ export async function updateEventSettings(
   })
 }
 
-export async function getEvent(id: string): Promise<AppEvent | undefined> {
-  const store = await requireOpenEventRoomStore(id)
-
-  return readEventFromStore(store, id)
-}
-
-export async function subscribeEvent(
-  eventId: string,
-  onChange: (event: AppEvent | undefined) => void,
-): Promise<() => void> {
-  const store = await requireOpenEventRoomStore(eventId)
-  const listenerId = store.addTablesListener(() => {
-    onChange(readEventFromStore(store, eventId))
-  })
-
-  onChange(readEventFromStore(store, eventId))
-
-  return () => {
-    store.delListener(listenerId)
-  }
-}
-
-export async function updateParticipantSlot(
-  eventId: string,
-  name: string,
-  slotStartUtcIso: string,
-  value: SlotValue,
-): Promise<void> {
-  const store = await requireOpenEventRoomStore(eventId)
-
-  if (!readParticipantNamesFromStore(store, eventId).includes(name)) {
-    return
-  }
-
-  if (value === 0) {
-    store.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
-
-    return
-  }
-
-  store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value)
-}
-
-export async function updateParticipantSlots(
-  eventId: string,
-  name: string,
-  slotStartUtcIsos: string[],
-  value: SlotValue,
-): Promise<void> {
-  const store = await requireOpenEventRoomStore(eventId)
-
-  if (!readParticipantNamesFromStore(store, eventId).includes(name)) {
-    return
-  }
-
-  const uniqueSlotStartUtcIsos = [...new Set(slotStartUtcIsos)]
-
-  if (uniqueSlotStartUtcIsos.length === 0) {
-    return
-  }
-
-  store.transaction(() => {
-    uniqueSlotStartUtcIsos.map((slotStartUtcIso) =>
-      value === 0
-        ? store.delCell(AVAILABILITY_TABLE, name, slotStartUtcIso, true)
-        : store.setCell(AVAILABILITY_TABLE, name, slotStartUtcIso, value),
-    )
-  })
-}
