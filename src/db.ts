@@ -129,11 +129,14 @@ export interface RecentEventSummary {
 	created: number;
 }
 
-let eventRoomId: string | null = null;
-let eventRoomStore: EventRoomStore | null = null;
-let eventRoomSynchronizer: WsSynchronizer<ReconnectingWebSocket> | null = null;
-let eventRoomSyncPromise: Promise<void> | null = null;
-let eventRoomPersisterPromise: Promise<void> | null = null;
+interface EventRoomEntry {
+	store: EventRoomStore;
+	synchronizer: WsSynchronizer<ReconnectingWebSocket> | null;
+	syncPromise: Promise<void> | null;
+	persisterPromise: Promise<void>;
+}
+
+const eventRooms = new Map<string, EventRoomEntry>();
 
 function getApiOrigin(): string {
 	const origin = import.meta.env.VITE_API_ORIGIN;
@@ -240,80 +243,75 @@ function syncParticipantAvailability(
 	});
 }
 
-async function stopEventRoomSync(): Promise<void> {
-	eventRoomSyncPromise = null;
+async function stopEventRoomSync(entry: EventRoomEntry): Promise<void> {
+	entry.syncPromise = null;
 
-	if (!eventRoomSynchronizer) {
+	if (!entry.synchronizer) {
 		return;
 	}
 
 	try {
-		await eventRoomSynchronizer.stopSync();
+		await entry.synchronizer.stopSync();
 	} catch (error) {
 		console.error("Failed to stop event room sync", error);
 	}
 
-	eventRoomSynchronizer = null;
+	entry.synchronizer = null;
 }
 
 async function startEventRoomSync(
 	eventId: string,
-	store: EventRoomStore,
+	entry: EventRoomEntry,
 ): Promise<void> {
-	await stopEventRoomSync();
+	await stopEventRoomSync(entry);
 
 	try {
 		const ws = new ReconnectingWebSocket(eventSyncUrl(eventId), [], {
 			maxRetries: Infinity,
 		});
-		const synchronizer = await createWsSynchronizer(store, ws);
+		const synchronizer = await createWsSynchronizer(entry.store, ws);
 
 		await synchronizer.startSync();
-		eventRoomSynchronizer = synchronizer;
+		entry.synchronizer = synchronizer;
 	} catch (error) {
-		eventRoomSynchronizer = null;
+		entry.synchronizer = null;
 		console.error("Failed to start event room sync", error);
 	}
 }
 
-function ensureEventRoomSync(eventId: string, store: EventRoomStore): void {
-	if (eventRoomId !== eventId) {
-		return;
-	}
+function ensureEventRoomSync(eventId: string): void {
+	const entry = eventRooms.get(eventId);
 
-	if (eventRoomSyncPromise) {
+	if (!entry || entry.syncPromise) {
 		return;
 	}
 
 	async function runSync() {
 		try {
-			await startEventRoomSync(eventId, store);
+			await startEventRoomSync(eventId, entry!);
 		} catch (error) {
 			console.error("Failed to initialize event room sync", error);
 		} finally {
-			if (eventRoomId === eventId) eventRoomSyncPromise = null;
+			if (entry) entry.syncPromise = null;
 		}
 	}
 
-	eventRoomSyncPromise = runSync();
+	entry.syncPromise = runSync();
 }
 
 export function openEventStore(eventId: string): EventRoomStore {
-	if (eventRoomStore && eventRoomId === eventId) {
-		return eventRoomStore;
+	const existing = eventRooms.get(eventId);
+
+	if (existing) {
+		return existing.store;
 	}
 
-	if (eventRoomStore) {
-		stopEventRoomSync();
-	}
-
-	eventRoomId = eventId;
-	eventRoomStore = createMergeableStore(`sync-${eventId}`);
+	const store = createMergeableStore(`sync-${eventId}`);
 
 	// Keep the local mergeable state on-device so CRDT metadata survives reloads
 	// before the websocket synchronizer reconnects to the shared event room.
 	const persister = createLocalPersister(
-		eventRoomStore,
+		store,
 		`timesweeper-events-main-${eventId}`,
 	);
 
@@ -326,9 +324,16 @@ export function openEventStore(eventId: string): EventRoomStore {
 		}
 	}
 
-	eventRoomPersisterPromise = initPersister();
+	const entry: EventRoomEntry = {
+		store,
+		synchronizer: null,
+		syncPromise: null,
+		persisterPromise: initPersister(),
+	};
 
-	return eventRoomStore;
+	eventRooms.set(eventId, entry);
+
+	return store;
 }
 
 export function useEventStore(eventId: string): {
@@ -339,14 +344,14 @@ export function useEventStore(eventId: string): {
 	const [status, setStatus] = createSignal<EventRoomStatus>("loading");
 
 	onMount(async () => {
-		await eventRoomPersisterPromise;
+		await eventRooms.get(eventId)!.persisterPromise;
 
 		const hasData =
 			store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL) !==
 			undefined;
 
 		if (hasData) {
-			ensureEventRoomSync(eventId, store);
+			ensureEventRoomSync(eventId);
 			setStatus("ready");
 			return;
 		}
@@ -360,7 +365,7 @@ export function useEventStore(eventId: string): {
 			}
 
 			createEvent(json);
-			ensureEventRoomSync(eventId, store);
+			ensureEventRoomSync(eventId);
 			setStatus("ready");
 		} catch {
 			setStatus("network-error");
@@ -372,23 +377,18 @@ export function useEventStore(eventId: string): {
 	return { store, status };
 }
 
-export async function closeEventStore(eventId?: string): Promise<void> {
-	if (eventId && eventRoomId !== eventId) {
+export async function closeEventStore(eventId: string): Promise<void> {
+	const entry = eventRooms.get(eventId);
+
+	if (!entry) {
 		return;
 	}
 
-	await stopEventRoomSync();
-
-	eventRoomId = null;
-	eventRoomStore = null;
+	await stopEventRoomSync(entry);
 }
 
 function requireWritableEventStore(eventId: string): EventRoomStore {
-	if (!eventRoomStore || eventRoomId !== eventId) {
-		return openEventStore(eventId);
-	}
-
-	return eventRoomStore;
+	return openEventStore(eventId);
 }
 
 export async function getEventJson(eventId: string): Promise<AppEvent | null> {
