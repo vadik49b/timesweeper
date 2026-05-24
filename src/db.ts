@@ -1,4 +1,4 @@
-import { createMemo } from 'solid-js'
+import { createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Accessor } from 'solid-js'
 import { createStore } from 'tinybase'
 import { createMergeableStore } from 'tinybase/mergeable-store'
@@ -27,45 +27,45 @@ export const DISPLAY_TIMEZONE_VALUE = 'displayTimezone'
 
 const MAX_RECENT_EVENTS = 5
 
-const localStore = createStore()
-const localPersister = createLocalPersister(localStore, 'timesweeper-local')
+export const deviceStore = createStore()
+const devicePersister = createLocalPersister(deviceStore, 'timesweeper-local')
 
-localPersister
-  .load()
-  .then(() => localPersister.startAutoSave())
-  .catch((error) => {
-    console.error('Failed to load local store', error)
-  })
-
-export function getLocalStore() {
-  return localStore
+async function initDeviceStore() {
+  try {
+    await devicePersister.load()
+    await devicePersister.startAutoSave()
+  } catch (error) {
+    console.error('Failed to initialize device store', error)
+  }
 }
 
+initDeviceStore()
+
 export function setSelectedParticipant(eventId: string, name: string): void {
-  localStore.setCell(SELECTED_PARTICIPANTS_TABLE, eventId, 'name', name)
+  deviceStore.setCell(SELECTED_PARTICIPANTS_TABLE, eventId, 'name', name)
 }
 
 export function clearSelectedParticipant(eventId: string): void {
-  localStore.delRow(SELECTED_PARTICIPANTS_TABLE, eventId)
+  deviceStore.delRow(SELECTED_PARTICIPANTS_TABLE, eventId)
 }
 
 export function setDisplayTimezone(timezone: string): void {
-  localStore.setValue(DISPLAY_TIMEZONE_VALUE, timezone)
+  deviceStore.setValue(DISPLAY_TIMEZONE_VALUE, timezone)
 }
 
 export function pushRecentEvent(summary: RecentEventSummary): void {
-  localStore.setRow(RECENT_EVENTS_TABLE, summary.id, {
+  deviceStore.setRow(RECENT_EVENTS_TABLE, summary.id, {
     name: summary.name,
     created: summary.created,
   })
 
-  const table = localStore.getTable(RECENT_EVENTS_TABLE)
+  const table = deviceStore.getTable(RECENT_EVENTS_TABLE)
   const sorted = Object.keys(table).sort(
     (a, b) => (table[b]!.created as number) - (table[a]!.created as number),
   )
 
   sorted.slice(MAX_RECENT_EVENTS).forEach((id) => {
-    localStore.delRow(RECENT_EVENTS_TABLE, id)
+    deviceStore.delRow(RECENT_EVENTS_TABLE, id)
   })
 }
 
@@ -95,7 +95,7 @@ export function useSelectedParticipant(
     SELECTED_PARTICIPANTS_TABLE,
     eventId,
     'name',
-    localStore,
+    deviceStore,
   ) as () => string | undefined
   const currentName = createMemo(() => {
     const stored = storedName()
@@ -110,7 +110,8 @@ export function useSelectedParticipant(
 
 // ─── Event room store (synced via WebSocket) ─────────────────────────────────
 
-type EventRoomStore = ReturnType<typeof createMergeableStore>
+export type EventRoomStore = ReturnType<typeof createMergeableStore>
+export type EventRoomStatus = 'loading' | 'ready' | 'not-found' | 'network-error'
 
 export interface RecentEventSummary {
   id: string
@@ -122,6 +123,7 @@ let eventRoomId: string | null = null
 let eventRoomStore: EventRoomStore | null = null
 let eventRoomSynchronizer: WsSynchronizer<ReconnectingWebSocket> | null = null
 let eventRoomSyncPromise: Promise<void> | null = null
+let eventRoomPersisterPromise: Promise<void> | null = null
 
 function getApiOrigin(): string {
   const origin = import.meta.env.VITE_API_ORIGIN
@@ -253,27 +255,26 @@ function ensureEventRoomSync(eventId: string, store: EventRoomStore): void {
     return
   }
 
-  eventRoomSyncPromise = startEventRoomSync(eventId, store)
-    .catch((error) => {
+  async function runSync() {
+    try {
+      await startEventRoomSync(eventId, store)
+    } catch (error) {
       console.error('Failed to initialize event room sync', error)
-    })
-    .finally(() => {
-      if (eventRoomId === eventId) {
-        eventRoomSyncPromise = null
-      }
-    })
+    } finally {
+      if (eventRoomId === eventId) eventRoomSyncPromise = null
+    }
+  }
+
+  eventRoomSyncPromise = runSync()
 }
 
 export function openEventStore(eventId: string): EventRoomStore {
   if (eventRoomStore && eventRoomId === eventId) {
-    ensureEventRoomSync(eventId, eventRoomStore)
     return eventRoomStore
   }
 
   if (eventRoomStore) {
-    stopEventRoomSync().catch((error) => {
-      console.error('Failed to stop previous event room sync', error)
-    })
+    stopEventRoomSync()
   }
 
   eventRoomId = eventId
@@ -283,16 +284,57 @@ export function openEventStore(eventId: string): EventRoomStore {
   // before the websocket synchronizer reconnects to the shared event room.
   const persister = createLocalPersister(eventRoomStore, `timesweeper-events-main-${eventId}`)
 
-  persister
-    .load()
-    .then(() => persister.startAutoSave())
-    .catch((error) => {
-      console.error('Failed to load event room persister', error)
-    })
+  async function initPersister() {
+    try {
+      await persister.load()
+      await persister.startAutoSave()
+    } catch (error) {
+      console.error('Failed to initialize event room persister', error)
+    }
+  }
 
-  ensureEventRoomSync(eventId, eventRoomStore)
+  eventRoomPersisterPromise = initPersister()
 
   return eventRoomStore
+}
+
+export function useEventStore(eventId: string): {
+  store: EventRoomStore
+  status: () => EventRoomStatus
+} {
+  const store = openEventStore(eventId)
+  const [status, setStatus] = createSignal<EventRoomStatus>('loading')
+
+  onMount(async () => {
+    await eventRoomPersisterPromise
+
+    const hasData = store.getCell(EVENT_META_TABLE, eventId, EVENT_META_NAME_CELL) !== undefined
+
+    if (hasData) {
+      ensureEventRoomSync(eventId, store)
+      setStatus('ready')
+      return
+    }
+
+    try {
+      const json = await getEventJson(eventId)
+
+      if (!json) {
+        setStatus('not-found')
+        return
+      }
+
+      createEvent(json)
+      ensureEventRoomSync(eventId, store)
+      setStatus('ready')
+    } catch {
+      setStatus('network-error')
+    }
+  })
+
+  onCleanup(() => closeEventStore(eventId))
+
+  return { store, status }
 }
 
 export async function closeEventStore(eventId?: string): Promise<void> {

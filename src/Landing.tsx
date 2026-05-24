@@ -20,7 +20,7 @@ import {
 } from './event-helpers'
 import {
   createEvent,
-  getLocalStore,
+  deviceStore,
   pushRecentEvent,
   RECENT_EVENTS_TABLE,
   setSelectedParticipant,
@@ -65,7 +65,7 @@ export default function Landing(props: Props) {
   const [validationError, setValidationError] = createSignal('')
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  const recentEventsTable = useTable(RECENT_EVENTS_TABLE, getLocalStore())
+  const recentEventsTable = useTable(RECENT_EVENTS_TABLE, deviceStore)
   const recentEvents = createMemo<RecentEventSummary[]>(() => {
     const table = recentEventsTable()
 

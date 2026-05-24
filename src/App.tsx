@@ -1,10 +1,8 @@
-import { createSignal, onCleanup, Show, Suspense, lazy, onMount } from 'solid-js'
+import { createSignal, Show, Suspense, lazy, onMount } from 'solid-js'
 import { makeEventListener } from '@solid-primitives/event-listener'
-import { Provider } from 'tinybase/ui-solid'
-import { closeEventStore, openEventStore } from './db'
 
 const Landing = lazy(() => import('./Landing'))
-const Grid = lazy(() => import('./Grid'))
+const Grid = lazy(() => import('./GridContainer'))
 
 function parseEventIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/e\/([^/]+)$/)
@@ -38,16 +36,7 @@ export default function App() {
   return (
     <Suspense fallback={null}>
       <Show when={eventId()} keyed fallback={<Landing onOpenEvent={navigateToEvent} />}>
-        {(id) => {
-          const store = openEventStore(id)
-          onCleanup(() => closeEventStore(id))
-
-          return (
-            <Provider store={store}>
-              <Grid eventId={id} />
-            </Provider>
-          )
-        }}
+        {(id) => <Grid eventId={id} />}
       </Show>
     </Suspense>
   )

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onMount, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { useCell, useRow, useStore, useValue } from 'tinybase/ui-solid'
 import {
@@ -11,16 +11,15 @@ import {
 import './styles/grid.css'
 import {
   clearSelectedParticipant,
-  createEvent,
   DISPLAY_TIMEZONE_VALUE,
-  getEventJson,
-  getLocalStore,
+  deviceStore,
   pushRecentEvent,
   setDisplayTimezone,
   setSelectedParticipant,
   updateEventSettings,
   useParticipants,
   useSelectedParticipant,
+  type EventRoomStatus,
 } from './db'
 import Win95Field from './components/Win95Field'
 import Win95Button from './components/Win95Button'
@@ -47,6 +46,7 @@ import {
 
 interface Props {
   eventId: string
+  status: () => EventRoomStatus
 }
 
 const EMPTY_DISPLAY: DisplayModel = {
@@ -58,7 +58,7 @@ const EMPTY_DISPLAY: DisplayModel = {
 const EMPTY_SLOT_STARTS_UTC_ISO: string[] = []
 
 export default function Grid(props: Props) {
-  const localStore = getLocalStore()
+
   const eventName = useCell(EVENT_META_TABLE, props.eventId, EVENT_META_NAME_CELL) as () =>
     | string
     | undefined
@@ -88,8 +88,7 @@ export default function Grid(props: Props) {
       participants: participants(),
     }
   })
-  const [localReady, setLocalReady] = createSignal(false)
-  const storedTimezone = useValue(DISPLAY_TIMEZONE_VALUE, localStore) as () => string | undefined
+  const storedTimezone = useValue(DISPLAY_TIMEZONE_VALUE, deviceStore) as () => string | undefined
   const displayTimezone = createMemo(
     () => storedTimezone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
@@ -122,15 +121,15 @@ export default function Grid(props: Props) {
   const selectedSlots = useRow(AVAILABILITY_TABLE, () => currentName()) as () => SlotMap
 
   type ActiveModal = null | 'name-picker' | 'settings'
-  const [activeModal, setActiveModal] = createSignal<ActiveModal>('name-picker')
+  const [activeModal, setActiveModal] = createSignal<ActiveModal>(
+    storedParticipantName() ? null : 'name-picker',
+  )
   const [settingsEventName, setSettingsEventName] = createSignal('')
   const [settingsParticipantNames, setSettingsParticipantNames] = createSignal<string[]>([])
   const [settingsNewParticipantNames, setSettingsNewParticipantNames] = createSignal<string[]>([''])
   const [showAllSettingsParticipants, setShowAllSettingsParticipants] = createSignal(false)
   const [dialogError, setDialogError] = createSignal('')
   const [copyStatus, setCopyStatus] = createSignal('')
-  const [pageErrorTitle, setPageErrorTitle] = createSignal('')
-  const [pageErrorMessage, setPageErrorMessage] = createSignal('')
 
   let shareInputRef!: HTMLInputElement
   const pageUrl = `${window.location.origin}/e/${encodeURIComponent(props.eventId)}`
@@ -467,21 +466,9 @@ export default function Grid(props: Props) {
     pushRecentEvent({ id: props.eventId, name, created })
   })
 
-  // Set localReady and open/close name-picker once event meta is loaded
-  let didInit = false
-  createEffect(() => {
-    if (didInit) return
-    if (eventName() === undefined) return
-
-    didInit = true
-    setLocalReady(true)
-    if (storedParticipantName()) setActiveModal(null)
-    else setActiveModal('name-picker')
-  })
-
   // Clear stale selection if the participant is removed and reopen name-picker
   createEffect(() => {
-    if (!localReady()) return
+    if (props.status() !== 'ready') return
     if (participants().length === 0) return
 
     const stored = storedParticipantName() as string | undefined
@@ -490,37 +477,6 @@ export default function Grid(props: Props) {
       clearSelectedParticipant(props.eventId)
       setActiveModal('name-picker')
     }
-  })
-
-  // HTTP fallback if local store stays empty
-  onMount(() => {
-    getEventJson(props.eventId)
-      .then((json) => {
-        if (json && eventName() === undefined) {
-          createEvent(json)
-
-          return
-        }
-
-        if (!json && eventName() === undefined) {
-          setActiveModal(null)
-          setPageErrorTitle('Event Not Found')
-          setPageErrorMessage(
-            'We could not find that schedule. The link may be incomplete, or the event may no longer exist.',
-          )
-          setLocalReady(true)
-        }
-      })
-      .catch(() => {
-        if (eventName() !== undefined) {
-          return
-        }
-
-        setActiveModal(null)
-        setPageErrorTitle('Could Not Open Schedule')
-        setPageErrorMessage('Check your connection and try opening the link again.')
-        setLocalReady(true)
-      })
   })
 
   const canCloseNamePicker = createMemo(() => {
@@ -534,9 +490,9 @@ export default function Grid(props: Props) {
   return (
     <>
       <div class="grid-view">
-        <Show when={localReady() && !pageErrorMessage()} fallback={null}>
+        <Show when={props.status() === 'ready'} fallback={null}>
           <div class="grid-view__shell">
-            <StatusBar class="grid-view__connection-bar" ready={localReady()} />
+            <StatusBar class="grid-view__connection-bar" ready={props.status() === 'ready'} />
             <div class="grid-view__hero row row--between row--center">
               <a href="/" class="grid-view__brand" aria-label="Go to TimeSweeper home">
                 <MineIcon size={18} /> TimeSweeper
@@ -758,14 +714,15 @@ export default function Grid(props: Props) {
             <ErrorDialog message={dialogError()} onClose={() => setDialogError('')} />
           </Show>
         </Show>
-        <Show when={!!pageErrorMessage()}>
+        <Show when={props.status() === 'not-found' || props.status() === 'network-error'}>
           <ErrorDialog
-            title={pageErrorTitle()}
-            message={pageErrorMessage()}
-            onClose={() => {
-              setPageErrorMessage('')
-              goToLanding()
-            }}
+            title={props.status() === 'not-found' ? 'Event Not Found' : 'Could Not Open Schedule'}
+            message={
+              props.status() === 'not-found'
+                ? 'We could not find that schedule. The link may be incomplete, or the event may no longer exist.'
+                : 'Check your connection and try opening the link again.'
+            }
+            onClose={goToLanding}
           />
         </Show>
       </div>
