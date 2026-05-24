@@ -217,7 +217,7 @@ export default function Landing(props: Props) {
         },
       ],
     }
-    await createEvent(createdEvent)
+    createEvent(createdEvent)
     setSelectedParticipant(createdEvent.id, organizer)
     pushRecentEvent({ id: createdEvent.id, name: createdEvent.name, created: createdEvent.created })
     props.onOpenEvent(createdEvent.id)

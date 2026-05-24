@@ -328,7 +328,7 @@ export async function getEventJson(eventId: string): Promise<AppEvent | null> {
   return (await response.json()) as AppEvent
 }
 
-export async function createEvent(event: AppEvent): Promise<void> {
+export function createEvent(event: AppEvent): void {
   const store = requireWritableEventStore(event.id)
 
   store.transaction(() => {

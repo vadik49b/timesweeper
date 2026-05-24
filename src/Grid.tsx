@@ -497,9 +497,7 @@ export default function Grid(props: Props) {
     getEventJson(props.eventId)
       .then((json) => {
         if (json && eventName() === undefined) {
-          createEvent(json).catch((error) => {
-            console.error('Failed to hydrate event from server', error)
-          })
+          createEvent(json)
 
           return
         }
