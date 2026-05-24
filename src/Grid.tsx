@@ -517,8 +517,7 @@ export default function Grid(props: Props) {
 	});
 
 	return (
-		<>
-			<div class="grid-view">
+		<div class="grid-view">
 				<Show when={props.status() === "ready"} fallback={null}>
 					<div class="grid-view__shell">
 						<StatusBar
@@ -569,19 +568,16 @@ export default function Grid(props: Props) {
 										</div>
 										<p class="grid-view__intro-text">
 											Hi{" "}
-											<a
-												href="#"
+											<button
+												type="button"
 												class="grid-controls__name-link"
-												onClick={(event) => {
-													event.preventDefault();
-													setActiveModal("name-picker");
-												}}
+												onClick={() => setActiveModal("name-picker")}
 												aria-label="Switch name"
 											>
 												<span class="grid-controls__name">
 													{currentName() || "there"}
 												</span>
-											</a>
+											</button>
 											! {introContext()} Share this page with anyone who needs
 											to respond. Fill your availability. The app will show the
 											strongest overlaps.
@@ -787,7 +783,6 @@ export default function Grid(props: Props) {
 						onClose={goToLanding}
 					/>
 				</Show>
-			</div>
-		</>
+		</div>
 	);
 }
