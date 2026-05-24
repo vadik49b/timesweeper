@@ -1,24 +1,24 @@
 /* @refresh reload */
-import { render } from 'solid-js/web'
-import { makeEventListener } from '@solid-primitives/event-listener'
-import './styles/base.css'
-import App from './App.tsx'
+import { render } from "solid-js/web";
+import { makeEventListener } from "@solid-primitives/event-listener";
+import "./styles/base.css";
+import App from "./App.tsx";
 
-const root = document.getElementById('root')
+const root = document.getElementById("root");
 
-render(() => <App />, root!)
+render(() => <App />, root!);
 
-if ('serviceWorker' in navigator) {
-  if (import.meta.env.PROD) {
-    makeEventListener(window, 'load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {
-        // Keep app working without SW in unsupported/restricted environments.
-      })
-    })
-  } else {
-    // Prevent SW from hijacking Vite HMR during local development.
-    void navigator.serviceWorker
-      .getRegistrations()
-      .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
-  }
+if ("serviceWorker" in navigator) {
+	if (import.meta.env.PROD) {
+		makeEventListener(window, "load", () => {
+			navigator.serviceWorker.register("/sw.js").catch(() => {
+				// Keep app working without SW in unsupported/restricted environments.
+			});
+		});
+	} else {
+		// Prevent SW from hijacking Vite HMR during local development.
+		void navigator.serviceWorker
+			.getRegistrations()
+			.then((regs) => Promise.all(regs.map((reg) => reg.unregister())));
+	}
 }

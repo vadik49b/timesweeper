@@ -1,415 +1,458 @@
 import {
-  getDate,
-  getHours,
-  getMinutes,
-  getMonth,
-  getYear,
-  intlFormat,
-  isValid,
-  lightFormat,
-  parse,
-  parseISO,
-} from 'date-fns'
+	getDate,
+	getHours,
+	getMinutes,
+	getMonth,
+	getYear,
+	intlFormat,
+	isValid,
+	lightFormat,
+	parse,
+	parseISO,
+} from "date-fns";
 
-export const SLOT_DURATION = 30
+export const SLOT_DURATION = 30;
 
-export type SlotValue = 0 | 1 | 2
+export type SlotValue = 0 | 1 | 2;
 
 export interface SlotGenerationInput {
-  dates: string[]
-  slotMinutes: number
-  windowStartMin: number
-  windowEndMin: number
-  timezone: string
+	dates: string[];
+	slotMinutes: number;
+	windowStartMin: number;
+	windowEndMin: number;
+	timezone: string;
 }
 
 export interface ParticipantSummaryGroups {
-  yes: string[]
-  maybe: string[]
-  no: string[]
+	yes: string[];
+	maybe: string[];
+	no: string[];
 }
 
 export interface ParticipantStatusRow {
-  value: SlotValue
-  names: string[]
-  label: 'yes' | 'maybe' | 'no'
+	value: SlotValue;
+	names: string[];
+	label: "yes" | "maybe" | "no";
 }
 
-export type SlotMap = Record<string, SlotValue>
+export type SlotMap = Record<string, SlotValue>;
 
 export interface Participant {
-  name: string
-  slots: SlotMap
+	name: string;
+	slots: SlotMap;
 }
 
 export interface DisplayDay {
-  key: string
-  label: string
-  weekdayLabel: string
-  dayNumberLabel: string
-  monthLabel: string
-  showMonthLabel: boolean
+	key: string;
+	label: string;
+	weekdayLabel: string;
+	dayNumberLabel: string;
+	monthLabel: string;
+	showMonthLabel: boolean;
 }
 
 export interface DisplayTime {
-  key: string
-  label: string
-  minutes: number
-  gapBefore: boolean
+	key: string;
+	label: string;
+	minutes: number;
+	gapBefore: boolean;
 }
 
 export interface DisplaySlot {
-  slotIndex: number
-  startUtcIso: string
-  dayKey: string
-  dayLabel: string
-  timeKey: string
-  timeLabel: string
-  endDayKey: string
-  endDayLabel: string
-  endTimeKey: string
-  endTimeLabel: string
+	slotIndex: number;
+	startUtcIso: string;
+	dayKey: string;
+	dayLabel: string;
+	timeKey: string;
+	timeLabel: string;
+	endDayKey: string;
+	endDayLabel: string;
+	endTimeKey: string;
+	endTimeLabel: string;
 }
 
 export interface DisplayModel {
-  slots: DisplaySlot[]
-  days: DisplayDay[]
-  times: DisplayTime[]
-  slotByDayTime: Record<string, DisplaySlot | undefined>
+	slots: DisplaySlot[];
+	days: DisplayDay[];
+	times: DisplayTime[];
+	slotByDayTime: Record<string, DisplaySlot | undefined>;
 }
 
 export interface AppEvent {
-  id: string
-  name: string
-  created: number
-  slotStartsUtcIso: string[]
-  participants: Participant[]
+	id: string;
+	name: string;
+	created: number;
+	slotStartsUtcIso: string[];
+	participants: Participant[];
 }
 
 function getFormattedDateTimeParts(
-  date: Date,
-  timeZone: string,
-): Pick<DisplaySlot, 'dayKey' | 'dayLabel' | 'timeKey' | 'timeLabel'> & {
-  minutes: number
-  weekdayLabel: string
-  dayNumberLabel: string
-  monthLabel: string
+	date: Date,
+	timeZone: string,
+): Pick<DisplaySlot, "dayKey" | "dayLabel" | "timeKey" | "timeLabel"> & {
+	minutes: number;
+	weekdayLabel: string;
+	dayNumberLabel: string;
+	monthLabel: string;
 } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  const hour = Number(values.hour ?? '0')
-  const minute = Number(values.minute ?? '0')
-  const weekdayLabel = intlFormat(date, { weekday: 'short', timeZone })
-  const dayNumberLabel = intlFormat(date, { day: 'numeric', timeZone })
-  const monthLabel = intlFormat(date, { month: 'short', timeZone })
+	const parts = new Intl.DateTimeFormat("en-CA", {
+		timeZone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		hourCycle: "h23",
+	}).formatToParts(date);
+	const values = Object.fromEntries(
+		parts.map((part) => [part.type, part.value]),
+	);
+	const hour = Number(values.hour ?? "0");
+	const minute = Number(values.minute ?? "0");
+	const weekdayLabel = intlFormat(date, { weekday: "short", timeZone });
+	const dayNumberLabel = intlFormat(date, { day: "numeric", timeZone });
+	const monthLabel = intlFormat(date, { month: "short", timeZone });
 
-  return {
-    dayKey: `${values.year}-${values.month}-${values.day}`,
-    dayLabel: `${weekdayLabel}, ${monthLabel} ${dayNumberLabel}`,
-    timeKey: `${values.hour}:${values.minute}`,
-    timeLabel: intlFormat(date, { hour: 'numeric', minute: '2-digit', timeZone }),
-    minutes: hour * 60 + minute,
-    weekdayLabel,
-    dayNumberLabel,
-    monthLabel,
-  }
+	return {
+		dayKey: `${values.year}-${values.month}-${values.day}`,
+		dayLabel: `${weekdayLabel}, ${monthLabel} ${dayNumberLabel}`,
+		timeKey: `${values.hour}:${values.minute}`,
+		timeLabel: intlFormat(date, {
+			hour: "numeric",
+			minute: "2-digit",
+			timeZone,
+		}),
+		minutes: hour * 60 + minute,
+		weekdayLabel,
+		dayNumberLabel,
+		monthLabel,
+	};
 }
 
 type ZonedDateTimeParts = {
-  year: number
-  month: number
-  day: number
-  hour: number
-  minute: number
-  second: number
-}
+	year: number;
+	month: number;
+	day: number;
+	hour: number;
+	minute: number;
+	second: number;
+};
 
-const zonedDateTimeFormatters = new Map<string, Intl.DateTimeFormat>()
+const zonedDateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function getZonedDateTimeFormatter(timeZone: string): Intl.DateTimeFormat {
-  const existing = zonedDateTimeFormatters.get(timeZone)
+	const existing = zonedDateTimeFormatters.get(timeZone);
 
-  if (existing) {
-    return existing
-  }
+	if (existing) {
+		return existing;
+	}
 
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  })
+	const formatter = new Intl.DateTimeFormat("en-CA", {
+		timeZone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hourCycle: "h23",
+	});
 
-  zonedDateTimeFormatters.set(timeZone, formatter)
+	zonedDateTimeFormatters.set(timeZone, formatter);
 
-  return formatter
+	return formatter;
 }
 
-function parseDateKey(dateKey: string): { year: number; month: number; day: number } | null {
-  const parsed = parse(dateKey, 'yyyy-MM-dd', new Date())
+function parseDateKey(
+	dateKey: string,
+): { year: number; month: number; day: number } | null {
+	const parsed = parse(dateKey, "yyyy-MM-dd", new Date());
 
-  if (!isValid(parsed) || lightFormat(parsed, 'yyyy-MM-dd') !== dateKey) {
-    return null
-  }
+	if (!isValid(parsed) || lightFormat(parsed, "yyyy-MM-dd") !== dateKey) {
+		return null;
+	}
 
-  return {
-    year: getYear(parsed),
-    month: getMonth(parsed) + 1,
-    day: getDate(parsed),
-  }
+	return {
+		year: getYear(parsed),
+		month: getMonth(parsed) + 1,
+		day: getDate(parsed),
+	};
 }
 
 function toUtcCivilMs(parts: ZonedDateTimeParts): number {
-  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second, 0)
+	return Date.UTC(
+		parts.year,
+		parts.month - 1,
+		parts.day,
+		parts.hour,
+		parts.minute,
+		parts.second,
+		0,
+	);
 }
 
-function getZonedDateTimeParts(utcMs: number, timeZone: string): ZonedDateTimeParts {
-  const formatter = getZonedDateTimeFormatter(timeZone)
-  const parts = formatter.formatToParts(new Date(utcMs))
-  const values = parts.reduce<Partial<ZonedDateTimeParts>>((acc, part) => {
-    if (
-      part.type === 'year' ||
-      part.type === 'month' ||
-      part.type === 'day' ||
-      part.type === 'hour' ||
-      part.type === 'minute' ||
-      part.type === 'second'
-    ) {
-      acc[part.type] = Number(part.value)
-    }
+function getZonedDateTimeParts(
+	utcMs: number,
+	timeZone: string,
+): ZonedDateTimeParts {
+	const formatter = getZonedDateTimeFormatter(timeZone);
+	const parts = formatter.formatToParts(new Date(utcMs));
+	const values = parts.reduce<Partial<ZonedDateTimeParts>>((acc, part) => {
+		if (
+			part.type === "year" ||
+			part.type === "month" ||
+			part.type === "day" ||
+			part.type === "hour" ||
+			part.type === "minute" ||
+			part.type === "second"
+		) {
+			acc[part.type] = Number(part.value);
+		}
 
-    return acc
-  }, {})
+		return acc;
+	}, {});
 
-  return {
-    year: values.year ?? 0,
-    month: values.month ?? 1,
-    day: values.day ?? 1,
-    hour: values.hour ?? 0,
-    minute: values.minute ?? 0,
-    second: values.second ?? 0,
-  }
+	return {
+		year: values.year ?? 0,
+		month: values.month ?? 1,
+		day: values.day ?? 1,
+		hour: values.hour ?? 0,
+		minute: values.minute ?? 0,
+		second: values.second ?? 0,
+	};
 }
 
-function zonedDateTimeToUtcMs(dateKey: string, minutes: number, timeZone: string): number | null {
-  const parsed = parseDateKey(dateKey)
+function zonedDateTimeToUtcMs(
+	dateKey: string,
+	minutes: number,
+	timeZone: string,
+): number | null {
+	const parsed = parseDateKey(dateKey);
 
-  if (!parsed) {
-    return null
-  }
+	if (!parsed) {
+		return null;
+	}
 
-  const desired: ZonedDateTimeParts = {
-    year: parsed.year,
-    month: parsed.month,
-    day: parsed.day,
-    hour: Math.floor(minutes / 60),
-    minute: minutes % 60,
-    second: 0,
-  }
+	const desired: ZonedDateTimeParts = {
+		year: parsed.year,
+		month: parsed.month,
+		day: parsed.day,
+		hour: Math.floor(minutes / 60),
+		minute: minutes % 60,
+		second: 0,
+	};
 
-  let utcMs = Date.UTC(
-    desired.year,
-    desired.month - 1,
-    desired.day,
-    desired.hour,
-    desired.minute,
-    desired.second,
-    0,
-  )
+	let utcMs = Date.UTC(
+		desired.year,
+		desired.month - 1,
+		desired.day,
+		desired.hour,
+		desired.minute,
+		desired.second,
+		0,
+	);
 
-  for (let i = 0; i < 4; i += 1) {
-    const actual = getZonedDateTimeParts(utcMs, timeZone)
-    const diffMs = toUtcCivilMs(desired) - toUtcCivilMs(actual)
+	for (let i = 0; i < 4; i += 1) {
+		const actual = getZonedDateTimeParts(utcMs, timeZone);
+		const diffMs = toUtcCivilMs(desired) - toUtcCivilMs(actual);
 
-    if (diffMs === 0) {
-      return utcMs
-    }
+		if (diffMs === 0) {
+			return utcMs;
+		}
 
-    utcMs += diffMs
-  }
+		utcMs += diffMs;
+	}
 
-  return utcMs
+	return utcMs;
 }
 
 export function parseTimeStringToMinutes(value: string): number | null {
-  const parsed = parse(value, 'HH:mm', new Date(2000, 0, 1))
+	const parsed = parse(value, "HH:mm", new Date(2000, 0, 1));
 
-  if (!isValid(parsed) || lightFormat(parsed, 'HH:mm') !== value) {
-    return null
-  }
+	if (!isValid(parsed) || lightFormat(parsed, "HH:mm") !== value) {
+		return null;
+	}
 
-  return getHours(parsed) * 60 + getMinutes(parsed)
+	return getHours(parsed) * 60 + getMinutes(parsed);
 }
 
 function getSlotsPerDay(
-  input: Pick<SlotGenerationInput, 'slotMinutes' | 'windowStartMin' | 'windowEndMin'>,
+	input: Pick<
+		SlotGenerationInput,
+		"slotMinutes" | "windowStartMin" | "windowEndMin"
+	>,
 ): number {
-  if (input.slotMinutes <= 0) {
-    return 0
-  }
+	if (input.slotMinutes <= 0) {
+		return 0;
+	}
 
-  const duration = input.windowEndMin - input.windowStartMin
+	const duration = input.windowEndMin - input.windowStartMin;
 
-  if (duration <= 0 || duration % input.slotMinutes !== 0) {
-    return 0
-  }
+	if (duration <= 0 || duration % input.slotMinutes !== 0) {
+		return 0;
+	}
 
-  return duration / input.slotMinutes
+	return duration / input.slotMinutes;
 }
 
 export function buildSlotStartsUtcIso(input: SlotGenerationInput): string[] {
-  const slotsPerDay = getSlotsPerDay(input)
+	const slotsPerDay = getSlotsPerDay(input);
 
-  return input.dates.flatMap((dateKey) =>
-    Array.from({ length: slotsPerDay }, (_, offset) => {
-      const minute = input.windowStartMin + offset * input.slotMinutes
-      const startUtcMs = zonedDateTimeToUtcMs(dateKey, minute, input.timezone)
+	return input.dates.flatMap((dateKey) =>
+		Array.from({ length: slotsPerDay }, (_, offset) => {
+			const minute = input.windowStartMin + offset * input.slotMinutes;
+			const startUtcMs = zonedDateTimeToUtcMs(dateKey, minute, input.timezone);
 
-      return startUtcMs === null ? null : new Date(startUtcMs).toISOString()
-    }).filter((slotStartUtcIso): slotStartUtcIso is string => slotStartUtcIso !== null),
-  )
+			return startUtcMs === null ? null : new Date(startUtcMs).toISOString();
+		}).filter(
+			(slotStartUtcIso): slotStartUtcIso is string => slotStartUtcIso !== null,
+		),
+	);
 }
 
 export function getParticipantSlotValue(
-  participant: Pick<Participant, 'slots'> | null | undefined,
-  slotStartUtcIso: string,
+	participant: Pick<Participant, "slots"> | null | undefined,
+	slotStartUtcIso: string,
 ): SlotValue {
-  return (participant?.slots[slotStartUtcIso] ?? 0) as SlotValue
+	return (participant?.slots[slotStartUtcIso] ?? 0) as SlotValue;
 }
 
-export function hasParticipantAvailability(participant: Pick<Participant, 'slots'>): boolean {
-  return Object.keys(participant.slots).length > 0
+export function hasParticipantAvailability(
+	participant: Pick<Participant, "slots">,
+): boolean {
+	return Object.keys(participant.slots).length > 0;
 }
 
 export function getNameKey(name: string): string {
-  return name.trim().toLowerCase()
+	return name.trim().toLowerCase();
 }
 
-export function findDuplicateName(names: string[], reservedNames: string[] = []): string | null {
-  const seen = new Set(reservedNames.map(getNameKey))
+export function findDuplicateName(
+	names: string[],
+	reservedNames: string[] = [],
+): string | null {
+	const seen = new Set(reservedNames.map(getNameKey));
 
-  for (const name of names) {
-    const trimmed = name.trim()
+	for (const name of names) {
+		const trimmed = name.trim();
 
-    if (!trimmed) {
-      continue
-    }
+		if (!trimmed) {
+			continue;
+		}
 
-    if (seen.has(getNameKey(trimmed))) {
-      return trimmed
-    }
+		if (seen.has(getNameKey(trimmed))) {
+			return trimmed;
+		}
 
-    seen.add(getNameKey(trimmed))
-  }
+		seen.add(getNameKey(trimmed));
+	}
 
-  return null
+	return null;
 }
 
-export function formatParticipantDisplayName(name: string, currentName: string): string {
-  return name === currentName ? `${name} (you)` : name
+export function formatParticipantDisplayName(
+	name: string,
+	currentName: string,
+): string {
+	return name === currentName ? `${name} (you)` : name;
 }
 
-export function buildDisplayModel(slotStartsUtcIso: string[], timeZone?: string): DisplayModel {
-  const displayTimeZone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
-  const { slots, dayMap, timeMap, slotByDayTime } = slotStartsUtcIso.reduce(
-    (acc, slotStartUtcIso, slotIndex) => {
-      const date = parseISO(slotStartUtcIso)
-      const {
-        dayKey,
-        dayLabel,
-        timeKey,
-        timeLabel,
-        minutes,
-        weekdayLabel,
-        dayNumberLabel,
-        monthLabel,
-      } = getFormattedDateTimeParts(date, displayTimeZone)
-      const slotEndDate = new Date(date.getTime() + SLOT_DURATION * 60 * 1000)
-      const {
-        dayKey: endDayKey,
-        dayLabel: endDayLabel,
-        timeKey: endTimeKey,
-        timeLabel: endTimeLabel,
-      } = getFormattedDateTimeParts(slotEndDate, displayTimeZone)
-      const slot = {
-        slotIndex,
-        startUtcIso: slotStartUtcIso,
-        dayKey,
-        dayLabel,
-        timeKey,
-        timeLabel,
-        endDayKey,
-        endDayLabel,
-        endTimeKey,
-        endTimeLabel,
-      }
+export function buildDisplayModel(
+	slotStartsUtcIso: string[],
+	timeZone?: string,
+): DisplayModel {
+	const displayTimeZone =
+		timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const { slots, dayMap, timeMap, slotByDayTime } = slotStartsUtcIso.reduce(
+		(acc, slotStartUtcIso, slotIndex) => {
+			const date = parseISO(slotStartUtcIso);
+			const {
+				dayKey,
+				dayLabel,
+				timeKey,
+				timeLabel,
+				minutes,
+				weekdayLabel,
+				dayNumberLabel,
+				monthLabel,
+			} = getFormattedDateTimeParts(date, displayTimeZone);
+			const slotEndDate = new Date(date.getTime() + SLOT_DURATION * 60 * 1000);
+			const {
+				dayKey: endDayKey,
+				dayLabel: endDayLabel,
+				timeKey: endTimeKey,
+				timeLabel: endTimeLabel,
+			} = getFormattedDateTimeParts(slotEndDate, displayTimeZone);
+			const slot = {
+				slotIndex,
+				startUtcIso: slotStartUtcIso,
+				dayKey,
+				dayLabel,
+				timeKey,
+				timeLabel,
+				endDayKey,
+				endDayLabel,
+				endTimeKey,
+				endTimeLabel,
+			};
 
-      acc.slots.push(slot)
-      acc.dayMap.set(dayKey, {
-        key: dayKey,
-        label: dayLabel,
-        weekdayLabel,
-        dayNumberLabel,
-        monthLabel,
-      })
-      acc.timeMap.set(timeKey, {
-        key: timeKey,
-        label: timeLabel,
-        minutes,
-        gapBefore: false,
-      })
-      acc.slotByDayTime[`${dayKey}|${timeKey}`] = slot
+			acc.slots.push(slot);
+			acc.dayMap.set(dayKey, {
+				key: dayKey,
+				label: dayLabel,
+				weekdayLabel,
+				dayNumberLabel,
+				monthLabel,
+			});
+			acc.timeMap.set(timeKey, {
+				key: timeKey,
+				label: timeLabel,
+				minutes,
+				gapBefore: false,
+			});
+			acc.slotByDayTime[`${dayKey}|${timeKey}`] = slot;
 
-      return acc
-    },
-    {
-      slots: [] as DisplaySlot[],
-      dayMap: new Map<string, Omit<DisplayDay, 'showMonthLabel'>>(),
-      timeMap: new Map<string, DisplayTime>(),
-      slotByDayTime: {} as DisplayModel['slotByDayTime'],
-    },
-  )
+			return acc;
+		},
+		{
+			slots: [] as DisplaySlot[],
+			dayMap: new Map<string, Omit<DisplayDay, "showMonthLabel">>(),
+			timeMap: new Map<string, DisplayTime>(),
+			slotByDayTime: {} as DisplayModel["slotByDayTime"],
+		},
+	);
 
-  const days = [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key))
-  const times = [...timeMap.values()].sort((a, b) => {
-    if (a.minutes !== b.minutes) {
-      return a.minutes - b.minutes
-    }
+	const days = [...dayMap.values()].sort((a, b) => a.key.localeCompare(b.key));
+	const times = [...timeMap.values()].sort((a, b) => {
+		if (a.minutes !== b.minutes) {
+			return a.minutes - b.minutes;
+		}
 
-    return a.key.localeCompare(b.key)
-  })
+		return a.key.localeCompare(b.key);
+	});
 
-  return {
-    slots,
-    days: days.map((day, index) => ({
-      ...day,
-      showMonthLabel: index === 0 || day.monthLabel !== days[index - 1]!.monthLabel,
-    })),
-    times: times.map((time, index) => ({
-      ...time,
-      gapBefore: index > 0 && time.minutes - times[index - 1]!.minutes > SLOT_DURATION,
-    })),
-    slotByDayTime,
-  }
+	return {
+		slots,
+		days: days.map((day, index) => ({
+			...day,
+			showMonthLabel:
+				index === 0 || day.monthLabel !== days[index - 1]!.monthLabel,
+		})),
+		times: times.map((time, index) => ({
+			...time,
+			gapBefore:
+				index > 0 && time.minutes - times[index - 1]!.minutes > SLOT_DURATION,
+		})),
+		slotByDayTime,
+	};
 }
 
-export function participantStatusRows(groups: ParticipantSummaryGroups): ParticipantStatusRow[] {
-  return [
-    { value: 1 as SlotValue, names: groups.yes, label: 'yes' as const },
-    { value: 2 as SlotValue, names: groups.maybe, label: 'maybe' as const },
-    { value: 0 as SlotValue, names: groups.no, label: 'no' as const },
-  ].filter((group) => group.names.length > 0)
+export function participantStatusRows(
+	groups: ParticipantSummaryGroups,
+): ParticipantStatusRow[] {
+	return [
+		{ value: 1 as SlotValue, names: groups.yes, label: "yes" as const },
+		{ value: 2 as SlotValue, names: groups.maybe, label: "maybe" as const },
+		{ value: 0 as SlotValue, names: groups.no, label: "no" as const },
+	].filter((group) => group.names.length > 0);
 }
-

@@ -1,133 +1,150 @@
-import { For, Show } from 'solid-js'
+import { For, Show } from "solid-js";
 
 interface Option {
-  value: string
-  label: string
+	value: string;
+	label: string;
 }
 
 interface BaseProps {
-  id?: string
-  name?: string
-  wrapperClass?: string
-  frameClass?: string
-  controlClass?: string
-  size?: 'normal' | 'small'
+	id?: string;
+	name?: string;
+	wrapperClass?: string;
+	frameClass?: string;
+	controlClass?: string;
+	size?: "normal" | "small";
 }
 
 interface InputProps extends BaseProps {
-  kind: 'input'
-  type?: 'text' | 'url'
-  value?: string
-  placeholder?: string
-  readOnly?: boolean
-  autoFocus?: boolean
-  onInput?: (value: string) => void
-  onClick?: () => void
-  inputRef?: (el: HTMLInputElement) => void
+	kind: "input";
+	type?: "text" | "url";
+	value?: string;
+	placeholder?: string;
+	readOnly?: boolean;
+	autoFocus?: boolean;
+	onInput?: (value: string) => void;
+	onClick?: () => void;
+	inputRef?: (el: HTMLInputElement) => void;
 }
 
 interface SelectProps extends BaseProps {
-  kind: 'select'
-  value?: string
-  options: Option[]
-  onChange?: (value: string) => void
-  selectRef?: (el: HTMLSelectElement) => void
+	kind: "select";
+	value?: string;
+	options: Option[];
+	onChange?: (value: string) => void;
+	selectRef?: (el: HTMLSelectElement) => void;
 }
 
-type Props = InputProps | SelectProps
+type Props = InputProps | SelectProps;
 
 export default function Win95Field(props: Props) {
-  let selectEl: HTMLSelectElement | undefined
+	let selectEl: HTMLSelectElement | undefined;
 
-  function openSelectMenu() {
-    if (!selectEl) {
-      return
-    }
+	function openSelectMenu() {
+		if (!selectEl) {
+			return;
+		}
 
-    selectEl.focus()
-    const picker = selectEl as HTMLSelectElement & { showPicker?: () => void }
+		selectEl.focus();
+		const picker = selectEl as HTMLSelectElement & { showPicker?: () => void };
 
-    if (picker.showPicker) {
-      picker.showPicker()
-    } else {
-      selectEl.click()
-    }
-  }
+		if (picker.showPicker) {
+			picker.showPicker();
+		} else {
+			selectEl.click();
+		}
+	}
 
-  const wrapperClass = () =>
-    ['win95-field', `win95-field--${props.size ?? 'normal'}`, props.wrapperClass]
-      .filter(Boolean)
-      .join(' ')
-  const frameClass = () =>
-    [
-      'win95-field__frame',
-      props.kind === 'select' ? 'win95-field__frame--select' : 'win95-field__frame--input',
-      's',
-      props.frameClass,
-    ]
-      .filter(Boolean)
-      .join(' ')
+	const wrapperClass = () =>
+		[
+			"win95-field",
+			`win95-field--${props.size ?? "normal"}`,
+			props.wrapperClass,
+		]
+			.filter(Boolean)
+			.join(" ");
+	const frameClass = () =>
+		[
+			"win95-field__frame",
+			props.kind === "select"
+				? "win95-field__frame--select"
+				: "win95-field__frame--input",
+			"s",
+			props.frameClass,
+		]
+			.filter(Boolean)
+			.join(" ");
 
-  return (
-    <div class={wrapperClass()}>
-      <div class={frameClass()}>
-        <Show when={props.kind === 'input'}>
-          <div class="win95-field__input-wrap">
-            <input
-              ref={(el) => props.kind === 'input' && props.inputRef?.(el)}
-              class={['win95-field__control', props.controlClass].filter(Boolean).join(' ')}
-              id={props.id}
-              name={props.name}
-              type={props.kind === 'input' ? (props.type ?? 'text') : 'text'}
-              value={props.kind === 'input' ? (props.value ?? '') : ''}
-              placeholder={props.kind === 'input' ? props.placeholder : ''}
-              readOnly={props.kind === 'input' ? props.readOnly : false}
-              autofocus={props.kind === 'input' ? props.autoFocus : false}
-              onInput={(e) => props.kind === 'input' && props.onInput?.(e.currentTarget.value)}
-              onClick={() => props.kind === 'input' && props.onClick?.()}
-            />
-          </div>
-        </Show>
-        <Show when={props.kind === 'select'}>
-          <div class="win95-field__select-wrap">
-            <select
-              ref={(el) => {
-                if (props.kind !== 'select') {
-                  return
-                }
+	return (
+		<div class={wrapperClass()}>
+			<div class={frameClass()}>
+				<Show when={props.kind === "input"}>
+					<div class="win95-field__input-wrap">
+						<input
+							ref={(el) => props.kind === "input" && props.inputRef?.(el)}
+							class={["win95-field__control", props.controlClass]
+								.filter(Boolean)
+								.join(" ")}
+							id={props.id}
+							name={props.name}
+							type={props.kind === "input" ? (props.type ?? "text") : "text"}
+							value={props.kind === "input" ? (props.value ?? "") : ""}
+							placeholder={props.kind === "input" ? props.placeholder : ""}
+							readOnly={props.kind === "input" ? props.readOnly : false}
+							autofocus={props.kind === "input" ? props.autoFocus : false}
+							onInput={(e) =>
+								props.kind === "input" && props.onInput?.(e.currentTarget.value)
+							}
+							onClick={() => props.kind === "input" && props.onClick?.()}
+						/>
+					</div>
+				</Show>
+				<Show when={props.kind === "select"}>
+					<div class="win95-field__select-wrap">
+						<select
+							ref={(el) => {
+								if (props.kind !== "select") {
+									return;
+								}
 
-                selectEl = el
-                props.selectRef?.(el)
-              }}
-              class={['win95-field__control', props.controlClass].filter(Boolean).join(' ')}
-              id={props.id}
-              name={props.name}
-              value={props.kind === 'select' ? (props.value ?? '') : ''}
-              onChange={(e) => props.kind === 'select' && props.onChange?.(e.currentTarget.value)}
-            >
-              <For each={props.kind === 'select' ? props.options : []}>
-                {(option) => <option value={option.value}>{option.label}</option>}
-              </For>
-            </select>
-            <button
-              type="button"
-              class="win95-field__arrow r"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                openSelectMenu()
-              }}
-              onClick={(e) => {
-                e.preventDefault()
-                openSelectMenu()
-              }}
-              aria-hidden="true"
-              tabIndex={-1}
-            >
-              ▼
-            </button>
-          </div>
-        </Show>
-      </div>
-    </div>
-  )
+								selectEl = el;
+								props.selectRef?.(el);
+							}}
+							class={["win95-field__control", props.controlClass]
+								.filter(Boolean)
+								.join(" ")}
+							id={props.id}
+							name={props.name}
+							value={props.kind === "select" ? (props.value ?? "") : ""}
+							onChange={(e) =>
+								props.kind === "select" &&
+								props.onChange?.(e.currentTarget.value)
+							}
+						>
+							<For each={props.kind === "select" ? props.options : []}>
+								{(option) => (
+									<option value={option.value}>{option.label}</option>
+								)}
+							</For>
+						</select>
+						<button
+							type="button"
+							class="win95-field__arrow r"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								openSelectMenu();
+							}}
+							onClick={(e) => {
+								e.preventDefault();
+								openSelectMenu();
+							}}
+							aria-hidden="true"
+							tabIndex={-1}
+						>
+							▼
+						</button>
+					</div>
+				</Show>
+			</div>
+		</div>
+	);
 }

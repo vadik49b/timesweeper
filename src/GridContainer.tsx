@@ -1,17 +1,17 @@
-import { Provider } from 'tinybase/ui-solid'
-import { useEventStore } from './db'
-import Grid from './Grid'
+import { Provider } from "tinybase/ui-solid";
+import { useEventStore } from "./db";
+import Grid from "./Grid";
 
 interface Props {
-  eventId: string
+	eventId: string;
 }
 
 export default function GridContainer(props: Props) {
-  const { store, status } = useEventStore(props.eventId)
+	const { store, status } = useEventStore(props.eventId);
 
-  return (
-    <Provider store={store}>
-      <Grid eventId={props.eventId} status={status} />
-    </Provider>
-  )
+	return (
+		<Provider store={store}>
+			<Grid eventId={props.eventId} status={status} />
+		</Provider>
+	);
 }
