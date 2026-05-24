@@ -475,13 +475,14 @@ export default function Grid(props: Props) {
 
     didInit = true
     setLocalReady(true)
-    if (currentName()) setActiveModal(null)
+    if (storedParticipantName()) setActiveModal(null)
     else setActiveModal('name-picker')
   })
 
   // Clear stale selection if the participant is removed and reopen name-picker
   createEffect(() => {
     if (!localReady()) return
+    if (participants().length === 0) return
 
     const stored = storedParticipantName() as string | undefined
 
